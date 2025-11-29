@@ -1,0 +1,375 @@
+.verification-detail-page {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-2xl);
+}
+
+.detail-header {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+}
+
+.back-btn {
+    align-self: flex-start;
+}
+
+.detail-title-section {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-lg);
+    flex-wrap: wrap;
+}
+
+.detail-title {
+    font-size: 32px;
+    font-weight: 700;
+    color: var(--color-text-primary);
+    margin: 0;
+}
+
+.detail-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+    gap: var(--spacing-xl);
+}
+
+.card-header-icon {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    margin-bottom: var(--spacing-lg);
+    color: var(--color-accent-cyan);
+}
+
+.card-header-icon h3 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--color-text-primary);
+}
+
+/* Profile Card */
+.profile-card {
+    grid-column: span 1;
+}
+
+.profile-info {
+    display: flex;
+    gap: var(--spacing-lg);
+}
+
+.profile-avatar {
+    width: 80px;
+    height: 80px;
+    border-radius: var(--radius-full);
+    background: rgba(0, 242, 255, 0.1);
+    border: 2px solid var(--color-accent-cyan);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--color-accent-cyan);
+    flex-shrink: 0;
+}
+
+.profile-details {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+}
+
+.info-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-bottom: var(--spacing-sm);
+    border-bottom: 1px solid var(--color-border-secondary);
+}
+
+.info-row:last-child {
+    border-bottom: none;
+}
+
+.info-label {
+    font-size: 13px;
+    color: var(--color-text-tertiary);
+    font-weight: 500;
+}
+
+.info-value {
+    font-size: 14px;
+    color: var(--color-text-primary);
+    font-weight: 600;
+}
+
+/* Risk Score Card */
+.risk-card {
+    grid-column: span 1;
+}
+
+.risk-score-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--spacing-xl);
+}
+
+.risk-score-circle {
+    position: relative;
+    width: 200px;
+    height: 200px;
+}
+
+.risk-score-svg {
+    width: 100%;
+    height: 100%;
+}
+
+.risk-score-value {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 48px;
+    font-weight: 700;
+    color: var(--color-text-primary);
+}
+
+.risk-details {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+}
+
+.risk-level {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-sm);
+    font-size: 14px;
+    color: var(--color-text-secondary);
+    font-weight: 600;
+}
+
+.risk-metric {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--spacing-sm) var(--spacing-md);
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: var(--radius-md);
+    font-size: 14px;
+}
+
+.risk-metric span:first-child {
+    color: var(--color-text-secondary);
+}
+
+.risk-metric span:last-child {
+    color: var(--color-text-primary);
+    font-weight: 600;
+}
+
+/* Timeline Card */
+.timeline-card {
+    grid-column: span 1;
+}
+
+.timeline {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+}
+
+.timeline-item {
+    display: flex;
+    gap: var(--spacing-md);
+    position: relative;
+}
+
+.timeline-marker {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding-top: 4px;
+}
+
+.timeline-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--color-accent-cyan);
+    box-shadow: 0 0 0 4px rgba(0, 242, 255, 0.2);
+    z-index: 1;
+}
+
+.timeline-line {
+    width: 2px;
+    flex: 1;
+    background: rgba(0, 242, 255, 0.3);
+    margin-top: 4px;
+}
+
+.timeline-content {
+    flex: 1;
+    padding-bottom: var(--spacing-lg);
+}
+
+.timeline-event {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--color-text-primary);
+    margin-bottom: 4px;
+}
+
+.timeline-time {
+    font-size: 12px;
+    color: var(--color-text-tertiary);
+}
+
+/* Documents Card */
+.documents-card {
+    grid-column: span 1;
+}
+
+.document-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+}
+
+.document-item-mini {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+    padding: var(--spacing-md);
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid var(--color-border-secondary);
+    border-radius: var(--radius-md);
+    transition: all 0.2s;
+}
+
+.document-item-mini:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.document-mini-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.document-mini-type {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--color-text-primary);
+    text-transform: capitalize;
+}
+
+.document-mini-number {
+    font-size: 12px;
+    color: var(--color-text-tertiary);
+    font-family: 'Courier New', monospace;
+}
+
+.no-documents {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: var(--spacing-2xl);
+    color: var(--color-text-tertiary);
+    gap: var(--spacing-md);
+}
+
+/* Status Card */
+.status-card {
+    grid-column: span 1;
+}
+
+.status-details {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+}
+
+.detail-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--spacing-sm) 0;
+    border-bottom: 1px solid var(--color-border-secondary);
+}
+
+.detail-item:last-child {
+    border-bottom: none;
+}
+
+.detail-label {
+    font-size: 13px;
+    color: var(--color-text-tertiary);
+    font-weight: 500;
+}
+
+.detail-value {
+    font-size: 14px;
+    color: var(--color-text-primary);
+    font-weight: 600;
+    text-transform: capitalize;
+}
+
+.error-text {
+    color: var(--color-error);
+}
+
+/* Empty State */
+.empty-detail {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: var(--spacing-3xl);
+    gap: var(--spacing-lg);
+    color: var(--color-text-tertiary);
+}
+
+.empty-detail h2 {
+    margin: 0;
+    font-size: 20px;
+    color: var(--color-text-primary);
+}
+
+@media (max-width: 1024px) {
+    .detail-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .profile-card,
+    .risk-card,
+    .timeline-card,
+    .documents-card,
+    .status-card {
+        grid-column: span 1;
+    }
+}
+
+@media (max-width: 640px) {
+    .profile-info {
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+    }
+
+    .info-row {
+        flex-direction: column;
+        gap: 4px;
+        align-items: flex-start;
+    }
+
+    .detail-title {
+        font-size: 24px;
+    }
+}

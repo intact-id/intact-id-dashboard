@@ -1,0 +1,15 @@
+<svg width="290" height="250" viewBox="0 0 290 250" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <circle cx="145" cy="125" r="100" fill="url(#fingerprint-gradient)" opacity="0.3"/>
+  <defs>
+    <radialGradient id="fingerprint-gradient">
+      <stop offset="0%" stop-color="#1E88E5"/>
+      <stop offset="100%" stop-color="#0A2463"/>
+    </radialGradient>
+  </defs>
+  <!-- Fingerprint ridges -->
+  <ellipse cx="145" cy="125" rx="80" ry="85" fill="none" stroke="#1E88E5" stroke-width="2.5" opacity="0.8"/>
+  <ellipse cx="145" cy="125" rx="65" ry="70" fill="none" stroke="#3E92CC" stroke-width="2.5" opacity="0.7"/>
+  <ellipse cx="145" cy="125" rx="50" ry="55" fill="none" stroke="#1E88E5" stroke-width="2.5" opacity="0.6"/>
+  <ellipse cx="145" cy="125" rx="35" ry="40" fill="none" stroke="#3E92CC" stroke-width="2.5" opacity="0.5"/>
+  <ellipse cx="145" cy="125" rx="20" ry="25" fill="none" stroke="#1E88E5" stroke-width="2.5" opacity="0.4"/>
+</svg>

@@ -1,0 +1,23 @@
+<svg width="254" height="174" viewBox="0 0 254 174" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="badgeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#6366F1;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#8B5CF6;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Shield Badge -->
+  <path d="M 127 20 L 200 40 L 200 100 C 200 130 170 150 127 160 C 84 150 54 130 54 100 L 54 40 Z" 
+        fill="url(#badgeGrad)" opacity="0.9"/>
+  
+  <!-- Checkmark -->
+  <path d="M 95 87 L 115 107 L 165 57" 
+        stroke="white" stroke-width="8" fill="none" 
+        stroke-linecap="round" stroke-linejoin="round"/>
+  
+  <!-- Decorative Elements -->
+  <circle cx="40" cy="40" r="6" fill="#06B6D4" opacity="0.6"/>
+  <circle cx="214" cy="40" r="6" fill="#06B6D4" opacity="0.6"/>
+  <circle cx="40" cy="134" r="6" fill="#8B5CF6" opacity="0.6"/>
+  <circle cx="214" cy="134" r="6" fill="#8B5CF6" opacity="0.6"/>
+</svg>

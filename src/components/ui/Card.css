@@ -1,0 +1,94 @@
+.card {
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-xl);
+    animation: fadeIn 0.4s ease-out;
+}
+
+.card--no-padding {
+    padding: 0;
+}
+
+.card--default {
+    background: rgba(11, 15, 25, 0.4);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 4px 24px -1px rgba(0, 0, 0, 0.2);
+}
+
+.card--elevated {
+    background: rgba(34, 38, 57, 0.6);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    box-shadow: 0 8px 32px -4px rgba(0, 0, 0, 0.3);
+}
+
+.card--gradient {
+    position: relative;
+    background: rgba(11, 15, 25, 0.4);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    overflow: hidden;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.card--gradient::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: var(--radius-lg);
+    padding: 1px;
+    background: linear-gradient(135deg,
+            rgba(0, 242, 255, 0.3),
+            rgba(0, 102, 255, 0.3),
+            rgba(107, 78, 255, 0.3));
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    transition: opacity 0.3s ease;
+}
+
+.card--gradient::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg,
+            rgba(0, 242, 255, 0.03),
+            rgba(0, 102, 255, 0.03),
+            rgba(107, 78, 255, 0.03));
+    pointer-events: none;
+}
+
+.card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 40px -8px rgba(0, 0, 0, 0.4);
+}
+
+.card--gradient:hover::before {
+    background: linear-gradient(135deg,
+            var(--color-accent-cyan),
+            var(--color-accent-blue),
+            var(--color-accent-purple));
+    box-shadow: 0 0 20px rgba(0, 242, 255, 0.2);
+}
+
+.card__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: var(--spacing-lg);
+    padding-bottom: var(--spacing-md);
+    border-bottom: 1px solid var(--color-border-secondary);
+}
+
+.card__title {
+    font-size: var(--font-size-xl);
+    font-weight: 700;
+    color: var(--color-text-primary);
+    margin: 0;
+}
+
+.card__body {
+    color: var(--color-text-secondary);
+}

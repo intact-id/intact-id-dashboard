@@ -1,0 +1,121 @@
+.dropdown-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.dropdown-label {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--color-text-primary);
+}
+
+.dropdown {
+    position: relative;
+    width: 100%;
+}
+
+.dropdown-trigger {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 14px;
+    background: var(--color-bg-secondary);
+    border: 1px solid var(--color-border-secondary);
+    border-radius: var(--radius-md);
+    color: var(--color-text-primary);
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.dropdown-trigger:hover {
+    border-color: var(--color-text-tertiary);
+}
+
+.dropdown--open .dropdown-trigger {
+    border-color: var(--color-accent-cyan);
+}
+
+.dropdown--disabled .dropdown-trigger {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.dropdown--error .dropdown-trigger {
+    border-color: var(--color-error);
+}
+
+.dropdown-value {
+    flex: 1;
+    text-align: left;
+}
+
+.dropdown-chevron {
+    transition: transform 0.2s;
+    color: var(--color-text-tertiary);
+}
+
+.dropdown-chevron--open {
+    transform: rotate(180deg);
+}
+
+.dropdown-menu {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    background: var(--color-bg-secondary);
+    border: 1px solid var(--color-border-secondary);
+    border-radius: var(--radius-md);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+    z-index: 100;
+    max-height: 300px;
+    overflow-y: auto;
+    animation: slideDown 0.2s ease-out;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-8px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.dropdown-option {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 14px;
+    background: transparent;
+    border: none;
+    color: var(--color-text-secondary);
+    font-size: 14px;
+    text-align: left;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.dropdown-option:hover {
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--color-text-primary);
+}
+
+.dropdown-option--selected {
+    color: var(--color-accent-cyan);
+    background: rgba(0, 242, 255, 0.08);
+}
+
+.dropdown-error {
+    font-size: 12px;
+    color: var(--color-error);
+}
