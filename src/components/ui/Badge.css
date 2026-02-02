@@ -2,73 +2,97 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    font-weight: 600;
+    font-weight: 500;
+    /* Reduced weight */
     border-radius: var(--radius-full);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
+    text-transform: capitalize;
+    /* Normal case */
+    letter-spacing: normal;
+    transition: all var(--transition-base);
+    position: relative;
+    font-size: 0.75rem;
+    line-height: 1;
 }
 
 /* Sizes */
 .badge--sm {
     padding: 2px 8px;
-    font-size: 10px;
+    font-size: 0.75rem;
 }
 
 .badge--md {
-    padding: 4px 12px;
-    font-size: var(--font-size-xs);
+    padding: 4px 10px;
+    font-size: 0.8125rem;
 }
 
 .badge--lg {
-    padding: 6px 16px;
-    font-size: var(--font-size-sm);
+    padding: 6px 12px;
+    font-size: 0.875rem;
 }
 
-/* Variants */
+/* Variants - Clean Pastel Backgrounds with Darker Text */
 .badge--default {
     background: var(--color-bg-tertiary);
     color: var(--color-text-secondary);
-    border: 1px solid var(--color-border-secondary);
+    border: 1px solid var(--color-border-primary);
 }
 
-.badge--success {
-    background: rgba(0, 255, 136, 0.2);
-    color: var(--color-success);
-    border: 1px solid var(--color-success);
+.badge--success,
+.badge--passed {
+    background: rgba(16, 185, 129, 0.1);
+    color: #059669;
+    /* Darker green for text */
+    border: 1px solid rgba(16, 185, 129, 0.2);
+    box-shadow: none;
 }
 
-.badge--warning {
-    background: rgba(255, 170, 0, 0.2);
-    color: var(--color-warning);
-    border: 1px solid var(--color-warning);
+.badge--warning,
+.badge--pending {
+    background: rgba(245, 158, 11, 0.1);
+    color: #d97706;
+    /* Darker orange */
+    border: 1px solid rgba(245, 158, 11, 0.2);
+    box-shadow: none;
+    animation: none;
 }
 
-.badge--error {
-    background: rgba(255, 0, 85, 0.2);
-    color: var(--color-error);
-    border: 1px solid var(--color-error);
+.badge--error,
+.badge--failed {
+    background: rgba(239, 68, 68, 0.1);
+    color: #dc2626;
+    /* Darker red */
+    border: 1px solid rgba(239, 68, 68, 0.2);
+    box-shadow: none;
 }
 
 .badge--info {
-    background: rgba(0, 102, 255, 0.2);
-    color: var(--color-info);
-    border: 1px solid var(--color-info);
+    background: rgba(59, 130, 246, 0.1);
+    color: #2563eb;
+    /* Darker blue */
+    border: 1px solid rgba(59, 130, 246, 0.2);
+    box-shadow: none;
 }
 
-.badge--passed {
-    background: rgba(0, 255, 136, 0.2);
-    color: var(--color-success);
-    border: 1px solid var(--color-success);
+.badge--primary {
+    background: rgba(14, 165, 233, 0.1);
+    color: #0284c7;
+    border: 1px solid rgba(14, 165, 233, 0.2);
+    box-shadow: none;
 }
 
-.badge--failed {
-    background: rgba(255, 0, 85, 0.2);
-    color: var(--color-error);
-    border: 1px solid var(--color-error);
+/* Hover effects - Minimal */
+.badge:hover {
+    transform: none;
+    opacity: 0.9;
 }
 
-.badge--pending {
-    background: rgba(255, 170, 0, 0.2);
-    color: var(--color-warning);
-    border: 1px solid var(--color-warning);
+/* Remove Pulse */
+@keyframes badgePulse {
+    0% {
+        opacity: 1;
+    }
+
+    100% {
+        opacity: 1;
+    }
 }

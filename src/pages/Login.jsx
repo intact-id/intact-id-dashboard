@@ -1,6 +1,6 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
+import {useState} from 'react';
+import {useNavigate} from 'react-router-dom';
+import {useAuth} from '../contexts/AuthContext';
 import Input from '../components/ui/Input';
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
@@ -8,11 +8,11 @@ import logoIcon from '../assets/intact-logo.svg';
 import './Login.css';
 
 export default function Login() {
-    const [email, setEmail] = useState('');
+    const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
-    const { login } = useAuth();
+    const {login} = useAuth();
     const navigate = useNavigate();
 
     const handleSubmit = async (e) => {
@@ -20,7 +20,7 @@ export default function Login() {
         setError('');
         setLoading(true);
 
-        const result = await login(email, password);
+        const result = await login(username, password);
 
         if (result.success) {
             navigate('/dashboard');
@@ -43,7 +43,7 @@ export default function Login() {
                 <Card variant="elevated" className="login-card">
                     <div className="login-header">
                         <div className="login-logo-container">
-                            <img src={logoIcon} alt="Intact ID" className="login-logo-img" />
+                            <img src={logoIcon} alt="Intact ID" className="login-logo-img"/>
                             <h1 className="login-logo-text">
                                 <span className="logo-text">Intact</span>
                                 <span className="logo-accent">ID</span>
@@ -54,12 +54,12 @@ export default function Login() {
 
                     <form onSubmit={handleSubmit} className="login-form">
                         <Input
-                            label="Email"
-                            type="email"
-                            name="email"
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                            placeholder="demo@intactid.com"
+                            label="Username"
+                            type="text"
+                            name="username"
+                            value={username}
+                            onChange={(e) => setUsername(e.target.value)}
+                            placeholder="Enter your username"
                             required
                         />
 
@@ -75,7 +75,7 @@ export default function Login() {
 
                         {error && (
                             <div className="login-error">
-                                <span className="error-icon">⚠️</span>
+                                <span className="error-icon">!</span>
                                 {error}
                             </div>
                         )}
@@ -93,9 +93,9 @@ export default function Login() {
 
                     <div className="login-footer">
                         <p className="demo-credentials">
-                            <strong>Demo Credentials:</strong><br />
-                            Email: demo@intactid.com<br />
-                            Password: demo123
+                            <strong>Demo Credentials:</strong><br/>
+                            Username: admin<br/>
+                            Password: Admin@123
                         </p>
                     </div>
                 </Card>

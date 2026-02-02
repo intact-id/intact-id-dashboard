@@ -1,10 +1,10 @@
 .btn {
-    font-family: var(--font-family-primary);
+    font-family: var(--font-family-brand);
     font-weight: 600;
     border: none;
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-lg);
     cursor: pointer;
-    transition: all var(--transition-base);
+    transition: all var(--transition-spring);
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -12,19 +12,38 @@
     text-decoration: none;
     position: relative;
     overflow: hidden;
+    letter-spacing: 0.02em;
 }
 
+/* Shimmer effect */
 .btn::before {
     content: '';
     position: absolute;
     inset: 0;
-    background: linear-gradient(135deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+    background: linear-gradient(135deg, transparent, rgba(255, 255, 255, 0.2), transparent);
     transform: translateX(-100%);
     transition: transform var(--transition-slow);
 }
 
 .btn:hover::before {
     transform: translateX(100%);
+}
+
+/* Ripple effect on click */
+.btn::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle, rgba(255, 255, 255, 0.3) 0%, transparent 70%);
+    transform: scale(0);
+    opacity: 0;
+    transition: transform 0.5s ease, opacity 0.5s ease;
+}
+
+.btn:active::after {
+    transform: scale(2);
+    opacity: 1;
+    transition: transform 0s, opacity 0s;
 }
 
 .btn:disabled {
@@ -50,50 +69,71 @@
 
 /* Variants */
 .btn--primary {
-    background: linear-gradient(135deg, var(--color-accent-cyan), var(--color-accent-blue));
-    color: var(--color-bg-primary);
-    box-shadow: var(--shadow-glow-cyan);
+    background: var(--gradient-brand);
+    color: var(--color-text-primary);
+    box-shadow: var(--shadow-md);
+    border: 1px solid rgba(99, 102, 241, 0.5);
 }
 
 .btn--primary:hover:not(:disabled) {
-    transform: translateY(-2px);
-    box-shadow: 0 0 30px rgba(0, 242, 255, 0.6);
+    transform: translateY(-2px) scale(1.02);
+    box-shadow: var(--shadow-xl);
+    border-color: var(--color-brand-secondary);
 }
 
 .btn--primary:active:not(:disabled) {
-    transform: translateY(0);
+    transform: translateY(0) scale(1);
 }
 
 .btn--secondary {
     background: transparent;
-    color: var(--color-accent-cyan);
-    border: 2px solid var(--color-accent-cyan);
+    color: var(--color-neon-cyan);
+    border: 2px solid var(--color-neon-cyan);
+    box-shadow: 0 0 10px rgba(34, 211, 238, 0.2);
 }
 
 .btn--secondary:hover:not(:disabled) {
-    background: rgba(0, 242, 255, 0.1);
-    border-color: var(--color-accent-blue);
-    color: var(--color-accent-blue);
+    background: rgba(34, 211, 238, 0.1);
+    border-color: var(--color-neon-purple);
+    color: var(--color-neon-purple);
+    box-shadow: var(--shadow-md);
+    transform: translateY(-2px);
 }
 
 .btn--danger {
-    background: linear-gradient(135deg, var(--color-accent-red), #cc0044);
+    background: linear-gradient(135deg, var(--color-error), #dc2626);
     color: var(--color-text-primary);
+    box-shadow: var(--shadow-md);
 }
 
 .btn--danger:hover:not(:disabled) {
     transform: translateY(-2px);
-    box-shadow: 0 0 20px rgba(255, 0, 85, 0.5);
+    box-shadow: var(--shadow-xl), 0 0 30px rgba(239, 68, 68, 0.5);
 }
 
 .btn--ghost {
     background: transparent;
     color: var(--color-text-secondary);
-    border: 1px solid var(--color-border-secondary);
+    border: 1px solid var(--color-border-primary);
 }
 
 .btn--ghost:hover:not(:disabled) {
     background: var(--color-bg-tertiary);
     border-color: var(--color-border-hover);
     color: var(--color-text-primary);
+    box-shadow: var(--shadow-sm);
+}
+
+/* Neon variant */
+.btn--neon {
+    background: transparent;
+    color: var(--color-neon-cyan);
+    border: 2px solid var(--color-neon-cyan);
+    box-shadow: 0 0 10px var(--color-neon-cyan), inset 0 0 10px rgba(34, 211, 238, 0.1);
+    text-shadow: 0 0 5px var(--color-neon-cyan);
+}
+
+.btn--neon:hover:not(:disabled) {
+    box-shadow: 0 0 20px var(--color-neon-cyan), 0 0 40px var(--color-neon-cyan), inset 0 0 20px rgba(34, 211, 238, 0.2);
+    transform: translateY(-2px);
 }

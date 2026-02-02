@@ -6,6 +6,7 @@ import Button from '../components/ui/Button';
 import Dropdown from '../components/ui/Dropdown';
 import Tabs from '../components/ui/Tabs';
 import { useToast } from '../contexts/ToastContext';
+import analyticsService from '../services/analyticsService';
 import './Analytics.css';
 
 export default function Analytics() {
@@ -21,11 +22,21 @@ export default function Analytics() {
     const fetchAnalytics = async () => {
         setLoading(true);
         try {
-            const response = await fetch('http://localhost:3001/usageData');
-            const data = await response.json();
-            setAnalyticsData(data);
+            const response = await analyticsService.getVerificationTrends();
+            if (response.success) {
+                // Map to expected format
+                const formattedData = response.data.map(item => ({
+                    date: item.date,
+                    verifications: item.total,
+                    approved: item.approved,
+                    rejected: item.rejected,
+                    pending: item.pending
+                }));
+                setAnalyticsData(formattedData);
+            }
         } catch (error) {
             toast.error('Failed to load analytics data');
+            setAnalyticsData([]);
         } finally {
             setLoading(false);
         }

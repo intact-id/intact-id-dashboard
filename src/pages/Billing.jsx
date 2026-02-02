@@ -72,7 +72,7 @@ export default function Billing() {
                     <div className="features-grid">
                         {billing?.features.map((feature, index) => (
                             <div key={index} className="feature-item">
-                                <span className="feature-icon">✓</span>
+                                <span className="feature-icon">•</span>
                                 <span className="feature-text">{feature}</span>
                             </div>
                         ))}
@@ -131,10 +131,10 @@ export default function Billing() {
                             </div>
                         </div>
                         <div className="pricing-features">
-                            <div className="pricing-feature">✓ Up to 1,000 verifications/month</div>
-                            <div className="pricing-feature">✓ 2 API Keys</div>
-                            <div className="pricing-feature">✓ Email Support</div>
-                            <div className="pricing-feature">✓ Basic Analytics</div>
+                            <div className="pricing-feature">Up to 1,000 verifications/month</div>
+                            <div className="pricing-feature">2 API Keys</div>
+                            <div className="pricing-feature">Email Support</div>
+                            <div className="pricing-feature">Basic Analytics</div>
                         </div>
                         <Button variant="ghost" size="md" className="pricing-btn">
                             Downgrade
@@ -153,12 +153,12 @@ export default function Billing() {
                             </div>
                         </div>
                         <div className="pricing-features">
-                            <div className="pricing-feature">✓ Up to 10,000 verifications/month</div>
-                            <div className="pricing-feature">✓ Unlimited API Keys</div>
-                            <div className="pricing-feature">✓ Priority Support</div>
-                            <div className="pricing-feature">✓ Advanced Analytics</div>
-                            <div className="pricing-feature">✓ Custom Webhooks</div>
-                            <div className="pricing-feature">✓ Team Management</div>
+                            <div className="pricing-feature">Up to 10,000 verifications/month</div>
+                            <div className="pricing-feature">Unlimited API Keys</div>
+                            <div className="pricing-feature">Priority Support</div>
+                            <div className="pricing-feature">Advanced Analytics</div>
+                            <div className="pricing-feature">Custom Webhooks</div>
+                            <div className="pricing-feature">Team Management</div>
                         </div>
                         <Button variant="primary" size="md" className="pricing-btn" disabled>
                             Current Plan
@@ -174,12 +174,12 @@ export default function Billing() {
                             </div>
                         </div>
                         <div className="pricing-features">
-                            <div className="pricing-feature">✓ Unlimited verifications</div>
-                            <div className="pricing-feature">✓ Dedicated infrastructure</div>
-                            <div className="pricing-feature">✓ 24/7 Premium Support</div>
-                            <div className="pricing-feature">✓ Custom integrations</div>
-                            <div className="pricing-feature">✓ SLA guarantees</div>
-                            <div className="pricing-feature">✓ Dedicated account manager</div>
+                            <div className="pricing-feature">Unlimited verifications</div>
+                            <div className="pricing-feature">Dedicated infrastructure</div>
+                            <div className="pricing-feature">24/7 Premium Support</div>
+                            <div className="pricing-feature">Custom integrations</div>
+                            <div className="pricing-feature">SLA guarantees</div>
+                            <div className="pricing-feature">Dedicated account manager</div>
                         </div>
                         <Button variant="secondary" size="md" className="pricing-btn">
                             Contact Sales

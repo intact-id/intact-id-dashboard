@@ -3,45 +3,51 @@ import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
 import Badge from '../components/ui/Badge';
+import userService from '../services/userService';
+import companyService from '../services/companyService';
+import authService from '../services/authService';
 import './Settings.css';
 
 export default function Settings() {
     const [activeTab, setActiveTab] = useState('team');
     const [team, setTeam] = useState([]);
     const [webhooks, setWebhooks] = useState([]);
+    const [company, setCompany] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [currentUser, setCurrentUser] = useState(null);
 
     useEffect(() => {
-        fetchSettingsData();
-    }, []);
+        const user = authService.getCurrentUser();
+        setCurrentUser(user);
+        fetchSettingsData(user);
+    }, [activeTab]);
 
-    const fetchSettingsData = async () => {
+    const fetchSettingsData = async (user) => {
+        setLoading(true);
         try {
-            const [teamRes, webhooksRes] = await Promise.all([
-                fetch('http://localhost:3001/team'),
-                fetch('http://localhost:3001/webhooks')
-            ]);
-
-            const [teamData, webhooksData] = await Promise.all([
-                teamRes.json(),
-                webhooksRes.json()
-            ]);
-
-            setTeam(teamData);
-            setWebhooks(webhooksData);
-            setLoading(false);
+            if (activeTab === 'team') {
+                const teamData = await userService.getUsers();
+                setTeam(teamData.data.content || []);
+            } else if (activeTab === 'profile' && user?.companyId) {
+                const companyData = await companyService.getCompanyById(user.companyId);
+                setCompany(companyData.data);
+            }
+            // Webhooks not yet implemented in backend
+            setWebhooks([]);
         } catch (error) {
             console.error('Error fetching settings data:', error);
+        } finally {
             setLoading(false);
         }
     };
 
     const formatDate = (dateString) => {
+        if (!dateString) return 'N/A';
         const date = new Date(dateString);
         return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
     };
 
-    if (loading) {
+    if (loading && !company && team.length === 0) {
         return <div className="page-loading"><div className="spinner"></div></div>;
     }
 
@@ -90,24 +96,32 @@ export default function Settings() {
                     </div>
                     <div className="card__body">
                         <div className="team-list">
-                            {team.map((member) => (
-                                <div key={member.id} className="team-member">
-                                    <div className="member-avatar">
-                                        {member.name.charAt(0)}
+                            {team.length > 0 ? (
+                                team.map((member) => (
+                                    <div key={member.id} className="team-member">
+                                        <div className="member-avatar">
+                                            {member.username.charAt(0).toUpperCase()}
+                                        </div>
+                                        <div className="member-info">
+                                            <div className="member-name">{member.username}</div>
+                                            <div className="member-email">{member.email}</div>
+                                        </div>
+                                        <div className="member-roles">
+                                            {member.roles && member.roles.map(role => (
+                                                <Badge key={role.id} variant="info" className="mr-1">
+                                                    {role.name}
+                                                </Badge>
+                                            ))}
+                                        </div>
+                                        <div className="member-joined">
+                                            Joined {formatDate(member.createdAt)}
+                                        </div>
+                                        <button className="member-action-btn">•••</button>
                                     </div>
-                                    <div className="member-info">
-                                        <div className="member-name">{member.name}</div>
-                                        <div className="member-email">{member.email}</div>
-                                    </div>
-                                    <Badge variant={member.role === 'Admin' ? 'info' : 'default'}>
-                                        {member.role}
-                                    </Badge>
-                                    <div className="member-joined">
-                                        Joined {formatDate(member.joinedDate)}
-                                    </div>
-                                    <button className="member-action-btn">•••</button>
-                                </div>
-                            ))}
+                                ))
+                            ) : (
+                                <div className="no-data">No team members found</div>
+                            )}
                         </div>
                     </div>
                 </Card>
@@ -121,24 +135,9 @@ export default function Settings() {
                         <Button variant="primary" size="sm">Add Webhook</Button>
                     </div>
                     <div className="card__body">
-                        {webhooks.map((webhook) => (
-                            <div key={webhook.id} className="webhook-item">
-                                <div className="webhook-header">
-                                    <code className="webhook-url">{webhook.url}</code>
-                                    <Badge variant="success">{webhook.status}</Badge>
-                                </div>
-                                <div className="webhook-events">
-                                    <span className="events-label">Events:</span>
-                                    {webhook.events.map((event, idx) => (
-                                        <span key={idx} className="event-tag">{event}</span>
-                                    ))}
-                                </div>
-                                <div className="webhook-meta">
-                                    <span>Created: {formatDate(webhook.created)}</span>
-                                    <span>Last triggered: {formatDate(webhook.lastTriggered)}</span>
-                                </div>
-                            </div>
-                        ))}
+                        <div className="placeholder-state">
+                            <p>Webhook management is coming soon.</p>
+                        </div>
                     </div>
                 </Card>
             )}
@@ -147,39 +146,40 @@ export default function Settings() {
             {activeTab === 'profile' && (
                 <Card>
                     <div className="card__header">
-                        <h3 className="card__title">Profile Information</h3>
+                        <h3 className="card__title">Company Profile</h3>
                     </div>
                     <div className="card__body">
                         <form className="settings-form">
                             <Input
-                                label="Full Name"
-                                name="name"
-                                value="Sarah Chen"
-                                placeholder="Enter your name"
-                            />
-                            <Input
-                                label="Email Address"
-                                type="email"
-                                name="email"
-                                value="demo@intactid.com"
-                                placeholder="Enter your email"
-                            />
-                            <Input
                                 label="Company Name"
                                 name="company"
-                                value="TechCorp Inc."
-                                placeholder="Enter company name"
+                                value={company?.legalName || ''}
+                                placeholder="Company Name"
+                                disabled
                             />
                             <Input
-                                label="Phone Number"
-                                type="tel"
-                                name="phone"
-                                value=""
-                                placeholder="+1 (555) 123-4567"
+                                label="Trading Name"
+                                name="tradingName"
+                                value={company?.tradingName || ''}
+                                placeholder="Trading Name"
+                                disabled
+                            />
+                            <Input
+                                label="Registration Number"
+                                name="regNumber"
+                                value={company?.registrationNumber || ''}
+                                placeholder="Registration Number"
+                                disabled
+                            />
+                            <Input
+                                label="Country"
+                                name="country"
+                                value={company?.country || ''}
+                                placeholder="Country"
+                                disabled
                             />
                             <div className="form-actions">
-                                <Button variant="primary">Save Changes</Button>
-                                <Button variant="ghost">Cancel</Button>
+                                <Button variant="primary" disabled>Save Changes</Button>
                             </div>
                         </form>
                     </div>
@@ -238,8 +238,8 @@ export default function Settings() {
                         <div className="card__body">
                             <div className="session-item">
                                 <div className="session-info">
-                                    <div className="session-device">🖥️ Chrome on Linux</div>
-                                    <div className="session-location">Current session</div>
+                                    <div className="session-device">Current Session</div>
+                                    <div className="session-location">Logged in as {currentUser?.username}</div>
                                 </div>
                                 <Badge variant="success">Active</Badge>
                             </div>
