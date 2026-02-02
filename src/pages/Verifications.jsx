@@ -111,6 +111,12 @@ export default function Verifications() {
 
     const closeModal = () => setSelectedVerification(null);
 
+    const handlePageChange = (newPage) => {
+        if (newPage >= 0 && newPage < pagination.totalPages) {
+            setPagination(prev => ({ ...prev, page: newPage }));
+        }
+    };
+
     const stats = {
         total: verifications.length,
         completed: verifications.filter(v => v.status === 'COMPLETED').length,
@@ -297,6 +303,34 @@ export default function Verifications() {
                             ))}
                         </tbody>
                     </table>
+                </div>
+            )}
+
+            {/* Pagination Controls */}
+            {!loading && pagination.totalElements > 0 && (
+                <div className="pagination-controls">
+                    <div className="pagination-info">
+                        Showing {pagination.page * pagination.size + 1} to {Math.min((pagination.page + 1) * pagination.size, pagination.totalElements)} of {pagination.totalElements} entries
+                    </div>
+                    <div className="pagination-buttons">
+                        <button
+                            className="pagination-btn"
+                            disabled={pagination.page === 0}
+                            onClick={() => handlePageChange(pagination.page - 1)}
+                        >
+                            Previous
+                        </button>
+                        <span className="pagination-current">
+                            Page {pagination.page + 1} of {pagination.totalPages}
+                        </span>
+                        <button
+                            className="pagination-btn"
+                            disabled={pagination.page >= pagination.totalPages - 1}
+                            onClick={() => handlePageChange(pagination.page + 1)}
+                        >
+                            Next
+                        </button>
+                    </div>
                 </div>
             )}
 
