@@ -1,94 +1,107 @@
+/* ========== CORPORATE CARD COMPONENT ========== */
 .card {
+    background: var(--color-bg-secondary);
+    /* White */
+    border: 1px solid var(--color-border-primary);
     border-radius: var(--radius-lg);
-    padding: var(--spacing-xl);
-    animation: fadeIn 0.4s ease-out;
-}
-
-.card--no-padding {
-    padding: 0;
-}
-
-.card--default {
-    background: rgba(11, 15, 25, 0.4);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    box-shadow: 0 4px 24px -1px rgba(0, 0, 0, 0.2);
-}
-
-.card--elevated {
-    background: rgba(34, 38, 57, 0.6);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    box-shadow: 0 8px 32px -4px rgba(0, 0, 0, 0.3);
-}
-
-.card--gradient {
+    padding: var(--spacing-6);
     position: relative;
-    background: rgba(11, 15, 25, 0.4);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
     overflow: hidden;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: var(--shadow-sm);
+    transition: box-shadow var(--transition-base), transform var(--transition-base);
 }
 
-.card--gradient::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    border-radius: var(--radius-lg);
-    padding: 1px;
-    background: linear-gradient(135deg,
-            rgba(0, 242, 255, 0.3),
-            rgba(0, 102, 255, 0.3),
-            rgba(107, 78, 255, 0.3));
-    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-    -webkit-mask-composite: xor;
-    mask-composite: exclude;
-    transition: opacity 0.3s ease;
+/* Remove animated gradient border effect */
+.card::before {
+    display: none;
 }
 
-.card--gradient::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(135deg,
-            rgba(0, 242, 255, 0.03),
-            rgba(0, 102, 255, 0.03),
-            rgba(107, 78, 255, 0.03));
-    pointer-events: none;
+/* Remove inner glow effect */
+.card::after {
+    display: none;
 }
 
 .card:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 12px 40px -8px rgba(0, 0, 0, 0.4);
+    box-shadow: var(--shadow-md);
+    border-color: var(--color-border-hover);
+    transform: translateY(-2px);
 }
 
-.card--gradient:hover::before {
-    background: linear-gradient(135deg,
-            var(--color-accent-cyan),
-            var(--color-accent-blue),
-            var(--color-accent-purple));
-    box-shadow: 0 0 20px rgba(0, 242, 255, 0.2);
+/* ========== CARD VARIANTS ========== */
+.card--elevated {
+    background: var(--color-bg-secondary);
+    border: 1px solid var(--color-border-primary);
+    box-shadow: var(--shadow-md);
 }
 
-.card__header {
+.card--elevated:hover {
+    box-shadow: var(--shadow-lg);
+}
+
+.card--interactive {
+    cursor: pointer;
+}
+
+.card--interactive:hover {
+    border-color: var(--color-brand-primary);
+    box-shadow: var(--shadow-md);
+}
+
+.card--interactive:active {
+    transform: translateY(0);
+}
+
+/* Standard Header */
+.card-header {
     display: flex;
-    align-items: center;
     justify-content: space-between;
-    margin-bottom: var(--spacing-lg);
-    padding-bottom: var(--spacing-md);
-    border-bottom: 1px solid var(--color-border-secondary);
+    align-items: center;
+    margin-bottom: var(--spacing-5);
+    padding-bottom: var(--spacing-4);
+    border-bottom: 1px solid var(--color-border-primary);
 }
 
-.card__title {
-    font-size: var(--font-size-xl);
-    font-weight: 700;
+/* Remove decorative underline */
+.card-header::after {
+    display: none;
+}
+
+.card-title {
+    font-size: var(--font-size-lg);
+    font-weight: 600;
     color: var(--color-text-primary);
     margin: 0;
+    letter-spacing: -0.01em;
+    font-family: var(--font-family-brand);
+    background: none;
+    -webkit-text-fill-color: initial;
 }
 
-.card__body {
+.card-subtitle {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-tertiary);
+    margin-top: var(--spacing-1);
+    font-weight: 400;
+}
+
+.card-body {
     color: var(--color-text-secondary);
+    font-size: var(--font-size-base);
+    line-height: 1.6;
+}
+
+.card-footer {
+    margin-top: var(--spacing-5);
+    padding-top: var(--spacing-4);
+    border-top: 1px solid var(--color-border-primary);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    color: var(--color-text-tertiary);
+    font-size: var(--font-size-sm);
+}
+
+/* Remove Pulse Animation */
+.card--pulse {
+    animation: none;
 }

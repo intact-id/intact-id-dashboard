@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect } from 'react';
+import authService from '../services/authService';
 
 const AuthContext = createContext(null);
 
@@ -8,46 +9,57 @@ export function AuthProvider({ children }) {
 
     useEffect(() => {
         // Check if user is logged in on mount
-        const token = localStorage.getItem('token');
-        const userData = localStorage.getItem('user');
+        console.log('AuthContext: Checking authentication on mount');
+        const currentUser = authService.getCurrentUser();
+        const isAuth = authService.isAuthenticated();
+        console.log('AuthContext: currentUser=', currentUser);
+        console.log('AuthContext: isAuthenticated=', isAuth);
 
-        if (token && userData) {
-            setUser(JSON.parse(userData));
+        if (currentUser && isAuth) {
+            console.log('AuthContext: Setting user state');
+            setUser(currentUser);
+        } else {
+            console.log('AuthContext: No valid user found');
         }
         setLoading(false);
     }, []);
 
-    const login = async (email, password) => {
-        try {
-            // Mock login - validate against db.json
-            const response = await fetch('http://localhost:3001/users');
-            const users = await response.json();
+    const login = async (username, password) => {
+        console.log('AuthContext: Login attempt for', username);
+        const result = await authService.login(username, password);
 
-            const user = users.find(u => u.email === email && u.password === password);
-
-            if (user) {
-                const { password: _, ...userWithoutPassword } = user;
-                setUser(userWithoutPassword);
-                localStorage.setItem('token', user.token);
-                localStorage.setItem('user', JSON.stringify(userWithoutPassword));
-                return { success: true };
-            } else {
-                return { success: false, error: 'Invalid credentials' };
-            }
-        } catch (error) {
-            console.error('Login error:', error);
-            return { success: false, error: 'Connection error. Make sure the mock server is running.' };
+        if (result.success) {
+            console.log('AuthContext: Login successful, setting user=', result.data);
+            setUser(result.data);
+        } else {
+            console.log('AuthContext: Login failed');
         }
+
+        return result;
     };
 
-    const logout = () => {
+    const logout = async () => {
+        await authService.logout();
         setUser(null);
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
+    };
+
+    const updateUser = (userData) => {
+        console.log('Updating user:', userData); // Debug log
+        setUser(userData);
+        localStorage.setItem('user', JSON.stringify(userData));
+    };
+
+    const value = {
+        user,
+        login,
+        logout,
+        updateUser,
+        loading,
+        isAuthenticated: () => authService.isAuthenticated(),
     };
 
     return (
-        <AuthContext.Provider value={{ user, login, logout, loading }}>
+        <AuthContext.Provider value={value}>
             {children}
         </AuthContext.Provider>
     );

@@ -27,14 +27,17 @@ import {
     BarChart2,
     AlertTriangle,
     CheckCircle,
-    ClipboardCheck
+    ClipboardCheck,
+    Building2
 } from 'lucide-react';
 import './DashboardLayout.css';
 import logoIcon from '../../assets/intact-logo.svg';
 import { useState } from 'react';
 
+import ChangePasswordModal from '../ui/ChangePasswordModal';
+
 export default function DashboardLayout() {
-    const { user, logout } = useAuth();
+    const { user, logout, updateUser } = useAuth();
     const location = useLocation();
     const navigate = useNavigate();
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -77,7 +80,7 @@ export default function DashboardLayout() {
             collapsible: true,
             items: [
                 { path: '/dashboard/api', label: 'API Keys', icon: Key },
-                { path: '/dashboard/webhooks', label: 'Webhooks', icon: Webhook, comingSoon: true },
+                { path: '/dashboard/webhooks', label: 'Webhooks', icon: Webhook },
                 { path: '/dashboard/logs', label: 'Request Logs', icon: Code, comingSoon: true },
             ]
         },
@@ -85,10 +88,11 @@ export default function DashboardLayout() {
             title: 'Management',
             collapsible: true,
             items: [
-                { path: '/dashboard/team', label: 'Team Members', icon: Users, comingSoon: true },
-                { path: '/dashboard/notifications', label: 'Notifications', icon: Bell, comingSoon: true },
+                { path: '/dashboard/team', label: 'Team Members', icon: Users },
+                { path: '/dashboard/notifications', label: 'Notifications', icon: Bell },
                 { path: '/dashboard/checklists', label: 'Checklists', icon: ShieldAlert },
                 { path: '/dashboard/approvals', label: 'Approvals', icon: ClipboardCheck },
+                { path: '/dashboard/companies', label: 'Companies', icon: Building2 },
             ]
         },
         {
@@ -196,7 +200,7 @@ export default function DashboardLayout() {
             </aside>
 
             {/* Main Content */}
-            <main className="main-content bg-[#000000]">
+            <main className="main-content">
                 <div className="content-container">
                     <Outlet />
                 </div>
@@ -206,6 +210,20 @@ export default function DashboardLayout() {
             {isMobileMenuOpen && (
                 <div className="mobile-overlay" onClick={() => setIsMobileMenuOpen(false)}></div>
             )}
+
+            {/* Password Change Modal */}
+            <ChangePasswordModal
+                isOpen={user?.mustChangePassword === true}
+                userId={user?.id}
+                onClose={() => { }} // Prevent closing
+                onSuccess={() => {
+                    if (updateUser && user) {
+                        // Update user with mustChangePassword set to false
+                        const updatedUser = { ...user, mustChangePassword: false };
+                        updateUser(updatedUser);
+                    }
+                }}
+            />
         </div>
     );
 }

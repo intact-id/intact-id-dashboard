@@ -1,0 +1,581 @@
+.companies-page {
+    padding: 2rem;
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+/* Filters */
+.filters-card {
+    margin-bottom: 1.5rem;
+}
+
+.filters-container {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.search-box {
+    position: relative;
+    flex: 1;
+    min-width: 300px;
+}
+
+.search-icon {
+    position: absolute;
+    left: 1rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #8b949e;
+    pointer-events: none;
+}
+
+.search-input {
+    width: 100%;
+    padding: 0.75rem 1rem 0.75rem 3rem;
+    background: rgba(17, 24, 39, 0.5);
+    border: 1px solid rgba(139, 148, 158, 0.2);
+    border-radius: 8px;
+    color: #fff;
+    font-size: 0.95rem;
+    transition: all 0.3s ease;
+}
+
+.search-input:focus {
+    outline: none;
+    border-color: #00f2ff;
+    box-shadow: 0 0 0 3px rgba(0, 242, 255, 0.1);
+}
+
+.search-input::placeholder {
+    color: #8b949e;
+}
+
+.filter-group {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.filter-group label {
+    color: #8b949e;
+    font-size: 0.9rem;
+    white-space: nowrap;
+}
+
+.filter-select {
+    padding: 0.75rem 1rem;
+    background: rgba(17, 24, 39, 0.5);
+    border: 1px solid rgba(139, 148, 158, 0.2);
+    border-radius: 8px;
+    color: #fff;
+    font-size: 0.95rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.filter-select:focus {
+    outline: none;
+    border-color: #00f2ff;
+}
+
+/* Table Styles */
+.data-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.data-table thead {
+    background: rgba(17, 24, 39, 0.5);
+    border-bottom: 2px solid rgba(0, 242, 255, 0.2);
+}
+
+.data-table th {
+    padding: 1rem;
+    text-align: left;
+    font-weight: 600;
+    color: #00f2ff;
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.data-table tbody tr {
+    border-bottom: 1px solid rgba(139, 148, 158, 0.1);
+    transition: background-color 0.2s ease;
+}
+
+.data-table tbody tr:hover {
+    background: rgba(0, 242, 255, 0.05);
+}
+
+.data-table td {
+    padding: 1rem;
+    color: #e6edf3;
+    font-size: 0.95rem;
+}
+
+.company-name {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 500;
+}
+
+.mono {
+    font-family: 'Courier New', monospace;
+    font-size: 0.9rem;
+    color: #8b949e;
+}
+
+.no-data {
+    text-align: center;
+    padding: 3rem 1rem;
+    color: #8b949e;
+    font-style: italic;
+}
+
+/* Action Buttons */
+.action-buttons {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.action-btn {
+    padding: 0.5rem;
+    background: rgba(17, 24, 39, 0.5);
+    border: 1px solid rgba(139, 148, 158, 0.2);
+    border-radius: 6px;
+    color: #8b949e;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.action-btn:hover {
+    transform: translateY(-2px);
+}
+
+.action-btn--view:hover {
+    background: rgba(59, 130, 246, 0.1);
+    border-color: #3b82f6;
+    color: #3b82f6;
+}
+
+.action-btn--edit:hover {
+    background: rgba(0, 242, 255, 0.1);
+    border-color: #00f2ff;
+    color: #00f2ff;
+}
+
+.action-btn--activate:hover {
+    background: rgba(34, 197, 94, 0.1);
+    border-color: #22c55e;
+    color: #22c55e;
+}
+
+.action-btn--suspend:hover {
+    background: rgba(251, 191, 36, 0.1);
+    border-color: #fbbf24;
+    color: #fbbf24;
+}
+
+.action-btn--delete:hover {
+    background: rgba(239, 68, 68, 0.1);
+    border-color: #ef4444;
+    color: #ef4444;
+}
+
+/* Pagination */
+.pagination {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    padding: 1.5rem 1rem;
+    border-top: 1px solid rgba(139, 148, 158, 0.1);
+}
+
+.pagination-info {
+    color: #8b949e;
+    font-size: 0.9rem;
+}
+
+/* Modal Styles */
+.modal-content--large {
+    max-width: 800px;
+    width: 90%;
+}
+
+.company-details-grid {
+    display: grid;
+    gap: 1rem;
+}
+
+.detail-row {
+    display: grid;
+    grid-template-columns: 200px 1fr;
+    gap: 1rem;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid rgba(139, 148, 158, 0.1);
+}
+
+.detail-row:last-child {
+    border-bottom: none;
+}
+
+.detail-label {
+    color: #8b949e;
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+.detail-value {
+    color: #e6edf3;
+    font-size: 0.95rem;
+}
+
+/* Edit Form */
+.edit-form {
+    display: grid;
+    gap: 1.5rem;
+    grid-template-columns: repeat(2, 1fr);
+}
+
+.edit-form>div {
+    grid-column: span 1;
+}
+
+.edit-form>div:nth-child(1),
+.edit-form>div:nth-child(2) {
+    grid-column: span 2;
+}
+
+/* Warning Box */
+.warning-box {
+    background: rgba(239, 68, 68, 0.1);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    border-radius: 8px;
+    padding: 1rem;
+}
+
+.warning-box p {
+    color: #e6edf3;
+    margin: 0.5rem 0;
+}
+
+.warning-box p:first-child {
+    margin-top: 0;
+}
+
+.warning-box p:last-child {
+    margin-bottom: 0;
+}
+
+.warning-box strong {
+    color: #ef4444;
+}
+
+/* Company Card Grid */
+.companies-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 20px;
+    padding: 1rem;
+}
+
+.company-card {
+    padding: 24px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 2px solid rgba(139, 148, 158, 0.15);
+    border-radius: 16px;
+    transition: all 0.3s ease;
+}
+
+.company-card:hover {
+    border-color: rgba(0, 242, 255, 0.4);
+    background: rgba(0, 242, 255, 0.03);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0, 242, 255, 0.1);
+}
+
+.company-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+}
+
+.company-card-header svg {
+    color: #00f2ff;
+}
+
+.company-card-name {
+    font-size: 18px;
+    font-weight: 600;
+    color: #e6edf3;
+    margin: 0 0 8px 0;
+}
+
+.company-card-trading {
+    font-size: 14px;
+    color: #8b949e;
+    margin: 0 0 16px 0;
+}
+
+.company-card-details {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 16px;
+}
+
+.company-detail {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 13px;
+}
+
+.company-detail .detail-label {
+    color: #8b949e;
+    font-weight: 500;
+}
+
+.company-detail .detail-value {
+    color: #e6edf3;
+    font-weight: 600;
+}
+
+.company-card-actions {
+    display: flex;
+    gap: 0.5rem;
+    padding-top: 16px;
+    border-top: 1px solid rgba(139, 148, 158, 0.15);
+}
+
+.companies-grid .no-data {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 3rem 1rem;
+    color: #8b949e;
+    font-style: italic;
+}
+
+/* Responsive Design */
+@media (max-width: 1024px) {
+    .companies-page {
+        padding: 1rem;
+    }
+
+    .filters-container {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .search-box {
+        min-width: 100%;
+    }
+
+    .edit-form {
+        grid-template-columns: 1fr;
+    }
+
+    .edit-form>div {
+        grid-column: span 1 !important;
+    }
+}
+
+@media (max-width: 768px) {
+    .data-table {
+        font-size: 0.85rem;
+    }
+
+    .data-table th,
+    .data-table td {
+        padding: 0.75rem 0.5rem;
+    }
+
+    .action-buttons {
+        flex-direction: column;
+    }
+
+    .detail-row {
+        grid-template-columns: 1fr;
+        gap: 0.25rem;
+    }
+
+    .detail-label {
+        font-size: 0.85rem;
+    }
+}
+
+/* Enhanced Modal Styles */
+.modal-content--xlarge {
+    max-width: 1000px;
+    width: 95%;
+    max-height: 90vh;
+    overflow: hidden;
+}
+
+.modal-content--xlarge .modal-body {
+    max-height: calc(90vh - 150px);
+    overflow-y: auto;
+}
+
+/* Status Banner */
+.status-banner {
+    color: #e6edf3;
+}
+
+/* Company Details Sections */
+.company-details-sections {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.details-section {
+    background: rgba(17, 24, 39, 0.3);
+    border: 1px solid rgba(139, 148, 158, 0.2);
+    border-radius: 8px;
+    padding: 1.5rem;
+}
+
+.section-title {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: #00f2ff;
+    font-size: 1rem;
+    font-weight: 600;
+    margin: 0 0 1rem 0;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid rgba(0, 242, 255, 0.2);
+}
+
+.detail-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1rem;
+}
+
+.detail-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.detail-item--full {
+    grid-column: span 2;
+}
+
+.detail-item .detail-label {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    color: #8b949e;
+    font-size: 0.85rem;
+    font-weight: 500;
+}
+
+.detail-item .detail-value {
+    color: #e6edf3;
+    font-size: 0.95rem;
+}
+
+/* Section Loading */
+.section-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    padding: 2rem;
+    color: #8b949e;
+}
+
+.spinner-small {
+    width: 20px;
+    height: 20px;
+    border: 2px solid rgba(0, 242, 255, 0.2);
+    border-top-color: #00f2ff;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Empty State */
+.empty-state-small {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+    color: #8b949e;
+    text-align: center;
+    gap: 0.5rem;
+}
+
+.empty-state-small p {
+    margin: 0;
+    font-size: 0.9rem;
+}
+
+/* Credentials Info */
+.credentials-info {
+    width: 100%;
+}
+
+/* Form Sections */
+.form-section {
+    background: rgba(17, 24, 39, 0.2);
+    border: 1px solid rgba(139, 148, 158, 0.15);
+    border-radius: 6px;
+    padding: 1.25rem;
+    margin-bottom: 1.25rem;
+}
+
+.form-section:last-child {
+    margin-bottom: 0;
+}
+
+.form-section-title {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: #8b949e;
+    font-size: 0.85rem;
+    font-weight: 500;
+    margin: 0 0 1rem 0;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid rgba(139, 148, 158, 0.1);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.form-section-title svg {
+    width: 14px;
+    height: 14px;
+    opacity: 0.7;
+}
+
+.form-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1rem;
+}
+
+@media (max-width: 768px) {
+    .form-grid {
+        grid-template-columns: 1fr;
+    }
+}

@@ -1,0 +1,57 @@
+import api from './api';
+
+const apiKeyService = {
+    /**
+     * Generate new API key for a company
+     * @param {string} companyId - Company ID
+     * @returns {Promise<object>}
+     */
+    async generateApiKey(companyId) {
+        try {
+            const response = await api.post('/api/companies/api-keys/generate', null, {
+                params: { companyId }
+            });
+            return response.data;
+        } catch (error) {
+            console.error('Generate API key error:', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Revoke an API key
+     * @param {string} companyId - Company ID
+     * @param {string} keyId - API Key ID to revoke
+     * @returns {Promise<object>}
+     */
+    async revokeApiKey(companyId, keyId) {
+        try {
+            const response = await api.delete(`/api/companies/api-keys/${keyId}`, {
+                params: { companyId }
+            });
+            return response.data;
+        } catch (error) {
+            console.error('Revoke API key error:', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Get all API keys for a company
+     * @param {string} companyId - Company ID
+     * @returns {Promise<object>}
+     */
+    async getApiKeys(companyId) {
+        try {
+            const response = await api.get('/api/companies/api-keys', {
+                params: { companyId }
+            });
+            return response.data;
+        } catch (error) {
+            console.error('Get API keys error:', error);
+            throw error;
+        }
+    }
+};
+
+export default apiKeyService;
