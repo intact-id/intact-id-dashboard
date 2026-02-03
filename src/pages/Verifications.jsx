@@ -222,8 +222,10 @@ export default function Verifications() {
                                 <th>Tier</th>
                                 <th>Risk Score</th>
                                 <th>Region</th>
+                                <th>Company</th>
                                 <th>Status</th>
                                 <th>Decision</th>
+                                <th>Reason</th>
                                 <th>Action</th>
                             </tr>
                         </thead>
@@ -291,6 +293,11 @@ export default function Verifications() {
                                         </Badge>
                                     </td>
                                     <td>{getDecisionBadge(verification.overallDecision)}</td>
+                                    <td>
+                                        <span className="truncate-reason" title={verification.failureReason || ''}>
+                                            {verification.failureReason || '-'}
+                                        </span>
+                                    </td>
                                     <td>
                                         <button
                                             className="view-btn"

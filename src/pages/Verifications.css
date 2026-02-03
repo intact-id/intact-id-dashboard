@@ -130,8 +130,9 @@
     border-collapse: separate;
     /* Required for sticky header border */
     border-spacing: 0;
-    font-size: 0.75rem;
-    /* Dense Font */
+    font-size: 0.7rem;
+    /* Ultra Dense Font */
+
 }
 
 /* Sticky Header */
@@ -144,10 +145,10 @@
 }
 
 .verifications-table th {
-    padding: 0.75rem 0.5rem;
+    padding: 0.5rem 0.5rem;
     /* Compact Padding */
     text-align: left;
-    font-size: 0.6875rem;
+    font-size: 0.65rem;
     font-weight: 600;
     color: var(--color-text-tertiary);
     text-transform: uppercase;
@@ -180,7 +181,7 @@
 
 /* Dense Rows */
 .verifications-table td {
-    padding: 0.5rem;
+    padding: 0.35rem 0.5rem;
     /* Dense Padding */
     color: var(--color-text-primary);
     vertical-align: middle;
@@ -208,7 +209,26 @@
 .mono {
     font-family: var(--font-family-mono);
     color: var(--accent-cyan);
-    font-size: 0.75rem;
+    font-size: 0.7rem;
+}
+
+.company-cell {
+    font-weight: 500;
+    max-width: 150px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--color-text-primary);
+}
+
+.truncate-reason {
+    display: block;
+    max-width: 150px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--color-error);
+    font-size: 0.7rem;
 }
 
 .tier-badge {
