@@ -1,6 +1,6 @@
 .billing {
     animation: fadeIn 0.5s ease-out;
-    color: #e5e7eb;
+    color: var(--color-text-secondary);
 }
 
 /* Current Plan */
@@ -25,7 +25,7 @@
 .plan-name {
     font-size: 3rem;
     margin: 0 0 0.5rem;
-    background: linear-gradient(135deg, #00f2ff, #3b82f6);
+    background: linear-gradient(135deg, var(--color-accent-cyan), var(--color-brand-secondary));
     -webkit-background-clip: text;
     background-clip: text;
     -webkit-text-fill-color: transparent;
@@ -33,7 +33,7 @@
 }
 
 .plan-cycle {
-    color: #a1a1aa;
+    color: var(--color-text-tertiary);
     text-transform: capitalize;
     margin: 0;
 }
@@ -44,7 +44,7 @@
 
 .cost-label {
     font-size: 0.875rem;
-    color: #71717a;
+    color: var(--color-text-muted);
     text-transform: uppercase;
     letter-spacing: 0.5px;
     margin-bottom: 4px;
@@ -53,12 +53,12 @@
 .cost-value {
     font-size: 2.5rem;
     font-weight: 700;
-    color: #ffffff;
+    color: var(--color-text-primary);
 }
 
 .plan-features h4 {
     font-size: 1.125rem;
-    color: #ffffff;
+    color: var(--color-text-primary);
     margin: 0 0 1.5rem;
 }
 
@@ -75,17 +75,17 @@
     padding: 1rem;
     background: rgba(255, 255, 255, 0.02);
     border-radius: 8px;
-    border: 1px solid #27272a;
+    border: 1px solid var(--color-border-secondary);
 }
 
 .feature-icon {
-    color: #10b981;
+    color: var(--color-success);
     font-weight: 700;
     font-size: 1.125rem;
 }
 
 .feature-text {
-    color: #d4d4d8;
+    color: var(--color-text-secondary);
     font-size: 0.875rem;
 }
 
@@ -98,16 +98,16 @@
 
 .usage-bar {
     height: 24px;
-    background: #18181b;
+    background: var(--color-bg-secondary);
     border-radius: 12px;
     overflow: hidden;
-    border: 1px solid #27272a;
+    border: 1px solid var(--color-border-secondary);
     position: relative;
 }
 
 .usage-fill {
     height: 100%;
-    background: linear-gradient(90deg, #00f2ff, #3b82f6);
+    background: linear-gradient(90deg, var(--color-accent-cyan), var(--color-brand-secondary));
     border-radius: 12px;
     transition: width 0.5s ease-out;
     position: relative;
@@ -133,7 +133,7 @@
 }
 
 .usage-fill--warning {
-    background: linear-gradient(90deg, #f59e0b, #fbbf24);
+    background: linear-gradient(90deg, var(--color-warning), var(--color-warning));
 }
 
 .usage-stats {
@@ -150,7 +150,7 @@
 
 .usage-stat .stat-label {
     font-size: 0.75rem;
-    color: #71717a;
+    color: var(--color-text-muted);
     text-transform: uppercase;
     letter-spacing: 0.5px;
 }
@@ -158,7 +158,7 @@
 .usage-stat .stat-value {
     font-size: 1.25rem;
     font-weight: 700;
-    color: #ffffff;
+    color: var(--color-text-primary);
 }
 
 /* Pricing Section */
@@ -169,7 +169,7 @@
 .section-title {
     font-size: 1.5rem;
     margin: 0 0 1.5rem;
-    color: #ffffff;
+    color: var(--color-text-primary);
 }
 
 .pricing-grid {
@@ -184,17 +184,17 @@
     position: relative;
     transition: all 0.2s;
     background: rgba(255, 255, 255, 0.02);
-    border: 1px solid #27272a;
+    border: 1px solid var(--color-border-secondary);
 }
 
 .pricing-card:hover {
     transform: translateY(-4px);
     background: rgba(255, 255, 255, 0.04);
-    border-color: #3f3f46;
+    border-color: var(--color-border-hover);
 }
 
 .pricing-card--current {
-    border: 2px solid #00f2ff;
+    border: 2px solid var(--color-accent-cyan);
     background: rgba(0, 242, 255, 0.02);
 }
 
@@ -207,13 +207,13 @@
 .pricing-header {
     margin-bottom: 1.5rem;
     padding-bottom: 1.5rem;
-    border-bottom: 1px solid #27272a;
+    border-bottom: 1px solid var(--color-border-secondary);
 }
 
 .pricing-header h3 {
     font-size: 1.5rem;
     margin: 0 0 1rem;
-    color: #ffffff;
+    color: var(--color-text-primary);
 }
 
 .pricing-cost {
@@ -225,12 +225,12 @@
 .price-value {
     font-size: 2rem;
     font-weight: 700;
-    color: #00f2ff;
+    color: var(--color-accent-cyan);
 }
 
 .price-unit {
     font-size: 0.875rem;
-    color: #71717a;
+    color: var(--color-text-muted);
 }
 
 .pricing-features {
@@ -242,7 +242,7 @@
 }
 
 .pricing-feature {
-    color: #d4d4d8;
+    color: var(--color-text-secondary);
     font-size: 0.875rem;
     display: flex;
     align-items: flex-start;

@@ -43,25 +43,35 @@
 }
 
 .stat-card {
-    background: rgba(30, 41, 59, 0.7);
-    /* Darker, more opaque background */
-    backdrop-filter: blur(12px);
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    /* Stronger border */
+    background: rgba(15, 23, 42, 0.75);
+    border: 1px solid var(--color-border-primary);
     border-radius: var(--radius-lg);
     padding: var(--spacing-3) var(--spacing-4);
     display: flex;
     flex-direction: row-reverse;
     justify-content: space-between;
     align-items: center;
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+    box-shadow: var(--shadow-sm);
     transition: all var(--transition-base);
+    position: relative;
+    overflow: hidden;
 }
 
 .stat-card:hover {
     background: var(--color-bg-hover);
     border-color: var(--color-border-hover);
     transform: translateY(-2px);
+}
+
+.stat-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: var(--gradient-accent);
+    opacity: 0.35;
 }
 
 .stat-content {
@@ -94,35 +104,28 @@
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
+    border: 1px solid rgba(148, 163, 184, 0.2);
 }
 
-/* Icon Variants - Brighter & More Visible */
+/* Icon Variants */
 .stat-icon--cyan {
-    background: rgba(6, 182, 212, 0.2);
-    color: #22D3EE;
-    /* Brighter Cyan */
-    box-shadow: 0 0 10px rgba(6, 182, 212, 0.2);
+    background: rgba(20, 184, 166, 0.18);
+    color: #5EEAD4;
 }
 
 .stat-icon--green {
-    background: rgba(16, 185, 129, 0.2);
-    color: #34D399;
-    /* Brighter Green */
-    box-shadow: 0 0 10px rgba(16, 185, 129, 0.2);
+    background: rgba(34, 197, 94, 0.18);
+    color: #86EFAC;
 }
 
 .stat-icon--blue {
-    background: rgba(99, 102, 241, 0.2);
-    color: #818CF8;
-    /* Brighter Indigo */
-    box-shadow: 0 0 10px rgba(99, 102, 241, 0.2);
+    background: rgba(59, 130, 246, 0.18);
+    color: #93C5FD;
 }
 
-.stat-icon--purple {
-    background: rgba(139, 92, 246, 0.2);
-    color: #A78BFA;
-    /* Brighter Purple */
-    box-shadow: 0 0 10px rgba(139, 92, 246, 0.2);
+.stat-icon--amber {
+    background: rgba(245, 158, 11, 0.2);
+    color: #FCD34D;
 }
 
 /* Bento Grid */
@@ -182,8 +185,8 @@
 .chart-period-select {
     padding: 4px 8px;
     font-size: 0.75rem;
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid var(--glass-border);
+    background: rgba(15, 23, 42, 0.6);
+    border: 1px solid var(--color-border-subtle);
     border-radius: var(--radius-sm);
     color: var(--color-text-secondary);
 }
@@ -236,7 +239,7 @@
 }
 
 .activity-item:hover {
-    background: rgba(255, 255, 255, 0.03);
+    background: rgba(148, 163, 184, 0.06);
 }
 
 .activity-icon {
@@ -283,13 +286,13 @@
     justify-content: space-between;
     align-items: center;
     padding: var(--spacing-2) var(--spacing-3);
-    background: rgba(255, 255, 255, 0.02);
-    border: 1px solid transparent;
+    background: rgba(15, 23, 42, 0.5);
+    border: 1px solid rgba(148, 163, 184, 0.12);
     border-radius: var(--radius-md);
 }
 
 .service-item:hover {
-    background: rgba(255, 255, 255, 0.05);
+    background: rgba(148, 163, 184, 0.08);
 }
 
 .service-status {
@@ -327,8 +330,42 @@
 
 .system-status-badge,
 .status-indicator {
-    /* Hide old badges if present */
-    display: none;
+    display: inline-flex;
+}
+
+.system-status-badge {
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.375rem 0.75rem;
+    border: 1px solid var(--color-border-subtle);
+    border-radius: 999px;
+    background: rgba(15, 23, 42, 0.7);
+    color: var(--color-text-secondary);
+    font-size: 0.75rem;
+    letter-spacing: 0.01em;
+}
+
+.status-indicator {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--color-success);
+    box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.15);
+}
+
+.status-indicator--operational {
+    background: var(--color-success);
+    box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.15);
+}
+
+.status-indicator--degraded {
+    background: var(--color-warning);
+    box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.15);
+}
+
+.status-indicator--down {
+    background: var(--color-error);
+    box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.15);
 }
 
 /* ========== RESPONSIVE FALLBACK ========== */
