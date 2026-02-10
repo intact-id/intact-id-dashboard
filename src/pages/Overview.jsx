@@ -161,7 +161,7 @@ export default function Overview() {
                         <div className="stat-label">API Calls Today</div>
                         <div className="stat-value">{stats?.apiCallsToday?.toLocaleString()}</div>
                     </div>
-                    <div className="stat-icon stat-icon--purple">
+                    <div className="stat-icon stat-icon--amber">
                         <Activity size={20} />
                     </div>
                 </Card>

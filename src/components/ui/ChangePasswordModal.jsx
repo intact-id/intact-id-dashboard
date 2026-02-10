@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Lock, Eye, EyeOff, CheckCircle } from 'lucide-react';
 import Button from '../ui/Button';
 import Input from '../ui/Input';
@@ -19,6 +19,14 @@ export default function ChangePasswordModal({ isOpen, onClose, userId, onSuccess
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
     const [isSuccess, setIsSuccess] = useState(false);
+    const [mustStayOpen, setMustStayOpen] = useState(false);
+
+    // Once the modal opens, latch it open until password is successfully changed
+    useEffect(() => {
+        if (isOpen) {
+            setMustStayOpen(true);
+        }
+    }, [isOpen]);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -54,6 +62,7 @@ export default function ChangePasswordModal({ isOpen, onClose, userId, onSuccess
 
                 // Close after delay
                 setTimeout(() => {
+                    setMustStayOpen(false);
                     if (onSuccess) onSuccess();
                 }, 2000);
             } else {
@@ -80,7 +89,7 @@ export default function ChangePasswordModal({ isOpen, onClose, userId, onSuccess
         }
     };
 
-    if (!isOpen) return null;
+    if (!isOpen && !mustStayOpen) return null;
 
     return (
         <div className="modal-overlay" onClick={(e) => e.stopPropagation()}>

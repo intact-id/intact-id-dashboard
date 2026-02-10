@@ -30,8 +30,8 @@ api.interceptors.response.use(
     async (error) => {
         const originalRequest = error.config;
 
-        // Handle 401 (Unauthorized) and 403 (Forbidden) errors
-        if ((error.response?.status === 401 || error.response?.status === 403) && !originalRequest._retry) {
+        // Handle 401 (Unauthorized) errors only - 403 means valid token but insufficient permissions
+        if (error.response?.status === 401 && !originalRequest._retry) {
             originalRequest._retry = true;
 
             try {

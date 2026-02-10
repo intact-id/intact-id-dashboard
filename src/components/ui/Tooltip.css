@@ -5,7 +5,7 @@
 
 .tooltip {
     position: absolute;
-    background: var(--color-bg-primary);
+    background: rgba(15, 23, 42, 0.95);
     border: 1px solid var(--color-border-secondary);
     border-radius: var(--radius-md);
     padding: 8px 12px;
@@ -13,8 +13,8 @@
     color: var(--color-text-primary);
     white-space: nowrap;
     z-index: 1000;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-    animation: fadeIn 0.15s ease-out;
+    box-shadow: var(--shadow-sm);
+    animation: fadeIn 0.15s var(--ease-out);
     pointer-events: none;
 }
 
