@@ -28,8 +28,8 @@ export default function Settings() {
             if (activeTab === 'team') {
                 const teamData = await userService.getUsers();
                 setTeam(teamData.data.content || []);
-            } else if (activeTab === 'profile' && user?.companyId) {
-                const companyData = await companyService.getCompanyById(user.companyId);
+            } else if (activeTab === 'profile') {
+                const companyData = await companyService.getCurrentCompany(user?.companyId);
                 setCompany(companyData.data);
             }
             // Webhooks not yet implemented in backend

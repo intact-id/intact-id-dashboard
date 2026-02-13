@@ -51,6 +51,23 @@ const apiKeyService = {
             console.error('Get API keys error:', error);
             throw error;
         }
+    },
+
+    /**
+     * Get API usage metrics (SUPER_ADMIN only)
+     * @param {string} companyId - Optional company ID
+     * @returns {Promise<object>}
+     */
+    async getUsage(companyId) {
+        try {
+            const response = await api.get('/api/companies/api-keys/usage', {
+                params: companyId ? { companyId } : undefined
+            });
+            return response.data;
+        } catch (error) {
+            console.error('Get API usage error:', error);
+            throw error;
+        }
     }
 };
 
