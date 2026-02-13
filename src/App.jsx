@@ -13,11 +13,11 @@ import Settings from './pages/Settings';
 import Documents from './pages/Documents';
 import Analytics from './pages/Analytics';
 import VerificationDetail from './pages/VerificationDetail';
-import Checklists from './pages/Checklists';
-import Approvals from './pages/Approvals';
+import MakerChecker from './pages/MakerChecker';
 import Companies from './pages/Companies';
 import Notifications from './pages/Notifications';
 import TeamMembers from './pages/TeamMembers';
+import Usage from './pages/Usage';
 
 // Protected Route Component
 function ProtectedRoute({ children }) {
@@ -82,11 +82,13 @@ function AppRoutes() {
         <Route path="verifications/:id" element={<VerificationDetail />} />
         <Route path="documents" element={<Documents />} />
         <Route path="analytics" element={<Analytics />} />
-        <Route path="checklists" element={<Checklists />} />
-        <Route path="approvals" element={<Approvals />} />
+        <Route path="approvals" element={<Navigate to="/dashboard/maker-checker" replace />} />
+        <Route path="maker-checker" element={<MakerChecker />} />
         <Route path="companies" element={<Companies />} />
         <Route path="notifications" element={<Notifications />} />
-        <Route path="team" element={<TeamMembers />} />
+        <Route path="team" element={<Navigate to="/dashboard/users" replace />} />
+        <Route path="users" element={<TeamMembers />} />
+        <Route path="usage" element={<Usage />} />
         <Route path="api" element={<ApiManagement />} />
         <Route path="webhooks" element={<Webhooks />} />
         <Route path="billing" element={<Billing />} />
@@ -114,4 +116,3 @@ function App() {
 }
 
 export default App;
-

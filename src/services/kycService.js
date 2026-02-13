@@ -48,9 +48,11 @@ const kycService = {
                 page: pagination.page,
                 size: pagination.size,
                 ...(filters.status && filters.status !== 'all' && { status: filters.status }),
-                ...(filters.tier && { tier: filters.tier }),
+                ...(filters.tier && filters.tier !== 'all' && { tier: filters.tier }),
                 ...(filters.fromDate && { fromDate: filters.fromDate }),
                 ...(filters.toDate && { toDate: filters.toDate }),
+                ...(filters.companyId && { companyId: filters.companyId }),
+                ...(filters.search && { search: filters.search }),
             });
 
             const response = await api.get(`/api/v1/kyc/verifications?${params}`);
@@ -62,14 +64,25 @@ const kycService = {
     },
 
     /**
-     * Get document URL for viewing
+     * Build document URL
      * @param {string} verificationId - Verification ID
      * @param {string} documentId - Document ID
      * @returns {string} Document URL
      */
     getDocumentUrl(verificationId, documentId) {
-        const token = localStorage.getItem('accessToken');
-        return `/api/v1/kyc/verifications/${verificationId}/documents/${documentId}?token=${token}`;
+        return `/api/v1/kyc/verifications/${verificationId}/documents/${documentId}`;
+    },
+
+    /**
+     * Fetch document as blob using authenticated API client.
+     * This is required because <img> requests do not include Authorization headers automatically.
+     */
+    async getDocumentBlob(verificationId, documentId) {
+        const response = await api.get(
+            `/api/v1/kyc/verifications/${verificationId}/documents/${documentId}`,
+            { responseType: 'blob' }
+        );
+        return response.data;
     }
 };
 

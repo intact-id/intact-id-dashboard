@@ -9,6 +9,11 @@ const authService = {
      */
     async login(username, password) {
         try {
+            // Avoid stale-session crossover when switching accounts.
+            localStorage.removeItem('accessToken');
+            localStorage.removeItem('refreshToken');
+            localStorage.removeItem('user');
+
             const response = await api.post('/api/auth/login', {
                 username,
                 password,

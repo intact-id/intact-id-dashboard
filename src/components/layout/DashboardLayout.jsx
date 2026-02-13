@@ -18,15 +18,7 @@ import {
     Activity,
     Code,
     Webhook,
-    BookOpen,
-    LifeBuoy,
-    ShieldAlert,
-    FileCheck,
-    MessageSquare,
-    DollarSign,
     BarChart2,
-    AlertTriangle,
-    CheckCircle,
     ClipboardCheck,
     Building2
 } from 'lucide-react';
@@ -65,6 +57,8 @@ export default function DashboardLayout() {
         }));
     };
 
+    const isSuperAdmin = Array.isArray(user?.roles) && user.roles.includes('SUPER_ADMIN');
+
     const navSections = [
         {
             title: 'Main',
@@ -80,6 +74,7 @@ export default function DashboardLayout() {
             collapsible: true,
             items: [
                 { path: '/dashboard/api', label: 'API Keys', icon: Key },
+                ...(isSuperAdmin ? [{ path: '/dashboard/usage', label: 'Usage', icon: Activity }] : []),
                 { path: '/dashboard/webhooks', label: 'Webhooks', icon: Webhook },
                 { path: '/dashboard/logs', label: 'Request Logs', icon: Code, comingSoon: true },
             ]
@@ -88,10 +83,9 @@ export default function DashboardLayout() {
             title: 'Management',
             collapsible: true,
             items: [
-                { path: '/dashboard/team', label: 'Team Members', icon: Users },
+                { path: '/dashboard/users', label: 'User Management', icon: Users },
                 { path: '/dashboard/notifications', label: 'Notifications', icon: Bell },
-                { path: '/dashboard/checklists', label: 'Checklists', icon: ShieldAlert },
-                { path: '/dashboard/approvals', label: 'Approvals', icon: ClipboardCheck },
+                ...(isSuperAdmin ? [{ path: '/dashboard/maker-checker', label: 'Maker Checker', icon: ClipboardCheck }] : []),
                 { path: '/dashboard/companies', label: 'Companies', icon: Building2 },
             ]
         },
