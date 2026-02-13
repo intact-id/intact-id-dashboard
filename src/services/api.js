@@ -29,9 +29,14 @@ api.interceptors.response.use(
     (response) => response,
     async (error) => {
         const originalRequest = error.config;
+        const requestUrl = originalRequest?.url || '';
+        const isAuthEndpoint = requestUrl.includes('/api/auth/login') ||
+            requestUrl.includes('/api/auth/refresh') ||
+            requestUrl.includes('/api/auth/logout');
+        const hasRefreshToken = !!localStorage.getItem('refreshToken');
 
         // Handle 401 (Unauthorized) errors only - 403 means valid token but insufficient permissions
-        if (error.response?.status === 401 && !originalRequest._retry) {
+        if (error.response?.status === 401 && !originalRequest?._retry && !isAuthEndpoint && hasRefreshToken) {
             originalRequest._retry = true;
 
             try {

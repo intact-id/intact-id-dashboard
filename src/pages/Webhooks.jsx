@@ -1,108 +1,122 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { Building2, Mail, Phone, Globe, Webhook as WebhookIcon, RefreshCcw, Save, TestTube } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Badge from '../components/ui/Badge';
-import { Building2, Webhook, TestTube, Save, RefreshCcw } from 'lucide-react';
 import companyService from '../services/companyService';
 import webhookService from '../services/webhookService';
 import './Webhooks.css';
 
 export default function Webhooks() {
     const [companies, setCompanies] = useState([]);
+    const [filteredCompanies, setFilteredCompanies] = useState([]);
     const [selectedCompany, setSelectedCompany] = useState(null);
     const [communication, setCommunication] = useState(null);
-    const [loading, setLoading] = useState(true);
-    const [loadingWebhook, setLoadingWebhook] = useState(false);
-    const [error, setError] = useState(null);
-    const [testingWebhook, setTestingWebhook] = useState(false);
+    const [loadingCompanies, setLoadingCompanies] = useState(true);
+    const [loadingDetails, setLoadingDetails] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [statusFilter, setStatusFilter] = useState('ACTIVE');
+    const [pagination, setPagination] = useState({ page: 0, size: 20, totalPages: 0, totalElements: 0 });
+    const [error, setError] = useState('');
+    const [notice, setNotice] = useState(null);
+    const [saving, setSaving] = useState(false);
+    const [testing, setTesting] = useState(false);
 
-    // Form state
     const [webhookUrl, setWebhookUrl] = useState('');
     const [webhookEnabled, setWebhookEnabled] = useState(false);
     const [emailNotifications, setEmailNotifications] = useState(true);
     const [smsNotifications, setSmsNotifications] = useState(false);
 
-    // Modal and notification states
-    const [showSuccessModal, setShowSuccessModal] = useState(false);
-    const [showTestResultModal, setShowTestResultModal] = useState(false);
-    const [testResult, setTestResult] = useState(null);
-    const [successMessage, setSuccessMessage] = useState('');
-
     useEffect(() => {
         fetchCompanies();
-    }, []);
+    }, [pagination.page, statusFilter]);
 
     useEffect(() => {
-        if (selectedCompany) {
-            fetchWebhookSettings();
+        if (!searchQuery.trim()) {
+            setFilteredCompanies(companies);
+            return;
         }
-    }, [selectedCompany]);
+        const query = searchQuery.toLowerCase();
+        setFilteredCompanies(
+            companies.filter((company) =>
+                company.legalName?.toLowerCase().includes(query) ||
+                company.registrationNumber?.toLowerCase().includes(query) ||
+                company.country?.toLowerCase().includes(query)
+            )
+        );
+    }, [searchQuery, companies]);
 
     const fetchCompanies = async () => {
-        setLoading(true);
+        setLoadingCompanies(true);
+        setError('');
         try {
             const response = await companyService.getAllCompanies(
-                { status: 'ACTIVE' },
-                { page: 0, size: 100 }
+                statusFilter === 'all' ? {} : { status: statusFilter },
+                { page: pagination.page, size: pagination.size }
             );
-
-            console.log('Companies response:', response);
-
             if (response.success) {
-                const companiesList = response.data.content || [];
-                console.log('Companies loaded:', companiesList.length, companiesList);
-                setCompanies(companiesList);
+                const pageData = response.data || {};
+                const list = pageData.content || [];
+                setCompanies(list);
+                setFilteredCompanies(list);
+                setPagination((prev) => ({
+                    ...prev,
+                    totalPages: pageData.totalPages || 0,
+                    totalElements: pageData.totalElements || 0
+                }));
+                if (list.length > 0) {
+                    const next = list.find((c) => c.id === selectedCompany?.id) || list[0];
+                    await selectCompany(next);
+                } else {
+                    setSelectedCompany(null);
+                    setCommunication(null);
+                }
             }
-        } catch (error) {
-            console.error('Error fetching companies:', error);
-            setError('Failed to load companies');
+        } catch (err) {
+            setError(err.response?.data?.errorMessage || err.message || 'Failed to load companies');
         } finally {
-            setLoading(false);
+            setLoadingCompanies(false);
         }
     };
 
-    const fetchWebhookSettings = async () => {
-        if (!selectedCompany) return;
-
-        setLoadingWebhook(true);
-        setError(null);
+    const selectCompany = async (company) => {
+        setSelectedCompany(company);
+        setLoadingDetails(true);
+        setError('');
+        setNotice(null);
         try {
-            const response = await webhookService.getCompanyCommunication(selectedCompany.id);
-
-            if (response.success && response.data) {
-                setCommunication(response.data);
-                setWebhookUrl(response.data.webhookUrl || '');
-                setWebhookEnabled(response.data.webhookEnabled || false);
-                setEmailNotifications(response.data.emailNotifications !== false);
-                setSmsNotifications(response.data.smsNotifications || false);
+            const response = await webhookService.getCompanyCommunication(company.id);
+            if (response.success) {
+                const data = response.data || null;
+                setCommunication(data);
+                setWebhookUrl(data?.webhookUrl || '');
+                setWebhookEnabled(data?.webhookEnabled || false);
+                setEmailNotifications(data?.emailNotifications !== false);
+                setSmsNotifications(data?.smsNotifications || false);
+            } else {
+                setCommunication(null);
             }
-        } catch (error) {
-            console.error('Error fetching webhook settings:', error);
-            setError(error.response?.data?.errorMessage || 'Failed to load webhook settings');
-            // Set defaults if error
+        } catch (err) {
             setCommunication(null);
             setWebhookUrl('');
             setWebhookEnabled(false);
+            setEmailNotifications(true);
+            setSmsNotifications(false);
+            setError(err.response?.data?.errorMessage || err.message || 'Failed to load webhook settings');
         } finally {
-            setLoadingWebhook(false);
+            setLoadingDetails(false);
         }
-    };
-
-    const handleCompanySelect = (company) => {
-        setSelectedCompany(company);
     };
 
     const handleSaveWebhook = async () => {
-        if (!selectedCompany) {
-            setError('Please select a company first');
-            return;
-        }
-
+        if (!selectedCompany) return;
         if (webhookEnabled && !webhookUrl.trim()) {
-            setError('Please provide a webhook URL');
+            setError('Webhook URL is required when webhook is enabled.');
             return;
         }
-
+        setSaving(true);
+        setError('');
+        setNotice(null);
         try {
             const response = await webhookService.updateWebhookSettings(selectedCompany.id, {
                 webhookUrl: webhookUrl.trim(),
@@ -110,328 +124,278 @@ export default function Webhooks() {
                 emailNotifications,
                 smsNotifications
             });
-
             if (response.success) {
-                setSuccessMessage('Webhook settings saved successfully');
-                setShowSuccessModal(true);
-                fetchWebhookSettings();
+                setNotice({ type: 'success', message: 'Webhook settings saved successfully.' });
+                await selectCompany(selectedCompany);
             } else {
-                setError('Failed to save webhook settings: ' + response.responseMessage);
+                setError(response.responseMessage || 'Failed to save webhook settings');
             }
-        } catch (error) {
-            console.error('Error saving webhook settings:', error);
-            setError('Failed to save webhook settings: ' + (error.response?.data?.errorMessage || error.message));
+        } catch (err) {
+            setError(err.response?.data?.errorMessage || err.message || 'Failed to save webhook settings');
+        } finally {
+            setSaving(false);
         }
     };
 
     const handleTestWebhook = async () => {
-        if (!selectedCompany) {
-            setError('Please select a company first');
-            return;
-        }
-
+        if (!selectedCompany) return;
         if (!webhookUrl.trim()) {
-            setError('Please provide a webhook URL first');
+            setError('Add a webhook URL before running test.');
             return;
         }
-
-        setTestingWebhook(true);
+        setTesting(true);
+        setError('');
+        setNotice(null);
         try {
             const response = await webhookService.testWebhook(selectedCompany.id);
-
             if (response.success) {
-                setTestResult({
-                    success: true,
-                    message: 'Test webhook sent successfully! Check your endpoint logs.'
-                });
+                setNotice({ type: 'success', message: 'Webhook test sent successfully.' });
             } else {
-                setTestResult({
-                    success: false,
-                    message: 'Webhook test failed: ' + response.responseMessage
-                });
+                setNotice({ type: 'error', message: response.responseMessage || 'Webhook test failed.' });
             }
-            setShowTestResultModal(true);
-        } catch (error) {
-            console.error('Error testing webhook:', error);
-            setTestResult({
-                success: false,
-                message: 'Webhook test failed: ' + (error.response?.data?.errorMessage || error.message)
+        } catch (err) {
+            setNotice({
+                type: 'error',
+                message: err.response?.data?.errorMessage || err.message || 'Webhook test failed.'
             });
-            setShowTestResultModal(true);
         } finally {
-            setTestingWebhook(false);
+            setTesting(false);
         }
     };
 
-    if (loading) {
-        return (
-            <div className="page-loading">
-                <div className="spinner"></div>
-                <p>Loading companies...</p>
-            </div>
-        );
-    }
+    const formatDate = (dateString) => {
+        if (!dateString) return 'N/A';
+        return new Date(dateString).toLocaleString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+    };
 
     return (
         <div className="webhooks-page">
             <div className="page-header">
                 <div>
                     <h1>Webhook Management</h1>
-                    <p className="page-subtitle">Configure webhook endpoints and notification settings for companies</p>
+                    <p className="page-subtitle">Configure webhook endpoints and communication channels per company.</p>
                 </div>
+                <Button variant="secondary" onClick={fetchCompanies}>
+                    <RefreshCcw size={14} />
+                    Refresh
+                </Button>
             </div>
 
-            {error && (
-                <div className="error-banner">
-                    {error}
+            {error && <div className="error-banner">{error}</div>}
+            {notice && (
+                <div className={`notice-banner ${notice.type === 'success' ? 'success' : 'error'}`}>
+                    {notice.message}
                 </div>
             )}
 
-            {/* Company Selection Grid */}
-            <Card className="company-selector-card">
-                <div className="card-header-action">
-                    <div>
-                        <h3>Select Company</h3>
-                        <p className="card-subtitle">Choose a company to manage webhook settings</p>
+            <div className="webhooks-layout">
+                <Card className="companies-panel">
+                    <div className="panel-header">
+                        <h3>Companies</h3>
+                        <Badge variant="info">{pagination.totalElements}</Badge>
                     </div>
-                    <Badge variant="info">{companies.length} Companies</Badge>
-                </div>
 
-                <div className="companies-grid">
-                    {companies.map((company) => (
-                        <div
-                            key={company.id}
-                            className={`company-card ${selectedCompany?.id === company.id ? 'selected' : ''}`}
-                            onClick={() => handleCompanySelect(company)}
+                    <div className="panel-filters">
+                        <input
+                            className="panel-input"
+                            placeholder="Search company..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                        />
+                        <select
+                            className="panel-input"
+                            value={statusFilter}
+                            onChange={(e) => {
+                                setPagination((prev) => ({ ...prev, page: 0 }));
+                                setStatusFilter(e.target.value);
+                            }}
                         >
-                            <div className="company-card-header">
-                                <Building2 size={24} />
-                                <Badge variant={company.status === 'ACTIVE' ? 'success' : 'warning'}>
-                                    {company.status}
-                                </Badge>
-                            </div>
-                            <h4 className="company-card-name">{company.legalName}</h4>
-                            <div className="company-card-details">
-                                <div className="company-detail">
-                                    <span className="detail-label">Code:</span>
-                                    <span className="detail-value">{company.companyIdentifierCode || 'N/A'}</span>
-                                </div>
-                                <div className="company-detail">
-                                    <span className="detail-label">Country:</span>
-                                    <span className="detail-value">{company.country || 'N/A'}</span>
-                                </div>
-                                <div className="company-detail">
-                                    <span className="detail-label">Type:</span>
-                                    <span className="detail-value">{company.businessType || 'N/A'}</span>
-                                </div>
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            </Card>
-
-            {/* Webhook Configuration */}
-            {selectedCompany && (
-                <Card className="webhook-config-card">
-                    <div className="card-header-action">
-                        <div>
-                            <h3>Webhook Configuration</h3>
-                            <p className="card-subtitle">Configure webhook endpoint for {selectedCompany.legalName}</p>
-                        </div>
-                        <div className="header-actions">
-                            <Button
-                                variant="secondary"
-                                size="sm"
-                                onClick={fetchWebhookSettings}
-                            >
-                                <RefreshCcw size={16} />
-                                Refresh
-                            </Button>
-                        </div>
+                            <option value="all">All Status</option>
+                            <option value="ACTIVE">Active</option>
+                            <option value="SUSPENDED">Suspended</option>
+                            <option value="INACTIVE">Inactive</option>
+                            <option value="PENDING">Pending</option>
+                        </select>
                     </div>
 
-                    <div className="card-body">
-                        {loadingWebhook ? (
-                            <div className="loading-state">
-                                <div className="spinner"></div>
-                                <p>Loading webhook settings...</p>
-                            </div>
+                    <div className="panel-table-wrap">
+                        {loadingCompanies ? (
+                            <div className="loading-state">Loading companies...</div>
                         ) : (
-                            <div className="webhook-form">
-                                {/* Webhook URL */}
-                                <div className="form-group">
-                                    <label className="form-label">
-                                        <Webhook size={16} />
-                                        Webhook URL
-                                    </label>
-                                    <input
-                                        type="url"
-                                        className="form-input"
-                                        placeholder="https://your-domain.com/webhook"
-                                        value={webhookUrl}
-                                        onChange={(e) => setWebhookUrl(e.target.value)}
-                                    />
-                                    <p className="form-help">Enter the endpoint URL where webhook notifications will be sent</p>
-                                </div>
-
-                                {/* Webhook Enabled Toggle */}
-                                <div className="form-group">
-                                    <label className="toggle-label">
-                                        <input
-                                            type="checkbox"
-                                            className="toggle-input"
-                                            checked={webhookEnabled}
-                                            onChange={(e) => setWebhookEnabled(e.target.checked)}
-                                        />
-                                        <span className="toggle-slider"></span>
-                                        <span className="toggle-text">Enable Webhook</span>
-                                    </label>
-                                    <p className="form-help">Enable or disable webhook notifications</p>
-                                </div>
-
-                                <div className="divider"></div>
-
-                                {/* Notification Settings */}
-                                <h4 className="section-title">Notification Channels</h4>
-
-                                <div className="form-group">
-                                    <label className="toggle-label">
-                                        <input
-                                            type="checkbox"
-                                            className="toggle-input"
-                                            checked={emailNotifications}
-                                            onChange={(e) => setEmailNotifications(e.target.checked)}
-                                        />
-                                        <span className="toggle-slider"></span>
-                                        <span className="toggle-text">Email Notifications</span>
-                                    </label>
-                                    <p className="form-help">Receive notifications via email</p>
-                                </div>
-
-                                <div className="form-group">
-                                    <label className="toggle-label">
-                                        <input
-                                            type="checkbox"
-                                            className="toggle-input"
-                                            checked={smsNotifications}
-                                            onChange={(e) => setSmsNotifications(e.target.checked)}
-                                        />
-                                        <span className="toggle-slider"></span>
-                                        <span className="toggle-text">SMS Notifications</span>
-                                    </label>
-                                    <p className="form-help">Receive notifications via SMS</p>
-                                </div>
-
-                                {/* Action Buttons */}
-                                <div className="form-actions">
-                                    <Button
-                                        variant="secondary"
-                                        onClick={handleTestWebhook}
-                                        disabled={!webhookUrl.trim() || testingWebhook}
-                                    >
-                                        <TestTube size={18} />
-                                        {testingWebhook ? 'Testing...' : 'Test Webhook'}
-                                    </Button>
-                                    <Button
-                                        variant="primary"
-                                        onClick={handleSaveWebhook}
-                                    >
-                                        <Save size={18} />
-                                        Save Settings
-                                    </Button>
-                                </div>
-                            </div>
+                            <table className="companies-table">
+                                <thead>
+                                    <tr>
+                                        <th>Company</th>
+                                        <th>Status</th>
+                                        <th>Country</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {filteredCompanies.map((company) => (
+                                        <tr
+                                            key={company.id}
+                                            className={selectedCompany?.id === company.id ? 'selected' : ''}
+                                            onClick={() => selectCompany(company)}
+                                        >
+                                            <td>
+                                                <div className="company-main">
+                                                    <Building2 size={14} />
+                                                    <span>{company.legalName}</span>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <Badge
+                                                    variant={
+                                                        company.status === 'ACTIVE'
+                                                            ? 'success'
+                                                            : company.status === 'SUSPENDED'
+                                                                ? 'warning'
+                                                                : 'default'
+                                                    }
+                                                >
+                                                    {company.status}
+                                                </Badge>
+                                            </td>
+                                            <td>{company.country || 'N/A'}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
                         )}
                     </div>
-                </Card>
-            )}
 
-            {/* Webhook Info Card */}
-            {selectedCompany && communication && (
-                <Card className="webhook-info-card">
-                    <div className="card-header">
-                        <h3>Communication Details</h3>
-                    </div>
-                    <div className="card-body">
-                        <div className="info-grid">
-                            <div className="info-item">
-                                <span className="info-label">Primary Email</span>
-                                <span className="info-value">{communication.email || 'N/A'}</span>
-                            </div>
-                            <div className="info-item">
-                                <span className="info-label">Phone</span>
-                                <span className="info-value">{communication.phone || 'N/A'}</span>
-                            </div>
-                            <div className="info-item">
-                                <span className="info-label">Support Email</span>
-                                <span className="info-value">{communication.supportEmail || 'N/A'}</span>
-                            </div>
-                            <div className="info-item">
-                                <span className="info-label">Website</span>
-                                <span className="info-value">{communication.website || 'N/A'}</span>
-                            </div>
-                        </div>
+                    <div className="pagination-controls">
+                        <button
+                            className="pagination-btn"
+                            disabled={pagination.page === 0}
+                            onClick={() => setPagination((prev) => ({ ...prev, page: prev.page - 1 }))}
+                        >
+                            Previous
+                        </button>
+                        <span>Page {pagination.page + 1} of {Math.max(pagination.totalPages, 1)}</span>
+                        <button
+                            className="pagination-btn"
+                            disabled={pagination.page >= pagination.totalPages - 1 || pagination.totalPages === 0}
+                            onClick={() => setPagination((prev) => ({ ...prev, page: prev.page + 1 }))}
+                        >
+                            Next
+                        </button>
                     </div>
                 </Card>
-            )}
 
-            {/* Success Modal */}
-            {showSuccessModal && (
-                <div className="modal-overlay" onClick={() => setShowSuccessModal(false)}>
-                    <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-                        <div className="modal-header">
-                            <h2>Success</h2>
-                            <button className="modal-close" onClick={() => setShowSuccessModal(false)}>×</button>
-                        </div>
-                        <div className="modal-body">
-                            <div className="info-box" style={{
-                                background: 'rgba(34, 197, 94, 0.1)',
-                                border: '1px solid rgba(34, 197, 94, 0.3)'
-                            }}>
-                                <p>{successMessage}</p>
+                <Card className="details-panel">
+                    {!selectedCompany ? (
+                        <div className="empty-state">Select a company to manage webhook settings.</div>
+                    ) : loadingDetails ? (
+                        <div className="loading-state">Loading details...</div>
+                    ) : (
+                        <div className="details-content">
+                            <div className="details-header">
+                                <div>
+                                    <h2>{selectedCompany.legalName}</h2>
+                                    <p>{selectedCompany.registrationNumber || selectedCompany.id}</p>
+                                    <div className="details-meta">
+                                        <Badge variant={selectedCompany.status === 'ACTIVE' ? 'success' : 'warning'}>
+                                            {selectedCompany.status}
+                                        </Badge>
+                                        <span>Created: {formatDate(selectedCompany.createdAt)}</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="details-grid">
+                                <div className="detail-box">
+                                    <h4>Company Details</h4>
+                                    <div className="detail-row"><span>Trading Name</span><strong>{selectedCompany.tradingName || 'N/A'}</strong></div>
+                                    <div className="detail-row"><span>Business Type</span><strong>{selectedCompany.businessType || 'N/A'}</strong></div>
+                                    <div className="detail-row"><span>Country</span><strong>{selectedCompany.country || 'N/A'}</strong></div>
+                                    <div className="detail-row"><span>Company Code</span><strong>{selectedCompany.companyIdentifierCode || 'N/A'}</strong></div>
+                                </div>
+
+                                <div className="detail-box">
+                                    <h4>Communication Channels</h4>
+                                    <div className="detail-row"><span><Mail size={14} /> Primary Email</span><strong>{communication?.email || 'N/A'}</strong></div>
+                                    <div className="detail-row"><span><Phone size={14} /> Primary Phone</span><strong>{communication?.phone || 'N/A'}</strong></div>
+                                    <div className="detail-row"><span><Mail size={14} /> Support Email</span><strong>{communication?.supportEmail || 'N/A'}</strong></div>
+                                    <div className="detail-row"><span><Globe size={14} /> Website</span><strong>{communication?.website || 'N/A'}</strong></div>
+                                </div>
+
+                                <div className="detail-box detail-box-full">
+                                    <h4>Webhook Configuration</h4>
+                                    <div className="field-grid">
+                                        <div className="field-group field-group-full">
+                                            <label className="field-label">
+                                                <WebhookIcon size={14} />
+                                                Webhook URL
+                                            </label>
+                                            <input
+                                                type="url"
+                                                className="panel-input"
+                                                placeholder="https://your-domain.com/webhook"
+                                                value={webhookUrl}
+                                                onChange={(e) => setWebhookUrl(e.target.value)}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="switch-stack">
+                                        <label className="switch-row">
+                                            <span className="switch-text">Enable Webhook</span>
+                                            <input className="switch-input" type="checkbox" checked={webhookEnabled} onChange={(e) => setWebhookEnabled(e.target.checked)} />
+                                            <span className="switch-control">
+                                                <span className="switch-pill" aria-hidden="true"></span>
+                                                <span className={`switch-state ${webhookEnabled ? 'on' : 'off'}`}>{webhookEnabled ? 'ON' : 'OFF'}</span>
+                                            </span>
+                                        </label>
+                                        <label className="switch-row">
+                                            <span className="switch-text">Email Notifications</span>
+                                            <input className="switch-input" type="checkbox" checked={emailNotifications} onChange={(e) => setEmailNotifications(e.target.checked)} />
+                                            <span className="switch-control">
+                                                <span className="switch-pill" aria-hidden="true"></span>
+                                                <span className={`switch-state ${emailNotifications ? 'on' : 'off'}`}>{emailNotifications ? 'ON' : 'OFF'}</span>
+                                            </span>
+                                        </label>
+                                        <label className="switch-row">
+                                            <span className="switch-text">SMS Notifications</span>
+                                            <input className="switch-input" type="checkbox" checked={smsNotifications} onChange={(e) => setSmsNotifications(e.target.checked)} />
+                                            <span className="switch-control">
+                                                <span className="switch-pill" aria-hidden="true"></span>
+                                                <span className={`switch-state ${smsNotifications ? 'on' : 'off'}`}>{smsNotifications ? 'ON' : 'OFF'}</span>
+                                            </span>
+                                        </label>
+                                    </div>
+
+                                    <div className="detail-row">
+                                        <span>Webhook Status</span>
+                                        <strong>{webhookEnabled ? 'Enabled' : 'Disabled'}</strong>
+                                    </div>
+                                    <div className="detail-row">
+                                        <span>Current URL</span>
+                                        <strong className="mono">{communication?.webhookUrl || 'Not configured'}</strong>
+                                    </div>
+
+                                    <div className="actions-row">
+                                        <Button variant="secondary" onClick={handleTestWebhook} disabled={testing || !webhookUrl.trim()}>
+                                            <TestTube size={14} />
+                                            {testing ? 'Testing...' : 'Test Webhook'}
+                                        </Button>
+                                        <Button onClick={handleSaveWebhook} disabled={saving}>
+                                            <Save size={14} />
+                                            {saving ? 'Saving...' : 'Save Settings'}
+                                        </Button>
+                                    </div>
+                                </div>
                             </div>
                         </div>
-                        <div className="modal-footer">
-                            <Button variant="primary" onClick={() => setShowSuccessModal(false)}>
-                                OK
-                            </Button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Test Result Modal */}
-            {showTestResultModal && (
-                <div className="modal-overlay" onClick={() => setShowTestResultModal(false)}>
-                    <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-                        <div className="modal-header">
-                            <h2>{testResult?.success ? 'Test Successful' : 'Test Failed'}</h2>
-                            <button className="modal-close" onClick={() => setShowTestResultModal(false)}>×</button>
-                        </div>
-                        <div className="modal-body">
-                            <div className="info-box" style={{
-                                background: testResult?.success ? 'rgba(34, 197, 94, 0.1)' : 'rgba(239, 68, 68, 0.1)',
-                                border: `1px solid ${testResult?.success ? 'rgba(34, 197, 94, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`
-                            }}>
-                                <p>{testResult?.message}</p>
-                                {testResult?.success && (
-                                    <p style={{ marginTop: '10px', fontSize: '0.9em', opacity: 0.8 }}>
-                                        Check your webhook endpoint logs to see the test payload.
-                                    </p>
-                                )}
-                            </div>
-                        </div>
-                        <div className="modal-footer">
-                            <Button
-                                variant={testResult?.success ? "primary" : "secondary"}
-                                onClick={() => setShowTestResultModal(false)}
-                            >
-                                Close
-                            </Button>
-                        </div>
-                    </div>
-                </div>
-            )}
+                    )}
+                </Card>
+            </div>
         </div>
     );
 }

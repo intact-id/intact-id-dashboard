@@ -1,279 +1,171 @@
-import { useState, useEffect, useRef } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { Building2, KeyRound, Copy, Check, RefreshCcw, PauseCircle, PlayCircle } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Badge from '../components/ui/Badge';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { Search, Building2, Key, RefreshCcw, Trash2, Edit3, Copy, Check, PauseCircle, PlayCircle } from 'lucide-react';
+import companyService from '../services/companyService';
 import apiKeyService from '../services/apiKeyService';
 import credentialsService from '../services/credentialsService';
-import analyticsService from '../services/analyticsService';
-import companyService from '../services/companyService';
 import './ApiManagement.css';
 
 export default function ApiManagement() {
-    // State management
+    const { user } = useAuth();
     const [companies, setCompanies] = useState([]);
-    const [selectedCompany, setSelectedCompany] = useState(null);
-    const [searchQuery, setSearchQuery] = useState('');
     const [filteredCompanies, setFilteredCompanies] = useState([]);
-    const [showSuggestions, setShowSuggestions] = useState(false);
-    const [apiKeys, setApiKeys] = useState([]);
-    const [usageData, setUsageData] = useState([]);
-    const [showNewKeyModal, setShowNewKeyModal] = useState(false);
-    const [showEditModal, setShowEditModal] = useState(false);
-    const [editingKey, setEditingKey] = useState(null);
-    const [newKeyName, setNewKeyName] = useState('');
-    const [generatedKey, setGeneratedKey] = useState(null);
-    const [loading, setLoading] = useState(true);
-    const [loadingKeys, setLoadingKeys] = useState(false);
-    const [error, setError] = useState(null);
-    const [copiedId, setCopiedId] = useState(null);
-
-    // Modal states
+    const [selectedCompany, setSelectedCompany] = useState(null);
+    const [credential, setCredential] = useState(null);
+    const [usage, setUsage] = useState(null);
+    const [loadingCompanies, setLoadingCompanies] = useState(true);
+    const [loadingDetails, setLoadingDetails] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [statusFilter, setStatusFilter] = useState('all');
+    const [pagination, setPagination] = useState({ page: 0, size: 20, totalPages: 0, totalElements: 0 });
+    const [copied, setCopied] = useState(null);
+    const [error, setError] = useState('');
+    const [showGenerateModal, setShowGenerateModal] = useState(false);
+    const [generatedCredential, setGeneratedCredential] = useState(null);
     const [showActionModal, setShowActionModal] = useState(false);
-    const [actionType, setActionType] = useState(null); // 'suspend' or 'activate'
+    const [actionType, setActionType] = useState(null);
     const [actionReason, setActionReason] = useState('');
     const [actionLoading, setActionLoading] = useState(false);
 
-    // Notification modal states
-    const [showNotificationModal, setShowNotificationModal] = useState(false);
-    const [notificationMessage, setNotificationMessage] = useState('');
-    const [notificationType, setNotificationType] = useState('success'); // 'success' or 'error'
+    const isSuperAdmin = useMemo(
+        () => Array.isArray(user?.roles) && user.roles.includes('SUPER_ADMIN'),
+        [user?.roles]
+    );
 
-    const searchRef = useRef(null);
-
-    // Fetch companies on mount
     useEffect(() => {
         fetchCompanies();
-    }, []);
+    }, [pagination.page, statusFilter]);
 
-    // Fetch API keys and usage data when company changes
     useEffect(() => {
-        if (selectedCompany) {
-            fetchApiKeys();
-            fetchUsageData();
+        if (!searchQuery.trim()) {
+            setFilteredCompanies(companies);
+            return;
         }
-    }, [selectedCompany]);
+        const query = searchQuery.toLowerCase();
+        setFilteredCompanies(
+            companies.filter((c) =>
+                c.legalName?.toLowerCase().includes(query) ||
+                c.registrationNumber?.toLowerCase().includes(query) ||
+                c.country?.toLowerCase().includes(query)
+            )
+        );
+    }, [companies, searchQuery]);
 
     const fetchCompanies = async () => {
-        setLoading(true);
+        setLoadingCompanies(true);
+        setError('');
         try {
             const response = await companyService.getAllCompanies(
-                { status: 'ACTIVE' }, // Backend uses ACTIVE, not APPROVED
-                { page: 0, size: 100 }
+                statusFilter === 'all' ? {} : { status: statusFilter },
+                { page: pagination.page, size: pagination.size }
             );
-
-            console.log('Companies response:', response);
-
             if (response.success) {
-                const companiesList = response.data.content || [];
-                console.log('Companies loaded:', companiesList.length, companiesList);
-                setCompanies(companiesList);
-            }
-        } catch (error) {
-            console.error('Error fetching companies:', error);
-            setError('Failed to load companies');
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const fetchApiKeys = async () => {
-        if (!selectedCompany) return;
-
-        setLoadingKeys(true);
-        setError(null);
-        try {
-            const response = await apiKeyService.getApiKeys(selectedCompany.id);
-
-            // Backend returns array, but we expect single credential per company
-            if (response.success && response.data) {
-                const credentials = response.data.map(cred => ({
-                    apiKey: cred.apiKey,
-                    apiSecret: cred.apiSecret,
-                    expiresAt: cred.expiresAt,
-                    status: cred.status
+                const pageData = response.data;
+                const list = pageData.content || [];
+                setCompanies(list);
+                setFilteredCompanies(list);
+                setPagination((prev) => ({
+                    ...prev,
+                    totalPages: pageData.totalPages || 0,
+                    totalElements: pageData.totalElements || 0
                 }));
-                setApiKeys(credentials);
+                if (list.length > 0 && !selectedCompany) {
+                    await selectCompany(list[0]);
+                }
             }
-        } catch (error) {
-            console.error('Error fetching API keys:', error);
-            setError(error.response?.data?.errorMessage || 'Failed to load API keys');
-            setApiKeys([]);
+        } catch (err) {
+            setError(err.response?.data?.errorMessage || err.message || 'Failed to load companies');
         } finally {
-            setLoadingKeys(false);
+            setLoadingCompanies(false);
         }
     };
 
-    const fetchUsageData = async () => {
-        if (!selectedCompany) return;
-
-        try {
-            const response = await analyticsService.getUsageData({
-                startDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
-                endDate: new Date().toISOString()
-            });
-
-            if (response.success && response.data) {
-                setUsageData(response.data.slice(0, 7)); // Last 7 days
-            }
-        } catch (error) {
-            console.error('Error fetching usage data:', error);
-        }
-    };
-
-    const handleCompanySelect = (company) => {
+    const selectCompany = async (company) => {
         setSelectedCompany(company);
-    };
-
-    const copyToClipboard = (text, id) => {
-        navigator.clipboard.writeText(text);
-        setCopiedId(id);
-        setTimeout(() => setCopiedId(null), 2000);
-    };
-
-    const generateNewKey = async () => {
-        if (!selectedCompany) {
-            setNotificationMessage('Please select a company first');
-            setNotificationType('error');
-            setShowNotificationModal(true);
-            return;
-        }
-
+        setLoadingDetails(true);
+        setError('');
         try {
-            const response = await apiKeyService.generateApiKey(selectedCompany.id);
+            const [keysResponse, usageResponse] = await Promise.allSettled([
+                apiKeyService.getApiKeys(company.id),
+                apiKeyService.getUsage(company.id)
+            ]);
 
-            if (response.success) {
-                const newCredential = {
-                    apiKey: response.data.apiKey,
-                    apiSecret: response.data.apiSecret,
-                    expiresAt: response.data.expiresAt,
-                    status: response.data.status
-                };
-
-                setGeneratedKey(newCredential);
-                // Replace existing credentials (backend only allows one set per company)
-                setApiKeys([newCredential]);
-                setShowNewKeyModal(true);
+            if (keysResponse.status === 'fulfilled' && keysResponse.value.success) {
+                setCredential(keysResponse.value.data?.[0] || null);
             } else {
-                setNotificationMessage('Failed to generate API key: ' + response.responseMessage);
-                setNotificationType('error');
-                setShowNotificationModal(true);
+                setCredential(null);
             }
-        } catch (error) {
-            console.error('Error generating API key:', error);
-            setNotificationMessage('Failed to generate API key: ' + (error.response?.data?.errorMessage || error.message));
-            setNotificationType('error');
-            setShowNotificationModal(true);
+
+            if (usageResponse.status === 'fulfilled' && usageResponse.value.success) {
+                setUsage(usageResponse.value.data || null);
+            } else {
+                setUsage(null);
+            }
+        } catch (err) {
+            setError(err.response?.data?.errorMessage || err.message || 'Failed to load company API details');
+        } finally {
+            setLoadingDetails(false);
         }
     };
 
-    const regenerateKey = async () => {
-        if (!confirm('Are you sure you want to regenerate the API credentials? The old credentials will be replaced.')) {
-            return;
-        }
-
-        try {
-            const response = await apiKeyService.generateApiKey(selectedCompany.id);
-
-            if (response.success) {
-                const newCredential = {
-                    apiKey: response.data.apiKey,
-                    apiSecret: response.data.apiSecret,
-                    expiresAt: response.data.expiresAt,
-                    status: response.data.status
-                };
-
-                setGeneratedKey(newCredential);
-                setApiKeys([newCredential]);
-                setNotificationMessage('API credentials regenerated successfully');
-                setNotificationType('success');
-                setShowNotificationModal(true);
-                setShowNewKeyModal(true);
-            } else {
-                setNotificationMessage('Failed to regenerate: ' + response.responseMessage);
-                setNotificationType('error');
-                setShowNotificationModal(true);
-            }
-        } catch (error) {
-            console.error('Error regenerating:', error);
-            setNotificationMessage('Failed to regenerate: ' + (error.response?.data?.errorMessage || error.message));
-            setNotificationType('error');
-            setShowNotificationModal(true);
-        }
+    const copyValue = async (value, key) => {
+        if (!value) return;
+        await navigator.clipboard.writeText(value);
+        setCopied(key);
+        setTimeout(() => setCopied(null), 1200);
     };
 
-    const suspendCredentials = async () => {
+    const generateCredentials = async () => {
         if (!selectedCompany) return;
-        setActionType('suspend');
+        try {
+            const response = await apiKeyService.generateApiKey(selectedCompany.id);
+            if (response.success) {
+                setGeneratedCredential(response.data);
+                setCredential(response.data);
+                setShowGenerateModal(true);
+                await selectCompany(selectedCompany);
+            }
+        } catch (err) {
+            setError(err.response?.data?.errorMessage || err.message || 'Failed to generate credentials');
+        }
+    };
+
+    const openAction = (type) => {
+        setActionType(type);
         setActionReason('');
         setShowActionModal(true);
     };
 
-    const activateCredentials = async () => {
+    const confirmAction = async () => {
         if (!selectedCompany) return;
-        setActionType('activate');
-        setActionReason('');
-        setShowActionModal(true);
-    };
-
-    const handleActionConfirm = async () => {
-        if (!selectedCompany) return;
-
         setActionLoading(true);
         try {
-            let response;
             if (actionType === 'suspend') {
-                response = await credentialsService.suspendCredentials(
-                    selectedCompany.id,
-                    actionReason || 'Suspended via dashboard'
-                );
+                await credentialsService.suspendCredentials(selectedCompany.id, actionReason || 'Suspended via dashboard');
             } else {
-                response = await credentialsService.activateCredentials(selectedCompany.id);
+                await credentialsService.activateCredentials(selectedCompany.id);
             }
-
-            if (response.success) {
-                setShowActionModal(false);
-                setActionReason('');
-                fetchApiKeys(); // Refresh to show updated status
-                fetchCompanies(); // Refresh company list
-
-                // Show success message
-                setNotificationMessage(`Credentials ${actionType === 'suspend' ? 'suspended' : 'activated'} successfully`);
-                setNotificationType('success');
-                setShowNotificationModal(true);
-            } else {
-                setNotificationMessage(`Failed to ${actionType}: ` + response.responseMessage);
-                setNotificationType('error');
-                setShowNotificationModal(true);
-            }
-        } catch (error) {
-            console.error(`Error ${actionType}ing credentials:`, error);
-            setNotificationMessage(`Failed to ${actionType}: ` + (error.response?.data?.errorMessage || error.message));
-            setNotificationType('error');
-            setShowNotificationModal(true);
+            setShowActionModal(false);
+            await selectCompany(selectedCompany);
+        } catch (err) {
+            setError(err.response?.data?.errorMessage || err.message || `Failed to ${actionType} credentials`);
         } finally {
             setActionLoading(false);
         }
     };
 
-    const formatDate = (dateString) => {
-        if (!dateString) return 'Never';
-        const date = new Date(dateString);
-        return date.toLocaleDateString('en-US', {
-            month: 'short',
-            day: 'numeric',
-            year: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit'
-        });
-    };
+    const safePct = (ok = 0, total = 0) => (!total ? 0 : Math.round((ok / total) * 100));
 
-    if (loading) {
+    if (!isSuperAdmin) {
         return (
-            <div className="page-loading">
-                <div className="spinner"></div>
-                <p>Loading companies...</p>
+            <div className="api-management">
+                <div className="page-header">
+                    <h1>API Key Management</h1>
+                </div>
+                <Card className="api-empty-state">This page is available to `SUPER_ADMIN` users only.</Card>
             </div>
         );
     }
@@ -283,382 +175,228 @@ export default function ApiManagement() {
             <div className="page-header">
                 <div>
                     <h1>API Key Management</h1>
-                    <p className="page-subtitle">Manage API keys and credentials for all companies</p>
+                    <p className="page-subtitle">Manage company credentials and API usage.</p>
                 </div>
-                <Button
-                    variant="primary"
-                    onClick={() => setShowNewKeyModal(true)}
-                    disabled={!selectedCompany}
-                >
-                    <Key size={18} />
-                    Generate New Key
+                <Button onClick={generateCredentials} disabled={!selectedCompany}>
+                    <KeyRound size={16} />
+                    Generate Credentials
                 </Button>
             </div>
 
-            {error && (
-                <div className="error-banner">
-                    {error}
-                </div>
-            )}
+            {error && <div className="error-banner">{error}</div>}
 
-            {/* Main Content Grid */}
-            <div className="api-content-grid">
-                {/* Left Sidebar: Company List */}
-                <div className="company-sidebar">
-                    <div className="sidebar-header">
-                        <h3 className="sidebar-title">Companies</h3>
-                        <Badge variant="info">{companies.length}</Badge>
+            <div className="api-layout">
+                <Card className="companies-panel">
+                    <div className="panel-header">
+                        <h3>Companies</h3>
+                        <Badge variant="info">{pagination.totalElements}</Badge>
                     </div>
-                     <div className="companies-list">
-                        {companies.map((company) => (
-                            <div
-                                key={company.id}
-                                className={`company-list-item ${selectedCompany?.id === company.id ? 'selected' : ''}`}
-                                onClick={() => handleCompanySelect(company)}
-                            >
-                                <div className="company-item-header">
-                                    <span className="company-name">{company.legalName}</span>
-                                    {company.status === 'ACTIVE' && <div className="status-dot status-dot--active"></div>}
-                                </div>
-                                <div className="company-item-meta">
-                                    <span>{company.country || 'N/A'}</span>
-                                    <span>•</span>
-                                    <span className="code-badge">{company.companyIdentifierCode || 'N/A'}</span>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
 
-                {/* Right Panel: API Details */}
-                <div className="main-content-panel">
+                    <div className="panel-filters">
+                        <input
+                            className="panel-input"
+                            placeholder="Search company..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                        />
+                        <select
+                            className="panel-input"
+                            value={statusFilter}
+                            onChange={(e) => {
+                                setPagination((prev) => ({ ...prev, page: 0 }));
+                                setStatusFilter(e.target.value);
+                            }}
+                        >
+                            <option value="all">All Status</option>
+                            <option value="ACTIVE">Active</option>
+                            <option value="SUSPENDED">Suspended</option>
+                            <option value="INACTIVE">Inactive</option>
+                        </select>
+                    </div>
+
+                    <div className="panel-table-wrap">
+                        {loadingCompanies ? (
+                            <div className="loading-state">Loading companies...</div>
+                        ) : (
+                            <table className="companies-table">
+                                <thead>
+                                    <tr>
+                                        <th>Company</th>
+                                        <th>Status</th>
+                                        <th>Country</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {filteredCompanies.map((company) => (
+                                        <tr
+                                            key={company.id}
+                                            className={selectedCompany?.id === company.id ? 'selected' : ''}
+                                            onClick={() => selectCompany(company)}
+                                        >
+                                            <td>
+                                                <div className="company-main">
+                                                    <Building2 size={14} />
+                                                    <span>{company.legalName}</span>
+                                                </div>
+                                            </td>
+                                            <td><Badge variant={company.status === 'ACTIVE' ? 'success' : 'warning'}>{company.status}</Badge></td>
+                                            <td>{company.country || 'N/A'}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        )}
+                    </div>
+
+                    <div className="pagination-controls">
+                        <button
+                            className="pagination-btn"
+                            disabled={pagination.page === 0}
+                            onClick={() => setPagination((prev) => ({ ...prev, page: prev.page - 1 }))}
+                        >
+                            Previous
+                        </button>
+                        <span>Page {pagination.page + 1} of {Math.max(pagination.totalPages, 1)}</span>
+                        <button
+                            className="pagination-btn"
+                            disabled={pagination.page >= pagination.totalPages - 1 || pagination.totalPages === 0}
+                            onClick={() => setPagination((prev) => ({ ...prev, page: prev.page + 1 }))}
+                        >
+                            Next
+                        </button>
+                    </div>
+                </Card>
+
+                <Card className="details-panel">
                     {!selectedCompany ? (
-                        <div className="empty-selection-state">
-                            <Building2 size={48} className="empty-icon-large" />
-                            <h3>Select a Company</h3>
-                            <p>Choose a company from the sidebar to manage API keys and view usage analytics.</p>
-                        </div>
+                        <div className="api-empty-state">Select a company to manage credentials.</div>
+                    ) : loadingDetails ? (
+                        <div className="loading-state">Loading API details...</div>
                     ) : (
-                        <div className="company-workspace">
-                            {/* Company Header Info */}
-                            <div className="workspace-header">
-                                <div className="workspace-title">
+                        <div className="details-content">
+                            <div className="details-header">
+                                <div>
                                     <h2>{selectedCompany.legalName}</h2>
-                                    <div className="workspace-badges">
-                                        <Badge variant={selectedCompany.status === 'ACTIVE' ? 'success' : 'warning'}>
-                                            {selectedCompany.status}
-                                        </Badge>
-                                        <span className="workspace-meta">ID: {selectedCompany.id.substring(0, 8)}...</span>
-                                    </div>
+                                    <p>{selectedCompany.registrationNumber || selectedCompany.id}</p>
                                 </div>
-                                <div className="workspace-actions">
-                                     <Button
-                                        variant="primary"
-                                        onClick={() => setShowNewKeyModal(true)}
-                                    >
-                                        <Key size={16} />
-                                        Generate Key
+                                <div className="details-actions">
+                                    <Button variant="secondary" onClick={generateCredentials}>
+                                        <RefreshCcw size={14} />
+                                        Rotate
                                     </Button>
+                                    {credential?.status === 'SUSPENDED' ? (
+                                        <Button onClick={() => openAction('activate')}>
+                                            <PlayCircle size={14} />
+                                            Activate
+                                        </Button>
+                                    ) : (
+                                        <Button variant="secondary" onClick={() => openAction('suspend')}>
+                                            <PauseCircle size={14} />
+                                            Suspend
+                                        </Button>
+                                    )}
                                 </div>
                             </div>
 
-                            {/* API Credentials Section */}
-                            <div className="credentials-section">
-                                <h3 className="section-title">Active Credentials</h3>
-                                {loadingKeys ? (
-                                    <div className="loading-state">
-                                        <div className="spinner"></div>
-                                        <p>Loading credentials...</p>
+                            <div className="credential-card">
+                                <div className="credential-row">
+                                    <span>Credential Status</span>
+                                    <Badge variant={credential?.status === 'ACTIVE' ? 'success' : 'warning'}>
+                                        {credential?.status || 'NOT GENERATED'}
+                                    </Badge>
+                                </div>
+                                <div className="credential-row">
+                                    <span>API Key</span>
+                                    <div className="secret-wrap">
+                                        <code>{credential?.apiKey || 'N/A'}</code>
+                                        {credential?.apiKey && (
+                                            <button onClick={() => copyValue(credential.apiKey, 'apiKey')}>
+                                                {copied === 'apiKey' ? <Check size={14} /> : <Copy size={14} />}
+                                            </button>
+                                        )}
                                     </div>
-                                ) : apiKeys.length === 0 ? (
-                                    <div className="empty-keys-state">
-                                        <p>No active API keys found.</p>
-                                        <Button variant="secondary" size="sm" onClick={() => setShowNewKeyModal(true)}>
-                                            Create First Key
-                                        </Button>
+                                </div>
+                                <div className="credential-row">
+                                    <span>API Secret</span>
+                                    <div className="secret-wrap">
+                                        <code>{credential?.apiSecret ? `${credential.apiSecret.slice(0, 8)}••••••••••` : 'N/A'}</code>
+                                        {credential?.apiSecret && (
+                                            <button onClick={() => copyValue(credential.apiSecret, 'apiSecret')}>
+                                                {copied === 'apiSecret' ? <Check size={14} /> : <Copy size={14} />}
+                                            </button>
+                                        )}
                                     </div>
-                                ) : (
-                                    <div className="keys-grid">
-                                        {apiKeys.map((credential, index) => (
-                                            <div key={index} className="key-detail-card">
-                                                <div className="key-header-row">
-                                                    <div className="status-badge-wrapper">
-                                                        <div className={`status-point ${credential.status === 'ACTIVE' ? 'active' : 'suspended'}`}></div>
-                                                        <span>{credential.status}</span>
-                                                    </div>
-                                                    <div className="key-actions">
-                                                        <button 
-                                                            className="action-icon-btn" 
-                                                            onClick={regenerateKey}
-                                                            title="Regenerate Key"
-                                                        >
-                                                            <RefreshCcw size={14} />
-                                                        </button>
-                                                        {credential.status === 'SUSPENDED' ? (
-                                                            <button 
-                                                                className="action-icon-btn success"
-                                                                onClick={activateCredentials}
-                                                                title="Activate"
-                                                            >
-                                                                <PlayCircle size={14} />
-                                                            </button>
-                                                        ) : (
-                                                            <button 
-                                                                className="action-icon-btn danger"
-                                                                onClick={suspendCredentials}
-                                                                title="Suspend"
-                                                            >
-                                                                <PauseCircle size={14} />
-                                                            </button>
-                                                        )}
-                                                    </div>
-                                                </div>
-
-                                                <div className="key-field-group">
-                                                    <label>API Key</label>
-                                                    <div className="code-display">
-                                                        <code>{credential.apiKey}</code>
-                                                        <button onClick={() => copyToClipboard(credential.apiKey, 'key')}>
-                                                            {copiedId === 'key' ? <Check size={14} className="text-success"/> : <Copy size={14}/>}
-                                                        </button>
-                                                    </div>
-                                                </div>
-
-                                                <div className="key-field-group">
-                                                    <label>API Secret</label>
-                                                    <div className="code-display">
-                                                        <code>{credential.apiSecret.substring(0, 8)}••••••••••••••••</code>
-                                                        <button onClick={() => copyToClipboard(credential.apiSecret, 'secret')}>
-                                                            {copiedId === 'secret' ? <Check size={14} className="text-success"/> : <Copy size={14}/>}
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
+                                </div>
                             </div>
-                            
-                            {/* Usage Chart Section */}
-                            <div className="usage-section">
-                                <h3 className="section-title">Traffic Analytics</h3>
-                                <div className="chart-container-glass">
-                                    <ResponsiveContainer width="100%" height={250}>
-                                        <BarChart data={usageData}>
-                                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255, 255, 255, 0.05)" vertical={false} />
-                                            <XAxis
-                                                dataKey="date"
-                                                stroke="#94A3B8" // var(--color-text-tertiary)
-                                                fontSize={12}
-                                                tickLine={false}
-                                                axisLine={false}
-                                                tickFormatter={(value) => {
-                                                    const date = new Date(value);
-                                                    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-                                                }}
-                                            />
-                                            <YAxis 
-                                                stroke="#94A3B8" 
-                                                fontSize={12}
-                                                tickLine={false}
-                                                axisLine={false}
-                                            />
-                                            <Tooltip
-                                                cursor={{ fill: 'rgba(255, 255, 255, 0.05)' }}
-                                                contentStyle={{
-                                                    background: 'rgba(15, 23, 42, 0.9)',
-                                                    border: '1px solid rgba(255, 255, 255, 0.1)',
-                                                    borderRadius: '8px',
-                                                    color: '#fff',
-                                                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.5)'
-                                                }}
-                                            />
-                                            <Bar 
-                                                dataKey="apiCalls" 
-                                                fill="url(#colorGradient)" 
-                                                radius={[4, 4, 0, 0]} 
-                                                barSize={40}
-                                            />
-                                            <defs>
-                                                <linearGradient id="colorGradient" x1="0" y1="0" x2="0" y2="1">
-                                                    <stop offset="0%" stopColor="#22D3EE" stopOpacity={0.8}/>
-                                                    <stop offset="100%" stopColor="#0EA5E9" stopOpacity={0.4}/>
-                                                </linearGradient>
-                                            </defs>
-                                        </BarChart>
-                                    </ResponsiveContainer>
+
+                            <div className="usage-grid">
+                                <div className="usage-box">
+                                    <h4>Development Usage</h4>
+                                    <div className="usage-row"><span>Total</span><strong>{(usage?.devTotalRequests || 0).toLocaleString()}</strong></div>
+                                    <div className="usage-row"><span>Success</span><strong>{(usage?.devTotalSuccessfulRequests || 0).toLocaleString()}</strong></div>
+                                    <div className="usage-row"><span>Failed</span><strong>{(usage?.devTotalFailedRequests || 0).toLocaleString()}</strong></div>
+                                    <div className="usage-row"><span>Success Rate</span><strong>{safePct(usage?.devTotalSuccessfulRequests, usage?.devTotalRequests)}%</strong></div>
+                                </div>
+                                <div className="usage-box">
+                                    <h4>Production Usage</h4>
+                                    <div className="usage-row"><span>Total</span><strong>{(usage?.prodTotalRequests || 0).toLocaleString()}</strong></div>
+                                    <div className="usage-row"><span>Success</span><strong>{(usage?.prodTotalSuccessfulRequests || 0).toLocaleString()}</strong></div>
+                                    <div className="usage-row"><span>Failed</span><strong>{(usage?.prodTotalFailedRequests || 0).toLocaleString()}</strong></div>
+                                    <div className="usage-row"><span>Success Rate</span><strong>{safePct(usage?.prodTotalSuccessfulRequests, usage?.prodTotalRequests)}%</strong></div>
                                 </div>
                             </div>
                         </div>
                     )}
-                </div>
+                </Card>
             </div>
 
-            {/* New Key Modal */}
-            {showNewKeyModal && (
-                <div className="modal-overlay" onClick={() => { setShowNewKeyModal(false); setGeneratedKey(null); }}>
+            {showGenerateModal && generatedCredential && (
+                <div className="modal-overlay" onClick={() => setShowGenerateModal(false)}>
                     <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-                        <Card className="modal-card">
-                            <div className="modal-header">
-                                <h2>{generatedKey ? 'Credentials Generated' : 'Generate API Credentials'}</h2>
-                                <button className="modal-close" onClick={() => { setShowNewKeyModal(false); setGeneratedKey(null); }}>
-                                    ×
-                                </button>
-                            </div>
-
-                            <div className="modal-body">
-                                {!generatedKey ? (
-                                    <>
-                                        <div className="input-group">
-                                            <label className="input-label">Company</label>
-                                            <input
-                                                type="text"
-                                                className="input"
-                                                value={selectedCompany?.legalName || ''}
-                                                disabled
-                                            />
-                                        </div>
-                                        <div className="info-box">
-                                            <p>This will generate API key and secret for <strong>{selectedCompany?.legalName}</strong>.</p>
-                                            <p>If credentials already exist, they will be replaced.</p>
-                                        </div>
-                                        <Button
-                                            variant="primary"
-                                            onClick={generateNewKey}
-                                        >
-                                            <Key size={18} />
-                                            Generate Credentials
-                                        </Button>
-                                    </>
-                                ) : (
-                                    <div className="generated-key-display">
-                                        <div className="warning-box">
-                                            <span className="warning-icon">!</span>
-                                            <div>
-                                                <strong>Save these credentials now!</strong>
-                                                <p>You won't be able to see them again after closing this dialog.</p>
-                                            </div>
-                                        </div>
-
-                                        <div className="key-display">
-                                            <div className="key-display-header">
-                                                <span>API Key</span>
-                                                <button
-                                                    className="copy-btn-large"
-                                                    onClick={() => copyToClipboard(generatedKey.apiKey)}
-                                                >
-                                                    <Copy size={16} />
-                                                    Copy
-                                                </button>
-                                            </div>
-                                            <code>{generatedKey.apiKey}</code>
-                                        </div>
-
-                                        <div className="key-display">
-                                            <div className="key-display-header">
-                                                <span>API Secret</span>
-                                                <button
-                                                    className="copy-btn-large"
-                                                    onClick={() => copyToClipboard(generatedKey.apiSecret)}
-                                                >
-                                                    <Copy size={16} />
-                                                    Copy
-                                                </button>
-                                            </div>
-                                            <code>{generatedKey.apiSecret}</code>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                        </Card>
+                        <h3>Credentials Generated</h3>
+                        <p>Copy and store these now. You may not see the full secret again.</p>
+                        <div className="generated-row">
+                            <span>API Key</span>
+                            <code>{generatedCredential.apiKey}</code>
+                        </div>
+                        <div className="generated-row">
+                            <span>API Secret</span>
+                            <code>{generatedCredential.apiSecret}</code>
+                        </div>
+                        <div className="modal-actions">
+                            <Button variant="secondary" onClick={() => copyValue(generatedCredential.apiKey, 'generatedKey')}>
+                                <Copy size={14} />
+                                Copy Key
+                            </Button>
+                            <Button onClick={() => copyValue(generatedCredential.apiSecret, 'generatedSecret')}>
+                                <Copy size={14} />
+                                Copy Secret
+                            </Button>
+                        </div>
                     </div>
                 </div>
             )}
 
-            {/* Suspend/Activate Confirmation Modal */}
             {showActionModal && (
                 <div className="modal-overlay" onClick={() => setShowActionModal(false)}>
                     <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-                        <div className="modal-header">
-                            <h2>
-                                {actionType === 'suspend' ? 'Suspend' : 'Activate'} Credentials
-                            </h2>
-                            <button className="modal-close" onClick={() => setShowActionModal(false)}>×</button>
-                        </div>
-
-                        <div className="modal-body">
-                            <div className="info-box" style={{
-                                background: actionType === 'suspend' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(34, 197, 94, 0.1)',
-                                border: `1px solid ${actionType === 'suspend' ? 'rgba(239, 68, 68, 0.3)' : 'rgba(34, 197, 94, 0.3)'}`
-                            }}>
-                                <p>
-                                    <strong>Company:</strong> {selectedCompany?.legalName}
-                                </p>
-                                <p>
-                                    {actionType === 'suspend'
-                                        ? 'This will prevent the company from using their API credentials. All API requests will be rejected.'
-                                        : 'This will restore the company\'s API access. They will be able to make API requests again.'}
-                                </p>
-                            </div>
-
-                            {actionType === 'suspend' && (
-                                <div className="input-group">
-                                    <label className="input-label">Reason (Optional)</label>
-                                    <textarea
-                                        className="input"
-                                        placeholder="Enter reason for suspension..."
-                                        value={actionReason}
-                                        onChange={(e) => setActionReason(e.target.value)}
-                                        rows={3}
-                                        style={{ resize: 'vertical', fontFamily: 'inherit' }}
-                                    />
-                                </div>
-                            )}
-                        </div>
-
-                        <div className="modal-footer">
-                            <Button
-                                variant="secondary"
-                                onClick={() => setShowActionModal(false)}
-                                disabled={actionLoading}
-                            >
-                                Cancel
-                            </Button>
-                            <Button
-                                variant={actionType === 'suspend' ? 'danger' : 'primary'}
-                                onClick={handleActionConfirm}
-                                disabled={actionLoading}
-                            >
-                                {actionLoading
-                                    ? (actionType === 'suspend' ? 'Suspending...' : 'Activating...')
-                                    : (actionType === 'suspend' ? 'Suspend Credentials' : 'Activate Credentials')}
-                            </Button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Notification Modal */}
-            {showNotificationModal && (
-                <div className="modal-overlay" onClick={() => setShowNotificationModal(false)}>
-                    <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-                        <div className="modal-header">
-                            <h2>{notificationType === 'success' ? 'Success' : 'Error'}</h2>
-                            <button className="modal-close" onClick={() => setShowNotificationModal(false)}>×</button>
-                        </div>
-
-                        <div className="modal-body">
-                            <div className="info-box" style={{
-                                background: notificationType === 'success' ? 'rgba(34, 197, 94, 0.1)' : 'rgba(239, 68, 68, 0.1)',
-                                border: `1px solid ${notificationType === 'success' ? 'rgba(34, 197, 94, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`
-                            }}>
-                                <p>{notificationMessage}</p>
-                            </div>
-                        </div>
-
-                        <div className="modal-footer">
-                            <Button variant="primary" onClick={() => setShowNotificationModal(false)}>
-                                OK
+                        <h3>{actionType === 'suspend' ? 'Suspend Credentials' : 'Activate Credentials'}</h3>
+                        <p>
+                            {actionType === 'suspend'
+                                ? 'Suspending credentials blocks API requests for this company.'
+                                : 'Activating credentials restores API access.'}
+                        </p>
+                        {actionType === 'suspend' && (
+                            <textarea
+                                value={actionReason}
+                                onChange={(e) => setActionReason(e.target.value)}
+                                placeholder="Reason (optional)"
+                            />
+                        )}
+                        <div className="modal-actions">
+                            <Button variant="secondary" onClick={() => setShowActionModal(false)}>Cancel</Button>
+                            <Button onClick={confirmAction} disabled={actionLoading}>
+                                {actionLoading ? 'Processing...' : (actionType === 'suspend' ? 'Suspend' : 'Activate')}
                             </Button>
                         </div>
                     </div>

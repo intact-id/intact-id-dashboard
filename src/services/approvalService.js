@@ -45,12 +45,9 @@ const approvalService = {
      * @param {string} comments - Optional comments
      * @returns {Promise<object>}
      */
-    async checkerDecision(approvalId, decision, comments = '') {
+    async checkerDecision(approvalId, payload) {
         try {
-            const response = await api.post(`/api/admin/applications/approvals/${approvalId}/checker-decision`, {
-                decision,
-                comments
-            });
+            const response = await api.post(`/api/admin/applications/approvals/${approvalId}/checker-decision`, payload);
             return response.data;
         } catch (error) {
             console.error('Checker decision error:', error);
@@ -64,14 +61,32 @@ const approvalService = {
      * @param {string} action - Action to perform
      * @returns {Promise<object>}
      */
-    async makerAction(applicationId, action) {
+    async makerAction(applicationId, payload) {
         try {
-            const response = await api.post(`/api/company-approval/applications/${applicationId}/maker-action`, {
-                action
-            });
+            const response = await api.post(`/api/company-approval/applications/${applicationId}/maker-action`, payload);
             return response.data;
         } catch (error) {
             console.error('Maker action error:', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Get pending maker approvals that need checker action
+     * @param {object} pagination - Pagination parameters (page, size)
+     * @returns {Promise<object>}
+     */
+    async getPendingCheckerApprovals(pagination = { page: 0, size: 10 }) {
+        try {
+            const params = new URLSearchParams({
+                page: pagination.page,
+                size: pagination.size,
+            });
+
+            const response = await api.get(`/api/admin/applications/approvals/pending-checker?${params}`);
+            return response.data;
+        } catch (error) {
+            console.error('Get pending checker approvals error:', error);
             throw error;
         }
     }
