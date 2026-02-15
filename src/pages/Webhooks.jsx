@@ -1,17 +1,22 @@
 import { useEffect, useState } from 'react';
-import { Building2, Mail, Phone, Globe, Webhook as WebhookIcon, RefreshCcw, Save, TestTube } from 'lucide-react';
+import { Building2, Mail, Phone, Globe, Webhook as WebhookIcon, RefreshCcw, Save, TestTube, Copy, RotateCcw, Eye, EyeOff } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Badge from '../components/ui/Badge';
+import { useAuth } from '../contexts/AuthContext';
+import { isAdminOrSuperAdmin } from '../utils/roles';
 import companyService from '../services/companyService';
 import webhookService from '../services/webhookService';
+import apiKeyService from '../services/apiKeyService';
 import './Webhooks.css';
 
 export default function Webhooks() {
+    const { user } = useAuth();
     const [companies, setCompanies] = useState([]);
     const [filteredCompanies, setFilteredCompanies] = useState([]);
     const [selectedCompany, setSelectedCompany] = useState(null);
     const [communication, setCommunication] = useState(null);
+    const [credentialStatuses, setCredentialStatuses] = useState({ DEV: 'N/A', PROD: 'N/A' });
     const [loadingCompanies, setLoadingCompanies] = useState(true);
     const [loadingDetails, setLoadingDetails] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
@@ -21,11 +26,26 @@ export default function Webhooks() {
     const [notice, setNotice] = useState(null);
     const [saving, setSaving] = useState(false);
     const [testing, setTesting] = useState(false);
+    const [rotating, setRotating] = useState(false);
+    const [secretVisible, setSecretVisible] = useState(false);
+    const [revealedSecret, setRevealedSecret] = useState(null);
 
     const [webhookUrl, setWebhookUrl] = useState('');
+    const [payloadFields, setPayloadFields] = useState({
+        includeVerificationId: true,
+        includeCompanyId: true,
+        includeCompanyName: true,
+        includeRejectionReason: true,
+        includeTier: true,
+        includeTimestamps: true,
+        includeResults: true,
+        includeRawScores: false,
+        includeApplicant: false,
+    });
     const [webhookEnabled, setWebhookEnabled] = useState(false);
     const [emailNotifications, setEmailNotifications] = useState(true);
     const [smsNotifications, setSmsNotifications] = useState(false);
+    const isAdminUser = isAdminOrSuperAdmin(user);
 
     useEffect(() => {
         fetchCompanies();
@@ -85,23 +105,51 @@ export default function Webhooks() {
         setError('');
         setNotice(null);
         try {
-            const response = await webhookService.getCompanyCommunication(company.id);
-            if (response.success) {
-                const data = response.data || null;
+            const [communicationResponse, keysResponse] = await Promise.allSettled([
+                webhookService.getCompanyCommunication(company.id),
+                isAdminUser ? apiKeyService.getApiKeys(company.id) : Promise.resolve({ success: false, data: [] })
+            ]);
+
+            if (communicationResponse.status === 'fulfilled' && communicationResponse.value.success) {
+                const data = communicationResponse.value.data || null;
                 setCommunication(data);
                 setWebhookUrl(data?.webhookUrl || '');
                 setWebhookEnabled(data?.webhookEnabled || false);
                 setEmailNotifications(data?.emailNotifications !== false);
                 setSmsNotifications(data?.smsNotifications || false);
+                setPayloadFields({
+                    includeVerificationId: data?.payloadFields?.includeVerificationId !== false,
+                    includeCompanyId: data?.payloadFields?.includeCompanyId !== false,
+                    includeCompanyName: data?.payloadFields?.includeCompanyName !== false,
+                    includeRejectionReason: data?.payloadFields?.includeRejectionReason !== false,
+                    includeTier: data?.payloadFields?.includeTier !== false,
+                    includeTimestamps: data?.payloadFields?.includeTimestamps !== false,
+                    includeResults: data?.payloadFields?.includeResults !== false,
+                    includeRawScores: data?.payloadFields?.includeRawScores || false,
+                    includeApplicant: data?.payloadFields?.includeApplicant || false,
+                });
             } else {
                 setCommunication(null);
             }
+
+            if (keysResponse.status === 'fulfilled' && keysResponse.value.success) {
+                const statuses = { DEV: 'NOT GENERATED', PROD: 'NOT GENERATED' };
+                (keysResponse.value.data || []).forEach((k) => {
+                    if (k.environment === 'DEV') statuses.DEV = k.status || 'UNKNOWN';
+                    if (k.environment === 'PROD') statuses.PROD = k.status || 'UNKNOWN';
+                });
+                setCredentialStatuses(statuses);
+            } else {
+                setCredentialStatuses({ DEV: 'N/A', PROD: 'N/A' });
+            }
         } catch (err) {
             setCommunication(null);
+            setCredentialStatuses({ DEV: 'N/A', PROD: 'N/A' });
             setWebhookUrl('');
             setWebhookEnabled(false);
             setEmailNotifications(true);
             setSmsNotifications(false);
+            setPayloadFields({ includeVerificationId: true, includeCompanyId: true, includeCompanyName: true, includeRejectionReason: true, includeTier: true, includeTimestamps: true, includeResults: true, includeRawScores: false, includeApplicant: false });
             setError(err.response?.data?.errorMessage || err.message || 'Failed to load webhook settings');
         } finally {
             setLoadingDetails(false);
@@ -122,7 +170,8 @@ export default function Webhooks() {
                 webhookUrl: webhookUrl.trim(),
                 webhookEnabled,
                 emailNotifications,
-                smsNotifications
+                smsNotifications,
+                payloadFields,
             });
             if (response.success) {
                 setNotice({ type: 'success', message: 'Webhook settings saved successfully.' });
@@ -134,6 +183,30 @@ export default function Webhooks() {
             setError(err.response?.data?.errorMessage || err.message || 'Failed to save webhook settings');
         } finally {
             setSaving(false);
+        }
+    };
+
+    const handleRotateSecret = async () => {
+        if (!selectedCompany) return;
+        setRotating(true);
+        setError('');
+        setNotice(null);
+        setRevealedSecret(null);
+        setSecretVisible(false);
+        try {
+            const response = await webhookService.rotateWebhookSecret(selectedCompany.id);
+            if (response.success) {
+                setRevealedSecret(response.data?.webhookSecret || null);
+                setSecretVisible(true);
+                setNotice({ type: 'success', message: 'Secret rotated. Copy it now — it will not be shown in full again.' });
+                await selectCompany(selectedCompany);
+            } else {
+                setError(response.responseMessage || 'Failed to rotate secret.');
+            }
+        } catch (err) {
+            setError(err.response?.data?.errorMessage || err.message || 'Failed to rotate secret.');
+        } finally {
+            setRotating(false);
         }
     };
 
@@ -344,52 +417,197 @@ export default function Webhooks() {
                                         </div>
                                     </div>
 
-                                    <div className="switch-stack">
-                                        <label className="switch-row">
-                                            <span className="switch-text">Enable Webhook</span>
-                                            <input className="switch-input" type="checkbox" checked={webhookEnabled} onChange={(e) => setWebhookEnabled(e.target.checked)} />
-                                            <span className="switch-control">
-                                                <span className="switch-pill" aria-hidden="true"></span>
-                                                <span className={`switch-state ${webhookEnabled ? 'on' : 'off'}`}>{webhookEnabled ? 'ON' : 'OFF'}</span>
-                                            </span>
-                                        </label>
-                                        <label className="switch-row">
-                                            <span className="switch-text">Email Notifications</span>
-                                            <input className="switch-input" type="checkbox" checked={emailNotifications} onChange={(e) => setEmailNotifications(e.target.checked)} />
-                                            <span className="switch-control">
-                                                <span className="switch-pill" aria-hidden="true"></span>
-                                                <span className={`switch-state ${emailNotifications ? 'on' : 'off'}`}>{emailNotifications ? 'ON' : 'OFF'}</span>
-                                            </span>
-                                        </label>
-                                        <label className="switch-row">
-                                            <span className="switch-text">SMS Notifications</span>
-                                            <input className="switch-input" type="checkbox" checked={smsNotifications} onChange={(e) => setSmsNotifications(e.target.checked)} />
-                                            <span className="switch-control">
-                                                <span className="switch-pill" aria-hidden="true"></span>
-                                                <span className={`switch-state ${smsNotifications ? 'on' : 'off'}`}>{smsNotifications ? 'ON' : 'OFF'}</span>
-                                            </span>
-                                        </label>
-                                    </div>
+                                    {isAdminUser && (
+                                        <>
+                                            <div className="switch-stack">
+                                                <label className="switch-row">
+                                                    <span className="switch-text">Enable Webhook</span>
+                                                    <input className="switch-input" type="checkbox" checked={webhookEnabled} onChange={(e) => setWebhookEnabled(e.target.checked)} />
+                                                    <span className="switch-control">
+                                                        <span className="switch-pill" aria-hidden="true"></span>
+                                                        <span className={`switch-state ${webhookEnabled ? 'on' : 'off'}`}>{webhookEnabled ? 'ON' : 'OFF'}</span>
+                                                    </span>
+                                                </label>
+                                                <label className="switch-row">
+                                                    <span className="switch-text">Email Notifications</span>
+                                                    <input className="switch-input" type="checkbox" checked={emailNotifications} onChange={(e) => setEmailNotifications(e.target.checked)} />
+                                                    <span className="switch-control">
+                                                        <span className="switch-pill" aria-hidden="true"></span>
+                                                        <span className={`switch-state ${emailNotifications ? 'on' : 'off'}`}>{emailNotifications ? 'ON' : 'OFF'}</span>
+                                                    </span>
+                                                </label>
+                                                <label className="switch-row">
+                                                    <span className="switch-text">SMS Notifications</span>
+                                                    <input className="switch-input" type="checkbox" checked={smsNotifications} onChange={(e) => setSmsNotifications(e.target.checked)} />
+                                                    <span className="switch-control">
+                                                        <span className="switch-pill" aria-hidden="true"></span>
+                                                        <span className={`switch-state ${smsNotifications ? 'on' : 'off'}`}>{smsNotifications ? 'ON' : 'OFF'}</span>
+                                                    </span>
+                                                </label>
+                                            </div>
+
+                                            <div className="payload-fields-section">
+                                                <p className="payload-fields-title">Payload Fields</p>
+                                                <div className="switch-stack">
+                                                    <label className="switch-row">
+                                                        <span className="switch-text">
+                                                            Include Verification ID
+                                                            <span className="switch-subtext">verificationId</span>
+                                                        </span>
+                                                        <input className="switch-input" type="checkbox" checked={payloadFields.includeVerificationId} onChange={() => setPayloadFields(p => ({ ...p, includeVerificationId: !p.includeVerificationId }))} />
+                                                        <span className="switch-control">
+                                                            <span className="switch-pill" aria-hidden="true"></span>
+                                                            <span className={`switch-state ${payloadFields.includeVerificationId ? 'on' : 'off'}`}>{payloadFields.includeVerificationId ? 'ON' : 'OFF'}</span>
+                                                        </span>
+                                                    </label>
+                                                    <label className="switch-row">
+                                                        <span className="switch-text">
+                                                            Include Company ID
+                                                            <span className="switch-subtext">companyId</span>
+                                                        </span>
+                                                        <input className="switch-input" type="checkbox" checked={payloadFields.includeCompanyId} onChange={() => setPayloadFields(p => ({ ...p, includeCompanyId: !p.includeCompanyId }))} />
+                                                        <span className="switch-control">
+                                                            <span className="switch-pill" aria-hidden="true"></span>
+                                                            <span className={`switch-state ${payloadFields.includeCompanyId ? 'on' : 'off'}`}>{payloadFields.includeCompanyId ? 'ON' : 'OFF'}</span>
+                                                        </span>
+                                                    </label>
+                                                    <label className="switch-row">
+                                                        <span className="switch-text">
+                                                            Include Company Name
+                                                            <span className="switch-subtext">companyName (legalName)</span>
+                                                        </span>
+                                                        <input className="switch-input" type="checkbox" checked={payloadFields.includeCompanyName} onChange={() => setPayloadFields(p => ({ ...p, includeCompanyName: !p.includeCompanyName }))} />
+                                                        <span className="switch-control">
+                                                            <span className="switch-pill" aria-hidden="true"></span>
+                                                            <span className={`switch-state ${payloadFields.includeCompanyName ? 'on' : 'off'}`}>{payloadFields.includeCompanyName ? 'ON' : 'OFF'}</span>
+                                                        </span>
+                                                    </label>
+                                                    <label className="switch-row">
+                                                        <span className="switch-text">
+                                                            Include Rejection Reason
+                                                            <span className="switch-subtext">rejection_reason, rejection_details</span>
+                                                        </span>
+                                                        <input className="switch-input" type="checkbox" checked={payloadFields.includeRejectionReason} onChange={() => setPayloadFields(p => ({ ...p, includeRejectionReason: !p.includeRejectionReason }))} />
+                                                        <span className="switch-control">
+                                                            <span className="switch-pill" aria-hidden="true"></span>
+                                                            <span className={`switch-state ${payloadFields.includeRejectionReason ? 'on' : 'off'}`}>{payloadFields.includeRejectionReason ? 'ON' : 'OFF'}</span>
+                                                        </span>
+                                                    </label>
+                                                    <label className="switch-row">
+                                                        <span className="switch-text">
+                                                            Include Tier
+                                                            <span className="switch-subtext">Verification tier (tier1, tier2…)</span>
+                                                        </span>
+                                                        <input className="switch-input" type="checkbox" checked={payloadFields.includeTier} onChange={() => setPayloadFields(p => ({ ...p, includeTier: !p.includeTier }))} />
+                                                        <span className="switch-control">
+                                                            <span className="switch-pill" aria-hidden="true"></span>
+                                                            <span className={`switch-state ${payloadFields.includeTier ? 'on' : 'off'}`}>{payloadFields.includeTier ? 'ON' : 'OFF'}</span>
+                                                        </span>
+                                                    </label>
+                                                    <label className="switch-row">
+                                                        <span className="switch-text">
+                                                            Include Timestamps
+                                                            <span className="switch-subtext">started_at / completed_at</span>
+                                                        </span>
+                                                        <input className="switch-input" type="checkbox" checked={payloadFields.includeTimestamps} onChange={() => setPayloadFields(p => ({ ...p, includeTimestamps: !p.includeTimestamps }))} />
+                                                        <span className="switch-control">
+                                                            <span className="switch-pill" aria-hidden="true"></span>
+                                                            <span className={`switch-state ${payloadFields.includeTimestamps ? 'on' : 'off'}`}>{payloadFields.includeTimestamps ? 'ON' : 'OFF'}</span>
+                                                        </span>
+                                                    </label>
+                                                    <label className="switch-row">
+                                                        <span className="switch-text">
+                                                            Include Results
+                                                            <span className="switch-subtext">Per-check decision & status</span>
+                                                        </span>
+                                                        <input className="switch-input" type="checkbox" checked={payloadFields.includeResults} onChange={() => setPayloadFields(p => ({ ...p, includeResults: !p.includeResults, includeRawScores: !p.includeResults ? p.includeRawScores : false }))} />
+                                                        <span className="switch-control">
+                                                            <span className="switch-pill" aria-hidden="true"></span>
+                                                            <span className={`switch-state ${payloadFields.includeResults ? 'on' : 'off'}`}>{payloadFields.includeResults ? 'ON' : 'OFF'}</span>
+                                                        </span>
+                                                    </label>
+                                                    <label className={`switch-row${!payloadFields.includeResults ? ' disabled' : ''}`}>
+                                                        <span className="switch-text">
+                                                            Include Raw Scores
+                                                            <span className="switch-subtext">face_match_score, quality_score — sensitive</span>
+                                                        </span>
+                                                        <input className="switch-input" type="checkbox" checked={payloadFields.includeRawScores} disabled={!payloadFields.includeResults} onChange={() => setPayloadFields(p => ({ ...p, includeRawScores: !p.includeRawScores }))} />
+                                                        <span className="switch-control">
+                                                            <span className="switch-pill" aria-hidden="true"></span>
+                                                            <span className={`switch-state ${payloadFields.includeRawScores ? 'on' : 'off'}`}>{payloadFields.includeRawScores ? 'ON' : 'OFF'}</span>
+                                                        </span>
+                                                    </label>
+                                                    <label className="switch-row">
+                                                        <span className="switch-text">
+                                                            Include Applicant Info
+                                                            <span className="switch-subtext">name & internal ID — PII</span>
+                                                        </span>
+                                                        <input className="switch-input" type="checkbox" checked={payloadFields.includeApplicant} onChange={() => setPayloadFields(p => ({ ...p, includeApplicant: !p.includeApplicant }))} />
+                                                        <span className="switch-control">
+                                                            <span className="switch-pill" aria-hidden="true"></span>
+                                                            <span className={`switch-state ${payloadFields.includeApplicant ? 'on' : 'off'}`}>{payloadFields.includeApplicant ? 'ON' : 'OFF'}</span>
+                                                        </span>
+                                                    </label>
+                                                </div>
+                                            </div>
+                                        </>
+                                    )}
 
                                     <div className="detail-row">
                                         <span>Webhook Status</span>
                                         <strong>{webhookEnabled ? 'Enabled' : 'Disabled'}</strong>
                                     </div>
                                     <div className="detail-row">
+                                        <span>PROD Credential Status</span>
+                                        <strong>{credentialStatuses.PROD}</strong>
+                                    </div>
+                                    <div className="detail-row">
+                                        <span>DEV Credential Status</span>
+                                        <strong>{credentialStatuses.DEV}</strong>
+                                    </div>
+                                    <div className="detail-row">
                                         <span>Current URL</span>
                                         <strong className="mono">{communication?.webhookUrl || 'Not configured'}</strong>
                                     </div>
-
-                                    <div className="actions-row">
-                                        <Button variant="secondary" onClick={handleTestWebhook} disabled={testing || !webhookUrl.trim()}>
-                                            <TestTube size={14} />
-                                            {testing ? 'Testing...' : 'Test Webhook'}
-                                        </Button>
-                                        <Button onClick={handleSaveWebhook} disabled={saving}>
-                                            <Save size={14} />
-                                            {saving ? 'Saving...' : 'Save Settings'}
-                                        </Button>
+                                    <div className="detail-row">
+                                        <span>Signing Secret</span>
+                                        <div className="secret-row">
+                                            <span className="mono secret-value">
+                                                {revealedSecret && secretVisible
+                                                    ? revealedSecret
+                                                    : (communication?.webhookSecret || 'Not generated')}
+                                            </span>
+                                            {(revealedSecret || communication?.webhookSecret) && (
+                                                <>
+                                                    <button className="secret-btn" title="Copy" onClick={() => navigator.clipboard.writeText(revealedSecret || communication?.webhookSecret)}>
+                                                        <Copy size={13} />
+                                                    </button>
+                                                    {revealedSecret && (
+                                                        <button className="secret-btn" title={secretVisible ? 'Hide' : 'Show'} onClick={() => setSecretVisible(v => !v)}>
+                                                            {secretVisible ? <EyeOff size={13} /> : <Eye size={13} />}
+                                                        </button>
+                                                    )}
+                                                </>
+                                            )}
+                                        </div>
                                     </div>
+
+                                    {isAdminUser && (
+                                        <div className="actions-row">
+                                            <Button variant="secondary" onClick={handleRotateSecret} disabled={rotating}>
+                                                <RotateCcw size={14} />
+                                                {rotating ? 'Rotating...' : 'Rotate Secret'}
+                                            </Button>
+                                            <Button variant="secondary" onClick={handleTestWebhook} disabled={testing || !webhookUrl.trim()}>
+                                                <TestTube size={14} />
+                                                {testing ? 'Testing...' : 'Test Webhook'}
+                                            </Button>
+                                            <Button onClick={handleSaveWebhook} disabled={saving}>
+                                                <Save size={14} />
+                                                {saving ? 'Saving...' : 'Save Settings'}
+                                            </Button>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         </div>
