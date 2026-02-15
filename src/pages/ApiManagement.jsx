@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Building2, KeyRound, Copy, Check, RefreshCcw, PauseCircle, PlayCircle } from 'lucide-react';
+import { Building2, KeyRound, RefreshCcw, PauseCircle, PlayCircle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { isAdminOrSuperAdmin } from '../utils/roles';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Badge from '../components/ui/Badge';
@@ -14,26 +15,23 @@ export default function ApiManagement() {
     const [companies, setCompanies] = useState([]);
     const [filteredCompanies, setFilteredCompanies] = useState([]);
     const [selectedCompany, setSelectedCompany] = useState(null);
-    const [credential, setCredential] = useState(null);
+    const [credentialsByEnv, setCredentialsByEnv] = useState({ DEV: null, PROD: null });
     const [usage, setUsage] = useState(null);
     const [loadingCompanies, setLoadingCompanies] = useState(true);
     const [loadingDetails, setLoadingDetails] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const [statusFilter, setStatusFilter] = useState('all');
     const [pagination, setPagination] = useState({ page: 0, size: 20, totalPages: 0, totalElements: 0 });
-    const [copied, setCopied] = useState(null);
     const [error, setError] = useState('');
     const [showGenerateModal, setShowGenerateModal] = useState(false);
     const [generatedCredential, setGeneratedCredential] = useState(null);
+    const [generatingEnv, setGeneratingEnv] = useState(null);
     const [showActionModal, setShowActionModal] = useState(false);
     const [actionType, setActionType] = useState(null);
     const [actionReason, setActionReason] = useState('');
     const [actionLoading, setActionLoading] = useState(false);
 
-    const isSuperAdmin = useMemo(
-        () => Array.isArray(user?.roles) && user.roles.includes('SUPER_ADMIN'),
-        [user?.roles]
-    );
+    const isAdminUser = useMemo(() => isAdminOrSuperAdmin(user), [user]);
 
     useEffect(() => {
         fetchCompanies();
@@ -94,9 +92,15 @@ export default function ApiManagement() {
             ]);
 
             if (keysResponse.status === 'fulfilled' && keysResponse.value.success) {
-                setCredential(keysResponse.value.data?.[0] || null);
+                const credentials = keysResponse.value.data || [];
+                const next = { DEV: null, PROD: null };
+                credentials.forEach((item) => {
+                    if (item.environment === 'DEV') next.DEV = item;
+                    if (item.environment === 'PROD') next.PROD = item;
+                });
+                setCredentialsByEnv(next);
             } else {
-                setCredential(null);
+                setCredentialsByEnv({ DEV: null, PROD: null });
             }
 
             if (usageResponse.status === 'fulfilled' && usageResponse.value.success) {
@@ -111,25 +115,22 @@ export default function ApiManagement() {
         }
     };
 
-    const copyValue = async (value, key) => {
-        if (!value) return;
-        await navigator.clipboard.writeText(value);
-        setCopied(key);
-        setTimeout(() => setCopied(null), 1200);
-    };
-
-    const generateCredentials = async () => {
+    const generateCredentials = async (environment) => {
         if (!selectedCompany) return;
+        setGeneratingEnv(environment);
         try {
-            const response = await apiKeyService.generateApiKey(selectedCompany.id);
+            const response = environment === 'DEV'
+                ? await apiKeyService.generateDevApiKey(selectedCompany.id)
+                : await apiKeyService.generateProdApiKey(selectedCompany.id);
             if (response.success) {
                 setGeneratedCredential(response.data);
-                setCredential(response.data);
                 setShowGenerateModal(true);
                 await selectCompany(selectedCompany);
             }
         } catch (err) {
             setError(err.response?.data?.errorMessage || err.message || 'Failed to generate credentials');
+        } finally {
+            setGeneratingEnv(null);
         }
     };
 
@@ -159,13 +160,13 @@ export default function ApiManagement() {
 
     const safePct = (ok = 0, total = 0) => (!total ? 0 : Math.round((ok / total) * 100));
 
-    if (!isSuperAdmin) {
+    if (!isAdminUser) {
         return (
             <div className="api-management">
                 <div className="page-header">
                     <h1>API Key Management</h1>
                 </div>
-                <Card className="api-empty-state">This page is available to `SUPER_ADMIN` users only.</Card>
+                <Card className="api-empty-state">This page is available to `ADMIN` and `SUPER_ADMIN` users only.</Card>
             </div>
         );
     }
@@ -177,9 +178,9 @@ export default function ApiManagement() {
                     <h1>API Key Management</h1>
                     <p className="page-subtitle">Manage company credentials and API usage.</p>
                 </div>
-                <Button onClick={generateCredentials} disabled={!selectedCompany}>
+                <Button onClick={() => generateCredentials('PROD')} disabled={!selectedCompany || generatingEnv !== null}>
                     <KeyRound size={16} />
-                    Generate Credentials
+                    Generate PROD
                 </Button>
             </div>
 
@@ -280,11 +281,15 @@ export default function ApiManagement() {
                                     <p>{selectedCompany.registrationNumber || selectedCompany.id}</p>
                                 </div>
                                 <div className="details-actions">
-                                    <Button variant="secondary" onClick={generateCredentials}>
+                                    <Button variant="secondary" onClick={() => generateCredentials('DEV')} disabled={generatingEnv !== null}>
                                         <RefreshCcw size={14} />
-                                        Rotate
+                                        {generatingEnv === 'DEV' ? 'Generating DEV...' : 'Generate DEV'}
                                     </Button>
-                                    {credential?.status === 'SUSPENDED' ? (
+                                    <Button variant="secondary" onClick={() => generateCredentials('PROD')} disabled={generatingEnv !== null}>
+                                        <RefreshCcw size={14} />
+                                        {generatingEnv === 'PROD' ? 'Generating PROD...' : 'Generate PROD'}
+                                    </Button>
+                                    {(credentialsByEnv.PROD?.status || credentialsByEnv.DEV?.status) === 'SUSPENDED' ? (
                                         <Button onClick={() => openAction('activate')}>
                                             <PlayCircle size={14} />
                                             Activate
@@ -299,33 +304,50 @@ export default function ApiManagement() {
                             </div>
 
                             <div className="credential-card">
+                                <h4 className="env-title">PROD Credentials</h4>
                                 <div className="credential-row">
                                     <span>Credential Status</span>
-                                    <Badge variant={credential?.status === 'ACTIVE' ? 'success' : 'warning'}>
-                                        {credential?.status || 'NOT GENERATED'}
+                                    <Badge variant={credentialsByEnv.PROD?.status === 'ACTIVE' ? 'success' : 'warning'}>
+                                        {credentialsByEnv.PROD?.status || 'NOT GENERATED'}
                                     </Badge>
                                 </div>
                                 <div className="credential-row">
-                                    <span>API Key</span>
-                                    <div className="secret-wrap">
-                                        <code>{credential?.apiKey || 'N/A'}</code>
-                                        {credential?.apiKey && (
-                                            <button onClick={() => copyValue(credential.apiKey, 'apiKey')}>
-                                                {copied === 'apiKey' ? <Check size={14} /> : <Copy size={14} />}
-                                            </button>
-                                        )}
-                                    </div>
+                                    <span>Expires At</span>
+                                    <strong>{credentialsByEnv.PROD?.expiresAt ? new Date(credentialsByEnv.PROD.expiresAt).toLocaleString() : 'N/A'}</strong>
                                 </div>
                                 <div className="credential-row">
-                                    <span>API Secret</span>
-                                    <div className="secret-wrap">
-                                        <code>{credential?.apiSecret ? `${credential.apiSecret.slice(0, 8)}••••••••••` : 'N/A'}</code>
-                                        {credential?.apiSecret && (
-                                            <button onClick={() => copyValue(credential.apiSecret, 'apiSecret')}>
-                                                {copied === 'apiSecret' ? <Check size={14} /> : <Copy size={14} />}
-                                            </button>
-                                        )}
-                                    </div>
+                                    <span>Environment</span>
+                                    <strong>{credentialsByEnv.PROD?.environment || 'PROD'}</strong>
+                                </div>
+                                <div className="credential-actions">
+                                    <Button size="sm" variant="secondary" onClick={() => generateCredentials('PROD')} disabled={generatingEnv !== null}>
+                                        <KeyRound size={14} />
+                                        {credentialsByEnv.PROD ? 'Regenerate PROD' : 'Generate PROD'}
+                                    </Button>
+                                </div>
+                            </div>
+
+                            <div className="credential-card">
+                                <h4 className="env-title">DEV Credentials</h4>
+                                <div className="credential-row">
+                                    <span>Credential Status</span>
+                                    <Badge variant={credentialsByEnv.DEV?.status === 'ACTIVE' ? 'success' : 'warning'}>
+                                        {credentialsByEnv.DEV?.status || 'NOT GENERATED'}
+                                    </Badge>
+                                </div>
+                                <div className="credential-row">
+                                    <span>Expires At</span>
+                                    <strong>{credentialsByEnv.DEV?.expiresAt ? new Date(credentialsByEnv.DEV.expiresAt).toLocaleString() : 'N/A'}</strong>
+                                </div>
+                                <div className="credential-row">
+                                    <span>Environment</span>
+                                    <strong>{credentialsByEnv.DEV?.environment || 'DEV'}</strong>
+                                </div>
+                                <div className="credential-actions">
+                                    <Button size="sm" variant="secondary" onClick={() => generateCredentials('DEV')} disabled={generatingEnv !== null}>
+                                        <KeyRound size={14} />
+                                        {credentialsByEnv.DEV ? 'Regenerate DEV' : 'Generate DEV'}
+                                    </Button>
                                 </div>
                             </div>
 
@@ -354,24 +376,13 @@ export default function ApiManagement() {
                 <div className="modal-overlay" onClick={() => setShowGenerateModal(false)}>
                     <div className="modal-content" onClick={(e) => e.stopPropagation()}>
                         <h3>Credentials Generated</h3>
-                        <p>Copy and store these now. You may not see the full secret again.</p>
+                        <p>Credentials were generated successfully for the selected environment.</p>
                         <div className="generated-row">
-                            <span>API Key</span>
-                            <code>{generatedCredential.apiKey}</code>
-                        </div>
-                        <div className="generated-row">
-                            <span>API Secret</span>
-                            <code>{generatedCredential.apiSecret}</code>
+                            <span>Environment</span>
+                            <code>{generatedCredential.environment || 'N/A'}</code>
                         </div>
                         <div className="modal-actions">
-                            <Button variant="secondary" onClick={() => copyValue(generatedCredential.apiKey, 'generatedKey')}>
-                                <Copy size={14} />
-                                Copy Key
-                            </Button>
-                            <Button onClick={() => copyValue(generatedCredential.apiSecret, 'generatedSecret')}>
-                                <Copy size={14} />
-                                Copy Secret
-                            </Button>
+                            <Button onClick={() => setShowGenerateModal(false)}>Close</Button>
                         </div>
                     </div>
                 </div>
