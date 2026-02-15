@@ -201,6 +201,12 @@
     background: rgba(15, 23, 42, 0.45);
 }
 
+.env-title {
+    margin: 0 0 0.6rem;
+    font-size: 0.9rem;
+    color: var(--color-text-primary);
+}
+
 .credential-row {
     display: flex;
     justify-content: space-between;
@@ -216,6 +222,11 @@
 
 .credential-row span {
     color: var(--color-text-tertiary);
+    font-size: 0.82rem;
+}
+
+.credential-row strong {
+    color: var(--color-text-primary);
     font-size: 0.82rem;
 }
 
@@ -241,6 +252,12 @@
     padding: 0.35rem;
     cursor: pointer;
     display: inline-flex;
+}
+
+.credential-actions {
+    margin-top: 0.6rem;
+    display: flex;
+    justify-content: flex-end;
 }
 
 .usage-grid {

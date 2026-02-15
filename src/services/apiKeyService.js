@@ -19,6 +19,40 @@ const apiKeyService = {
     },
 
     /**
+     * Generate or regenerate DEV API key for a company
+     * @param {string} companyId - Company ID
+     * @returns {Promise<object>}
+     */
+    async generateDevApiKey(companyId) {
+        try {
+            const response = await api.post('/api/companies/api-keys/generate/dev', null, {
+                params: { companyId }
+            });
+            return response.data;
+        } catch (error) {
+            console.error('Generate DEV API key error:', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Generate or regenerate PROD API key for a company
+     * @param {string} companyId - Company ID
+     * @returns {Promise<object>}
+     */
+    async generateProdApiKey(companyId) {
+        try {
+            const response = await api.post('/api/companies/api-keys/generate/prod', null, {
+                params: { companyId }
+            });
+            return response.data;
+        } catch (error) {
+            console.error('Generate PROD API key error:', error);
+            throw error;
+        }
+    },
+
+    /**
      * Revoke an API key
      * @param {string} companyId - Company ID
      * @param {string} keyId - API Key ID to revoke

@@ -34,6 +34,17 @@ const webhookService = {
         }
     },
 
+    // Rotate webhook signing secret
+    async rotateWebhookSecret(companyId) {
+        try {
+            const response = await api.post(`/api/companies/${companyId}/communication/webhook/rotate-secret`);
+            return response.data;
+        } catch (error) {
+            console.error('Rotate webhook secret error:', error);
+            throw error;
+        }
+    },
+
     // Get webhook logs/history
     async getWebhookLogs(companyId, pagination = { page: 0, size: 20 }) {
         try {

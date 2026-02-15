@@ -1,14 +1,17 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Building2, Mail, Phone, Globe, Webhook as WebhookIcon, PauseCircle, PlayCircle, RefreshCcw, KeyRound } from 'lucide-react';
+import { Building2, Mail, Phone, Globe, Webhook as WebhookIcon, PauseCircle, PlayCircle, RefreshCcw } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Badge from '../components/ui/Badge';
+import { useAuth } from '../contexts/AuthContext';
+import { isAdminOrSuperAdmin } from '../utils/roles';
 import companyService from '../services/companyService';
 import webhookService from '../services/webhookService';
 import apiKeyService from '../services/apiKeyService';
 import './Companies.css';
 
 export default function Companies() {
+    const { user } = useAuth();
     const [companies, setCompanies] = useState([]);
     const [filteredCompanies, setFilteredCompanies] = useState([]);
     const [selectedCompany, setSelectedCompany] = useState(null);
@@ -24,6 +27,7 @@ export default function Companies() {
     const [statusAction, setStatusAction] = useState(null);
     const [actionReason, setActionReason] = useState('');
     const [actionLoading, setActionLoading] = useState(false);
+    const isAdminUser = useMemo(() => isAdminOrSuperAdmin(user), [user]);
 
     useEffect(() => {
         fetchCompanies();
@@ -102,13 +106,14 @@ export default function Companies() {
     };
 
     const openStatusAction = (action) => {
+        if (!isAdminUser) return;
         setStatusAction(action);
         setActionReason('');
         setShowStatusModal(true);
     };
 
     const confirmStatusAction = async () => {
-        if (!selectedCompany) return;
+        if (!selectedCompany || !isAdminUser) return;
         setActionLoading(true);
         try {
             if (statusAction === 'activate') {
@@ -262,13 +267,13 @@ export default function Companies() {
                                     </div>
                                 </div>
                                 <div className="details-actions">
-                                    {canSuspend && (
+                                    {isAdminUser && canSuspend && (
                                         <Button variant="secondary" onClick={() => openStatusAction('suspend')}>
                                             <PauseCircle size={14} />
                                             Suspend
                                         </Button>
                                     )}
-                                    {canActivate && (
+                                    {isAdminUser && canActivate && (
                                         <Button onClick={() => openStatusAction('activate')}>
                                             <PlayCircle size={14} />
                                             Activate
@@ -303,8 +308,8 @@ export default function Companies() {
                                     <h4>API Credentials</h4>
                                     {credential ? (
                                         <>
-                                            <div className="detail-row"><span><KeyRound size={14} /> API Key</span><strong className="mono">{credential.apiKey}</strong></div>
                                             <div className="detail-row"><span>Status</span><strong>{credential.status || 'N/A'}</strong></div>
+                                            <div className="detail-row"><span>Environment</span><strong>{credential.environment || 'N/A'}</strong></div>
                                             <div className="detail-row"><span>Expires At</span><strong>{formatDate(credential.expiresAt)}</strong></div>
                                         </>
                                     ) : (
@@ -317,7 +322,7 @@ export default function Companies() {
                 </Card>
             </div>
 
-            {showStatusModal && selectedCompany && (
+            {showStatusModal && selectedCompany && isAdminUser && (
                 <div className="modal-overlay" onClick={() => setShowStatusModal(false)}>
                     <div className="modal-content" onClick={(e) => e.stopPropagation()}>
                         <h3>{statusAction === 'suspend' ? 'Suspend Company' : 'Activate Company'}</h3>
