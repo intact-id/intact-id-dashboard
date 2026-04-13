@@ -1,15 +1,18 @@
 import api from './api';
 
+const envPrefix = (environment) => (environment === 'dev' ? '/dev' : '/prod');
+
 const kycService = {
     /**
      * Submit a new KYC verification
      * @param {string} tier - Verification tier (e.g., 'basic', 'standard')
      * @param {FormData} formData - Form data containing files and fields
+     * @param {string} environment - 'prod' or 'dev'
      * @returns {Promise<object>}
      */
-    async submitVerification(tier, formData) {
+    async submitVerification(tier, formData, environment = 'prod') {
         try {
-            const response = await api.post(`/api/v1/kyc/verify/${tier}`, formData, {
+            const response = await api.post(`/api/v1/kyc${envPrefix(environment)}/verify/${tier}`, formData, {
                 headers: {
                     'Content-Type': 'multipart/form-data',
                 },
@@ -24,11 +27,12 @@ const kycService = {
     /**
      * Get verification status/details
      * @param {string} verificationId - Verification ID
+     * @param {string} environment - 'prod' or 'dev'
      * @returns {Promise<object>}
      */
-    async getVerification(verificationId) {
+    async getVerification(verificationId, environment = 'prod') {
         try {
-            const response = await api.get(`/api/v1/kyc/verify/${verificationId}`);
+            const response = await api.get(`/api/v1/kyc${envPrefix(environment)}/verify/${verificationId}`);
             return response.data;
         } catch (error) {
             console.error('Get verification error:', error);
@@ -40,9 +44,10 @@ const kycService = {
      * List verifications with filters
      * @param {object} filters - Filter parameters (status, tier, fromDate, toDate)
      * @param {object} pagination - Pagination parameters (page, size)
+     * @param {string} environment - 'prod' or 'dev'
      * @returns {Promise<object>}
      */
-    async listVerifications(filters = {}, pagination = { page: 0, size: 10 }) {
+    async listVerifications(filters = {}, pagination = { page: 0, size: 10 }, environment = 'prod') {
         try {
             const params = new URLSearchParams({
                 page: pagination.page,
@@ -55,7 +60,7 @@ const kycService = {
                 ...(filters.search && { search: filters.search }),
             });
 
-            const response = await api.get(`/api/v1/kyc/verifications?${params}`);
+            const response = await api.get(`/api/v1/kyc${envPrefix(environment)}/verifications?${params}`);
             return response.data;
         } catch (error) {
             console.error('List verifications error:', error);
