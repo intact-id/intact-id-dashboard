@@ -18,6 +18,37 @@
     flex-shrink: 0;
 }
 
+/* ========== ENV TOGGLE ========== */
+.env-toggle {
+    display: flex;
+    background: var(--color-bg-secondary, #1a1a2e);
+    border: 1px solid var(--color-border, rgba(255,255,255,0.08));
+    border-radius: 8px;
+    padding: 3px;
+    gap: 2px;
+}
+
+.env-toggle-btn {
+    padding: 6px 14px;
+    border-radius: 6px;
+    border: none;
+    background: transparent;
+    color: var(--color-text-secondary, #9ca3af);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+}
+
+.env-toggle-btn:hover {
+    color: var(--color-text-primary, #fff);
+}
+
+.env-toggle-btn.active {
+    background: var(--color-accent, #6366f1);
+    color: #fff;
+}
+
 .page-header h1 {
     font-size: 1.75rem;
     font-weight: 700;
