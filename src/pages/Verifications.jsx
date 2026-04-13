@@ -41,6 +41,7 @@ export default function Verifications() {
     });
 
     const isSuperAdmin = Array.isArray(user?.roles) && user.roles.includes('SUPER_ADMIN');
+    const [environment, setEnvironment] = useState('prod');
 
     useEffect(() => {
         const timeout = setTimeout(() => setDebouncedSearch(filters.search.trim()), 350);
@@ -57,7 +58,8 @@ export default function Verifications() {
         filters.toDate,
         debouncedSearch,
         pagination.page,
-        pagination.size
+        pagination.size,
+        environment
     ]);
 
     useEffect(() => {
@@ -132,7 +134,8 @@ export default function Verifications() {
                     toDate: toDateTimeEnd(filters.toDate),
                     search: debouncedSearch || null
                 },
-                { page: pagination.page, size: pagination.size }
+                { page: pagination.page, size: pagination.size },
+                environment
             );
             if (data.success) {
                 setVerifications(data.data.content || []);
@@ -174,7 +177,7 @@ export default function Verifications() {
     const handleViewVerification = async (verification) => {
         setLoadingDetails(true);
         try {
-            const response = await kycService.getVerification(verification.verificationId);
+            const response = await kycService.getVerification(verification.verificationId, environment);
             if (response.success) {
                 setSelectedVerification(response.data);
             } else {
@@ -237,9 +240,25 @@ export default function Verifications() {
                     <h1>Verifications</h1>
                     <p className="page-subtitle">Manage and monitor identity verification requests.</p>
                 </div>
-                <Button variant="secondary">
-                    <Download size={16} /> Export
-                </Button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div className="env-toggle">
+                        <button
+                            className={`env-toggle-btn${environment === 'prod' ? ' active' : ''}`}
+                            onClick={() => { setEnvironment('prod'); setPagination((prev) => ({ ...prev, page: 0 })); }}
+                        >
+                            Production
+                        </button>
+                        <button
+                            className={`env-toggle-btn${environment === 'dev' ? ' active' : ''}`}
+                            onClick={() => { setEnvironment('dev'); setPagination((prev) => ({ ...prev, page: 0 })); }}
+                        >
+                            Development
+                        </button>
+                    </div>
+                    <Button variant="secondary">
+                        <Download size={16} /> Export
+                    </Button>
+                </div>
             </div>
 
             {error && <div className="error-banner">{error}</div>}
