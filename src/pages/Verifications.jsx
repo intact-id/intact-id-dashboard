@@ -166,10 +166,19 @@ export default function Verifications() {
 
     const getStatusVariant = (status) => {
         const normalized = status?.toUpperCase();
-        if (['COMPLETED', 'PASSED', 'APPROVED'].includes(normalized)) return 'success';
+        if (['COMPLETED', 'PASSED'].includes(normalized)) return 'success';
+        if (['APPROVED'].includes(normalized)) return 'success';
         if (['FAILED', 'REJECTED'].includes(normalized)) return 'error';
         if (normalized === 'MANUAL_REVIEW') return 'info';
         return 'warning';
+    };
+
+    const getDecisionVariant = (decision) => {
+        const normalized = decision?.toUpperCase();
+        if (normalized === 'APPROVED') return 'success';
+        if (normalized === 'REJECTED') return 'error';
+        if (normalized === 'MANUAL_REVIEW') return 'info';
+        return null;
     };
 
     const getInitials = (first, last) => `${first?.[0] || ''}${last?.[0] || ''}`.toUpperCase() || 'U';
@@ -360,7 +369,12 @@ export default function Verifications() {
                                     </td>
                                     <td className="text-secondary">{v.verificationType || '-'}</td>
                                     <td className="text-secondary">{v.companyName || '-'}</td>
-                                    <td className="text-secondary">{v.overallDecision || '-'}</td>
+                                    <td>
+                                        {v.overallDecision && getDecisionVariant(v.overallDecision)
+                                            ? <Badge variant={getDecisionVariant(v.overallDecision)}>{v.overallDecision}</Badge>
+                                            : <span className="text-secondary">{v.overallDecision || '-'}</span>
+                                        }
+                                    </td>
                                     <td className="text-secondary">
                                         {Array.isArray(v.documents) && v.documents.length > 0
                                             ? `${v.documents.length} file(s)`
@@ -413,6 +427,11 @@ export default function Verifications() {
                                     <Badge variant={getStatusVariant(selectedVerification.status)} dot={true}>
                                         {selectedVerification.status?.replace(/_/g, ' ')}
                                     </Badge>
+                                    {selectedVerification.overallDecision && getDecisionVariant(selectedVerification.overallDecision) && (
+                                        <Badge variant={getDecisionVariant(selectedVerification.overallDecision)}>
+                                            {selectedVerification.overallDecision}
+                                        </Badge>
+                                    )}
                                     <Badge variant="info">{selectedVerification.tier || 'N/A'}</Badge>
                                     <Badge variant="default">{selectedVerification.verificationType || 'individual'}</Badge>
                                 </div>
@@ -427,7 +446,15 @@ export default function Verifications() {
                                         <div className="info-grid">
                                             <div className="info-row"><span className="info-label">Company</span><span className="info-value">{selectedVerification.companyName || '-'}</span></div>
                                             <div className="info-row"><span className="info-label">Verification Type</span><span className="info-value">{selectedVerification.verificationType || '-'}</span></div>
-                                            <div className="info-row"><span className="info-label">Decision</span><span className="info-value">{selectedVerification.overallDecision || '-'}</span></div>
+                                            <div className="info-row">
+                                                <span className="info-label">Decision</span>
+                                                <span className="info-value">
+                                                    {selectedVerification.overallDecision && getDecisionVariant(selectedVerification.overallDecision)
+                                                        ? <Badge variant={getDecisionVariant(selectedVerification.overallDecision)}>{selectedVerification.overallDecision}</Badge>
+                                                        : selectedVerification.overallDecision || '-'
+                                                    }
+                                                </span>
+                                            </div>
                                             <div className="info-row"><span className="info-label">Created</span><span className="info-value">{formatDate(selectedVerification.createdAt)}</span></div>
                                             <div className="info-row"><span className="info-label">Completed</span><span className="info-value">{formatDate(selectedVerification.completedAt)}</span></div>
                                             <div className="info-row"><span className="info-label">Risk Score</span><span className="info-value">{selectedVerification.riskScore ?? '-'}</span></div>
