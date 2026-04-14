@@ -10,7 +10,7 @@ import companyService from '../services/companyService';
 import './Verifications.css';
 import '../components/ModalStyles.css';
 
-const STATUS_OPTIONS = ['all', 'PENDING', 'PROCESSING', 'APPROVED', 'REJECTED', 'FAILED', 'COMPLETED', 'MANUAL_REVIEW'];
+const STATUS_OPTIONS = ['all', 'SUBMITTED', 'PENDING', 'PROCESSING', 'APPROVED', 'REJECTED', 'FAILED', 'COMPLETED', 'MANUAL_REVIEW'];
 const TIER_OPTIONS = ['all', 'basic', 'standard', 'enhanced'];
 
 export default function Verifications() {
@@ -44,6 +44,8 @@ export default function Verifications() {
     const [environment, setEnvironment] = useState('prod');
     const [isPolling, setIsPolling] = useState(false);
     const pollRef = useRef(null);
+    const fetchRef = useRef(null);
+    const selectedRef = useRef(null);
 
     useEffect(() => {
         const timeout = setTimeout(() => setDebouncedSearch(filters.search.trim()), 350);
@@ -70,24 +72,20 @@ export default function Verifications() {
         }
     }, [isSuperAdmin]);
 
-    // Auto-poll every 5 s when there are active verifications, pause when modal is open
+    // Auto-poll every 5s — interval created once, refs keep it always current
     useEffect(() => {
-        const hasActive = verifications.some((v) =>
-            ['PENDING', 'PROCESSING'].includes(v.status)
-        );
+        setIsPolling(true);
+        pollRef.current = setInterval(() => {
+            if (!selectedRef.current) {
+                fetchRef.current(true);
+            }
+        }, 5000);
 
-        if (hasActive && !selectedVerification) {
-            setIsPolling(true);
-            pollRef.current = setInterval(() => {
-                fetchVerifications(true);
-            }, 5000);
-        } else {
-            setIsPolling(false);
+        return () => {
             clearInterval(pollRef.current);
-        }
-
-        return () => clearInterval(pollRef.current);
-    }, [verifications, selectedVerification]);
+            setIsPolling(false);
+        };
+    }, []);
 
     useEffect(() => {
         const loadInlinePreviews = async () => {
@@ -173,6 +171,10 @@ export default function Verifications() {
             setLoading(false);
         }
     };
+
+    // Keep refs pointing at latest values so the interval never goes stale
+    fetchRef.current = fetchVerifications;
+    selectedRef.current = selectedVerification;
 
     const formatDate = (dateString) => {
         if (!dateString) return '-';
