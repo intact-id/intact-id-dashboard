@@ -118,6 +118,40 @@ const companyService = {
             console.error('Activate company error:', error);
             throw error;
         }
+    },
+
+    /**
+     * Suspend company credentials only (does not suspend the company itself)
+     * @param {string} companyId - Company ID
+     * @param {string} environment - 'prod', 'dev', or null for both
+     * @returns {Promise<object>}
+     */
+    async suspendCredentials(companyId, environment = null) {
+        try {
+            const params = environment ? { environment } : {};
+            const response = await api.post(`/api/companies/${companyId}/credentials/suspend`, null, { params });
+            return response.data;
+        } catch (error) {
+            console.error('Suspend credentials error:', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Activate company credentials only (does not activate the company itself)
+     * @param {string} companyId - Company ID
+     * @param {string} environment - 'prod', 'dev', or null for both
+     * @returns {Promise<object>}
+     */
+    async activateCredentials(companyId, environment = null) {
+        try {
+            const params = environment ? { environment } : {};
+            const response = await api.post(`/api/companies/${companyId}/credentials/activate`, null, { params });
+            return response.data;
+        } catch (error) {
+            console.error('Activate credentials error:', error);
+            throw error;
+        }
     }
 };
 
