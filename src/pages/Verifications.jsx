@@ -10,7 +10,7 @@ import companyService from '../services/companyService';
 import './Verifications.css';
 import '../components/ModalStyles.css';
 
-const STATUS_OPTIONS = ['all', 'PENDING', 'PROCESSING', 'APPROVED', 'REJECTED', 'FAILED', 'COMPLETED', 'MANUAL_REVIEW'];
+const STATUS_OPTIONS = ['all', 'SUBMITTED', 'PENDING', 'PROCESSING', 'APPROVED', 'REJECTED', 'FAILED', 'COMPLETED', 'MANUAL_REVIEW'];
 const TIER_OPTIONS = ['all', 'basic', 'standard', 'enhanced'];
 
 export default function Verifications() {
