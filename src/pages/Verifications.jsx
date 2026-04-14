@@ -44,6 +44,8 @@ export default function Verifications() {
     const [environment, setEnvironment] = useState('prod');
     const [isPolling, setIsPolling] = useState(false);
     const pollRef = useRef(null);
+    const fetchRef = useRef(null);
+    const selectedRef = useRef(null);
 
     useEffect(() => {
         const timeout = setTimeout(() => setDebouncedSearch(filters.search.trim()), 350);
@@ -70,24 +72,20 @@ export default function Verifications() {
         }
     }, [isSuperAdmin]);
 
-    // Auto-poll every 5s — pauses only when detail modal is open
+    // Auto-poll every 5s — interval created once, refs keep it always current
     useEffect(() => {
-        if (selectedVerification) {
-            setIsPolling(false);
-            clearInterval(pollRef.current);
-            return;
-        }
-
         setIsPolling(true);
         pollRef.current = setInterval(() => {
-            fetchVerifications(true);
+            if (!selectedRef.current) {
+                fetchRef.current(true);
+            }
         }, 5000);
 
         return () => {
             clearInterval(pollRef.current);
             setIsPolling(false);
         };
-    }, [selectedVerification]);
+    }, []);
 
     useEffect(() => {
         const loadInlinePreviews = async () => {
@@ -173,6 +171,10 @@ export default function Verifications() {
             setLoading(false);
         }
     };
+
+    // Keep refs pointing at latest values so the interval never goes stale
+    fetchRef.current = fetchVerifications;
+    selectedRef.current = selectedVerification;
 
     const formatDate = (dateString) => {
         if (!dateString) return '-';
