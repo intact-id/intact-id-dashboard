@@ -25,6 +25,7 @@ import {
 import analyticsService from "../services/analyticsService";
 import kycService from "../services/kycService";
 import "./Overview.css";
+import "./Verifications.css";
 
 export default function Overview() {
   const [stats, setStats] = useState({
@@ -46,24 +47,26 @@ export default function Overview() {
     ],
   });
   const [loading, setLoading] = useState(true);
+  const [environment, setEnvironment] = useState('prod');
 
   useEffect(() => {
     fetchDashboardData();
-  }, []);
+  }, [environment]);
 
   const fetchDashboardData = async () => {
     setLoading(true);
     try {
       // Fetch real stats from analytics service
-      const statsResponse = await analyticsService.getOverviewStats();
+      const statsResponse = await analyticsService.getOverviewStats(environment);
 
       // Fetch trends for chart
-      const trendsResponse = await analyticsService.getVerificationTrends();
+      const trendsResponse = await analyticsService.getVerificationTrends({}, environment);
 
       // Fetch recent verifications for activity log
       const recentVerifications = await kycService.listVerifications(
         {},
         { page: 0, size: 10 },
+        environment,
       );
 
       if (statsResponse.success) {
@@ -148,15 +151,31 @@ export default function Overview() {
             Monitor your verification activity in real-time
           </p>
         </div>
-        <div className="system-status-badge">
-          <span
-            className={`status-indicator status-indicator--${systemStatus?.status}`}
-          ></span>
-          <span>
-            {systemStatus?.status === "operational"
-              ? "All Systems Operational"
-              : "System Issue"}
-          </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div className="env-toggle">
+            <button
+              className={`env-toggle-btn${environment === 'prod' ? ' active' : ''}`}
+              onClick={() => setEnvironment('prod')}
+            >
+              Production
+            </button>
+            <button
+              className={`env-toggle-btn${environment === 'dev' ? ' active' : ''}`}
+              onClick={() => setEnvironment('dev')}
+            >
+              Development
+            </button>
+          </div>
+          <div className="system-status-badge">
+            <span
+              className={`status-indicator status-indicator--${systemStatus?.status}`}
+            ></span>
+            <span>
+              {systemStatus?.status === "operational"
+                ? "All Systems Operational"
+                : "System Issue"}
+            </span>
+          </div>
         </div>
       </div>
 

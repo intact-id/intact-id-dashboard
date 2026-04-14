@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Eye, Download, X, FileText } from 'lucide-react';
 import DocumentViewer from '../components/ui/DocumentViewer';
 import Badge from '../components/ui/Badge';
@@ -42,6 +42,8 @@ export default function Verifications() {
 
     const isSuperAdmin = Array.isArray(user?.roles) && user.roles.includes('SUPER_ADMIN');
     const [environment, setEnvironment] = useState('prod');
+    const [isPolling, setIsPolling] = useState(false);
+    const pollRef = useRef(null);
 
     useEffect(() => {
         const timeout = setTimeout(() => setDebouncedSearch(filters.search.trim()), 350);
@@ -67,6 +69,25 @@ export default function Verifications() {
             fetchCompanies();
         }
     }, [isSuperAdmin]);
+
+    // Auto-poll every 5 s when there are active verifications, pause when modal is open
+    useEffect(() => {
+        const hasActive = verifications.some((v) =>
+            ['PENDING', 'PROCESSING'].includes(v.status)
+        );
+
+        if (hasActive && !selectedVerification) {
+            setIsPolling(true);
+            pollRef.current = setInterval(() => {
+                fetchVerifications(true);
+            }, 5000);
+        } else {
+            setIsPolling(false);
+            clearInterval(pollRef.current);
+        }
+
+        return () => clearInterval(pollRef.current);
+    }, [verifications, selectedVerification]);
 
     useEffect(() => {
         const loadInlinePreviews = async () => {
@@ -121,8 +142,8 @@ export default function Verifications() {
     const toDateTimeStart = (date) => (date ? `${date}T00:00:00` : undefined);
     const toDateTimeEnd = (date) => (date ? `${date}T23:59:59` : undefined);
 
-    const fetchVerifications = async () => {
-        setLoading(true);
+    const fetchVerifications = async (silent = false) => {
+        if (!silent) setLoading(true);
         setError('');
         try {
             const data = await kycService.listVerifications(
@@ -166,10 +187,19 @@ export default function Verifications() {
 
     const getStatusVariant = (status) => {
         const normalized = status?.toUpperCase();
-        if (['COMPLETED', 'PASSED', 'APPROVED'].includes(normalized)) return 'success';
+        if (['COMPLETED', 'PASSED'].includes(normalized)) return 'success';
+        if (['APPROVED'].includes(normalized)) return 'success';
         if (['FAILED', 'REJECTED'].includes(normalized)) return 'error';
         if (normalized === 'MANUAL_REVIEW') return 'info';
         return 'warning';
+    };
+
+    const getDecisionVariant = (decision) => {
+        const normalized = decision?.toUpperCase();
+        if (normalized === 'APPROVED') return 'success';
+        if (normalized === 'REJECTED') return 'error';
+        if (normalized === 'MANUAL_REVIEW') return 'info';
+        return null;
     };
 
     const getInitials = (first, last) => `${first?.[0] || ''}${last?.[0] || ''}`.toUpperCase() || 'U';
@@ -314,6 +344,12 @@ export default function Verifications() {
                     <div className="card-title-group">
                         <span className="card-title">All requests</span>
                         <span className="count-badge">{pagination.totalElements} users</span>
+                        {isPolling && (
+                            <span className="polling-indicator" title="Auto-refreshing every 5s">
+                                <span className="polling-dot" />
+                                Live
+                            </span>
+                        )}
                     </div>
                 </div>
 
@@ -360,7 +396,12 @@ export default function Verifications() {
                                     </td>
                                     <td className="text-secondary">{v.verificationType || '-'}</td>
                                     <td className="text-secondary">{v.companyName || '-'}</td>
-                                    <td className="text-secondary">{v.overallDecision || '-'}</td>
+                                    <td>
+                                        {v.overallDecision && getDecisionVariant(v.overallDecision)
+                                            ? <Badge variant={getDecisionVariant(v.overallDecision)}>{v.overallDecision}</Badge>
+                                            : <span className="text-secondary">{v.overallDecision || '-'}</span>
+                                        }
+                                    </td>
                                     <td className="text-secondary">
                                         {Array.isArray(v.documents) && v.documents.length > 0
                                             ? `${v.documents.length} file(s)`
@@ -413,6 +454,11 @@ export default function Verifications() {
                                     <Badge variant={getStatusVariant(selectedVerification.status)} dot={true}>
                                         {selectedVerification.status?.replace(/_/g, ' ')}
                                     </Badge>
+                                    {selectedVerification.overallDecision && getDecisionVariant(selectedVerification.overallDecision) && (
+                                        <Badge variant={getDecisionVariant(selectedVerification.overallDecision)}>
+                                            {selectedVerification.overallDecision}
+                                        </Badge>
+                                    )}
                                     <Badge variant="info">{selectedVerification.tier || 'N/A'}</Badge>
                                     <Badge variant="default">{selectedVerification.verificationType || 'individual'}</Badge>
                                 </div>
@@ -427,7 +473,15 @@ export default function Verifications() {
                                         <div className="info-grid">
                                             <div className="info-row"><span className="info-label">Company</span><span className="info-value">{selectedVerification.companyName || '-'}</span></div>
                                             <div className="info-row"><span className="info-label">Verification Type</span><span className="info-value">{selectedVerification.verificationType || '-'}</span></div>
-                                            <div className="info-row"><span className="info-label">Decision</span><span className="info-value">{selectedVerification.overallDecision || '-'}</span></div>
+                                            <div className="info-row">
+                                                <span className="info-label">Decision</span>
+                                                <span className="info-value">
+                                                    {selectedVerification.overallDecision && getDecisionVariant(selectedVerification.overallDecision)
+                                                        ? <Badge variant={getDecisionVariant(selectedVerification.overallDecision)}>{selectedVerification.overallDecision}</Badge>
+                                                        : selectedVerification.overallDecision || '-'
+                                                    }
+                                                </span>
+                                            </div>
                                             <div className="info-row"><span className="info-label">Created</span><span className="info-value">{formatDate(selectedVerification.createdAt)}</span></div>
                                             <div className="info-row"><span className="info-label">Completed</span><span className="info-value">{formatDate(selectedVerification.completedAt)}</span></div>
                                             <div className="info-row"><span className="info-label">Risk Score</span><span className="info-value">{selectedVerification.riskScore ?? '-'}</span></div>

@@ -6,12 +6,13 @@ const analyticsService = {
      * Get overview statistics for dashboard
      * @returns {Promise<object>}
      */
-    async getOverviewStats() {
+    async getOverviewStats(environment = 'prod') {
         try {
             // Fetch recent verifications to calculate stats
             const verificationsResponse = await kycService.listVerifications(
                 {},
-                { page: 0, size: 100 }
+                { page: 0, size: 100 },
+                environment
             );
 
             if (!verificationsResponse.success) {
@@ -57,11 +58,12 @@ const analyticsService = {
      * @param {object} dateRange - Date range {fromDate, toDate}
      * @returns {Promise<object>}
      */
-    async getVerificationTrends(dateRange = {}) {
+    async getVerificationTrends(dateRange = {}, environment = 'prod') {
         try {
             const response = await kycService.listVerifications(
                 dateRange,
-                { page: 0, size: 1000 }
+                { page: 0, size: 1000 },
+                environment
             );
 
             if (!response.success) {

@@ -7,6 +7,7 @@ import Badge from '../components/ui/Badge';
 import { useAuth } from '../contexts/AuthContext';
 import userService from '../services/userService';
 import companyService from '../services/companyService';
+import roleService from '../services/roleService';
 import './TeamMembers.css';
 
 const DEFAULT_FORM = {
@@ -16,17 +17,17 @@ const DEFAULT_FORM = {
     lastName: '',
     phone: '',
     companyId: '',
-    roles: []
+    roleIds: []
 };
 
-const ROLES = [
-    { value: 'SUPER_ADMIN', label: 'Super Admin', color: 'primary' },
-    { value: 'ADMIN', label: 'Admin', color: 'primary' },
-    { value: 'CHECKER', label: 'Checker', color: 'info' },
-    { value: 'MAKER', label: 'Maker', color: 'warning' },
-    { value: 'VIEWER', label: 'Viewer', color: 'default' },
-    { value: 'COMPLIANCE_OFFICER', label: 'Compliance Officer', color: 'warning' }
-];
+const ROLE_COLORS = {
+    SUPER_ADMIN: 'primary',
+    ADMIN: 'primary',
+    CHECKER: 'info',
+    MAKER: 'warning',
+    VIEWER: 'default',
+    COMPLIANCE_OFFICER: 'warning',
+};
 
 export default function TeamMembers() {
     const { user } = useAuth();
@@ -47,6 +48,12 @@ export default function TeamMembers() {
 
     const isSuperAdmin = Array.isArray(user?.roles) && user.roles.includes('SUPER_ADMIN');
 
+    const [roles, setRoles] = useState([]);
+
+    useEffect(() => {
+        fetchRoles();
+    }, []);
+
     useEffect(() => {
         fetchData();
     }, [pagination.page, filterStatus, searchTerm]);
@@ -54,6 +61,17 @@ export default function TeamMembers() {
     useEffect(() => {
         setPagination((prev) => ({ ...prev, page: 0 }));
     }, [filterStatus, searchTerm]);
+
+    const fetchRoles = async () => {
+        try {
+            const response = await roleService.getRoles();
+            if (response.success) {
+                setRoles(response.data || []);
+            }
+        } catch (error) {
+            console.error('Error fetching roles:', error);
+        }
+    };
 
     const fetchData = async () => {
         try {
@@ -136,7 +154,7 @@ export default function TeamMembers() {
         });
     };
 
-    const getRoleVariant = (roleName) => ROLES.find((r) => r.value === roleName)?.color || 'default';
+    const getRoleVariant = (roleName) => ROLE_COLORS[roleName] || 'default';
 
     const openCreateModal = () => {
         setModalMode('create');
@@ -148,6 +166,10 @@ export default function TeamMembers() {
     const openEditModal = (userRecord) => {
         setModalMode('edit');
         setSelectedUser(userRecord);
+        // Map role names back to IDs for the form
+        const roleIds = (userRecord.roles || [])
+            .map((name) => roles.find((r) => r.name === name)?.id)
+            .filter(Boolean);
         setFormData({
             username: userRecord.username || '',
             email: userRecord.email || '',
@@ -155,7 +177,7 @@ export default function TeamMembers() {
             lastName: userRecord.lastName || '',
             phone: userRecord.phone || '',
             companyId: userRecord.companyId || '',
-            roles: userRecord.roles || []
+            roleIds
         });
         setModalOpen(true);
     };
@@ -163,15 +185,15 @@ export default function TeamMembers() {
     const closeModal = () => {
         setModalOpen(false);
         setSelectedUser(null);
-        setFormData(DEFAULT_FORM);
+        setFormData({ ...DEFAULT_FORM, roleIds: [] });
     };
 
-    const handleRoleToggle = (roleName) => {
+    const handleRoleToggle = (roleId) => {
         setFormData((prev) => ({
             ...prev,
-            roles: prev.roles.includes(roleName)
-                ? prev.roles.filter((r) => r !== roleName)
-                : [...prev.roles, roleName]
+            roleIds: prev.roleIds.includes(roleId)
+                ? prev.roleIds.filter((id) => id !== roleId)
+                : [...prev.roleIds, roleId]
         }));
     };
 
@@ -181,7 +203,7 @@ export default function TeamMembers() {
         firstName: formData.firstName,
         lastName: formData.lastName,
         phone: formData.phone || undefined,
-        roleIds: formData.roles,
+        roleIds: formData.roleIds,
         companyId: isSuperAdmin ? (formData.companyId || undefined) : undefined
     });
 
@@ -271,7 +293,11 @@ export default function TeamMembers() {
                     </div>
                     <select value={filterRole} onChange={(e) => setFilterRole(e.target.value)} className="filter-select">
                         <option value="all">All Roles</option>
-                        {ROLES.map((role) => <option key={role.value} value={role.value}>{role.label}</option>)}
+                        {roles.map((role) => (
+                            <option key={role.id} value={role.name}>
+                                {role.name.replace(/_/g, ' ')}
+                            </option>
+                        ))}
                     </select>
                     <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="filter-select">
                         <option value="all">All Status</option>
@@ -499,14 +525,14 @@ export default function TeamMembers() {
                                 <div className="form-group">
                                     <label>Roles *</label>
                                     <div className="role-chip-grid">
-                                        {ROLES.map((role) => (
+                                        {roles.map((role) => (
                                             <button
-                                                key={role.value}
+                                                key={role.id}
                                                 type="button"
-                                                className={`role-chip ${formData.roles.includes(role.value) ? 'role-chip--active' : ''}`}
-                                                onClick={() => handleRoleToggle(role.value)}
+                                                className={`role-chip ${formData.roleIds.includes(role.id) ? 'role-chip--active' : ''}`}
+                                                onClick={() => handleRoleToggle(role.id)}
                                             >
-                                                {role.label}
+                                                {role.name.replace(/_/g, ' ')}
                                             </button>
                                         ))}
                                     </div>
