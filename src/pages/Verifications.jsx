@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Eye, Download, X, FileText } from 'lucide-react';
 import DocumentViewer from '../components/ui/DocumentViewer';
 import Badge from '../components/ui/Badge';
@@ -42,6 +42,8 @@ export default function Verifications() {
 
     const isSuperAdmin = Array.isArray(user?.roles) && user.roles.includes('SUPER_ADMIN');
     const [environment, setEnvironment] = useState('prod');
+    const [isPolling, setIsPolling] = useState(false);
+    const pollRef = useRef(null);
 
     useEffect(() => {
         const timeout = setTimeout(() => setDebouncedSearch(filters.search.trim()), 350);
@@ -67,6 +69,25 @@ export default function Verifications() {
             fetchCompanies();
         }
     }, [isSuperAdmin]);
+
+    // Auto-poll every 5 s when there are active verifications, pause when modal is open
+    useEffect(() => {
+        const hasActive = verifications.some((v) =>
+            ['PENDING', 'PROCESSING'].includes(v.status)
+        );
+
+        if (hasActive && !selectedVerification) {
+            setIsPolling(true);
+            pollRef.current = setInterval(() => {
+                fetchVerifications(true);
+            }, 5000);
+        } else {
+            setIsPolling(false);
+            clearInterval(pollRef.current);
+        }
+
+        return () => clearInterval(pollRef.current);
+    }, [verifications, selectedVerification]);
 
     useEffect(() => {
         const loadInlinePreviews = async () => {
@@ -121,8 +142,8 @@ export default function Verifications() {
     const toDateTimeStart = (date) => (date ? `${date}T00:00:00` : undefined);
     const toDateTimeEnd = (date) => (date ? `${date}T23:59:59` : undefined);
 
-    const fetchVerifications = async () => {
-        setLoading(true);
+    const fetchVerifications = async (silent = false) => {
+        if (!silent) setLoading(true);
         setError('');
         try {
             const data = await kycService.listVerifications(
@@ -323,6 +344,12 @@ export default function Verifications() {
                     <div className="card-title-group">
                         <span className="card-title">All requests</span>
                         <span className="count-badge">{pagination.totalElements} users</span>
+                        {isPolling && (
+                            <span className="polling-indicator" title="Auto-refreshing every 5s">
+                                <span className="polling-dot" />
+                                Live
+                            </span>
+                        )}
                     </div>
                 </div>
 
