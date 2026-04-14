@@ -23,9 +23,7 @@ export default function Companies() {
     const [statusFilter, setStatusFilter] = useState('all');
     const [pagination, setPagination] = useState({ page: 0, size: 20, totalPages: 0, totalElements: 0 });
     const [error, setError] = useState('');
-    const [showStatusModal, setShowStatusModal] = useState(false);
-    const [statusAction, setStatusAction] = useState(null);
-    const [actionReason, setActionReason] = useState('');
+    const [credentials, setCredentials] = useState([]);
     const [actionLoading, setActionLoading] = useState(false);
     const isAdminUser = useMemo(() => isAdminOrSuperAdmin(user), [user]);
 
@@ -94,8 +92,11 @@ export default function Companies() {
             }
 
             if (keyResponse.status === 'fulfilled' && keyResponse.value.success) {
-                setCredential(keyResponse.value.data?.[0] || null);
+                const keyList = keyResponse.value.data || [];
+                setCredentials(keyList);
+                setCredential(keyList[0] || null);
             } else {
+                setCredentials([]);
                 setCredential(null);
             }
         } catch (err) {
@@ -105,27 +106,38 @@ export default function Companies() {
         }
     };
 
-    const openStatusAction = (action) => {
-        if (!isAdminUser) return;
-        setStatusAction(action);
-        setActionReason('');
-        setShowStatusModal(true);
-    };
-
-    const confirmStatusAction = async () => {
+    const handleCompanyAction = async (type) => {
         if (!selectedCompany || !isAdminUser) return;
         setActionLoading(true);
+        setError('');
         try {
-            if (statusAction === 'activate') {
+            if (type === 'activate') {
                 await companyService.activateCompany(selectedCompany.id);
             } else {
-                await companyService.suspendCompany(selectedCompany.id, actionReason || '');
+                await companyService.suspendCompany(selectedCompany.id, '');
             }
-            setShowStatusModal(false);
             await fetchCompanies();
             if (selectedCompany) await selectCompany(selectedCompany);
         } catch (err) {
-            setError(err.response?.data?.errorMessage || err.message || `Failed to ${statusAction} company`);
+            setError(err.response?.data?.errorMessage || err.message || `Failed to ${type} company`);
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
+    const handleCredentialAction = async (type, environment) => {
+        if (!selectedCompany || !isAdminUser) return;
+        setActionLoading(true);
+        setError('');
+        try {
+            if (type === 'activate') {
+                await companyService.activateCredentials(selectedCompany.id, environment);
+            } else {
+                await companyService.suspendCredentials(selectedCompany.id, environment);
+            }
+            await selectCompany(selectedCompany);
+        } catch (err) {
+            setError(err.response?.data?.errorMessage || err.message || `Failed to ${type} credentials`);
         } finally {
             setActionLoading(false);
         }
@@ -268,15 +280,15 @@ export default function Companies() {
                                 </div>
                                 <div className="details-actions">
                                     {isAdminUser && canSuspend && (
-                                        <Button variant="secondary" onClick={() => openStatusAction('suspend')}>
+                                        <Button variant="secondary" onClick={() => handleCompanyAction('suspend')} disabled={actionLoading}>
                                             <PauseCircle size={14} />
-                                            Suspend
+                                            Suspend Company
                                         </Button>
                                     )}
                                     {isAdminUser && canActivate && (
-                                        <Button onClick={() => openStatusAction('activate')}>
+                                        <Button onClick={() => handleCompanyAction('activate')} disabled={actionLoading}>
                                             <PlayCircle size={14} />
-                                            Activate
+                                            Activate Company
                                         </Button>
                                     )}
                                 </div>
@@ -306,14 +318,46 @@ export default function Companies() {
 
                                 <div className="detail-box">
                                     <h4>API Credentials</h4>
-                                    {credential ? (
-                                        <>
-                                            <div className="detail-row"><span>Status</span><strong>{credential.status || 'N/A'}</strong></div>
-                                            <div className="detail-row"><span>Environment</span><strong>{credential.environment || 'N/A'}</strong></div>
-                                            <div className="detail-row"><span>Expires At</span><strong>{formatDate(credential.expiresAt)}</strong></div>
-                                        </>
-                                    ) : (
+                                    {credentials.length === 0 ? (
                                         <p className="text-muted">No credentials generated yet.</p>
+                                    ) : (
+                                        credentials.map((cred) => {
+                                            const env = cred.environment?.toLowerCase();
+                                            const isSuspended = cred.status === 'SUSPENDED';
+                                            return (
+                                                <div key={cred.environment} className="credential-env-block">
+                                                    <div className="detail-row">
+                                                        <span>Environment</span>
+                                                        <strong>{cred.environment}</strong>
+                                                    </div>
+                                                    <div className="detail-row">
+                                                        <span>Status</span>
+                                                        <Badge variant={cred.status === 'ACTIVE' ? 'success' : cred.status === 'SUSPENDED' ? 'warning' : 'default'}>
+                                                            {cred.status}
+                                                        </Badge>
+                                                    </div>
+                                                    <div className="detail-row">
+                                                        <span>Expires At</span>
+                                                        <strong>{formatDate(cred.expiresAt)}</strong>
+                                                    </div>
+                                                    {isAdminUser && (
+                                                        <div className="detail-row credential-actions">
+                                                            {isSuspended ? (
+                                                                <Button onClick={() => handleCredentialAction('activate', env)} disabled={actionLoading}>
+                                                                    <PlayCircle size={12} />
+                                                                    Activate {cred.environment}
+                                                                </Button>
+                                                            ) : (
+                                                                <Button variant="secondary" onClick={() => handleCredentialAction('suspend', env)} disabled={actionLoading}>
+                                                                    <PauseCircle size={12} />
+                                                                    Suspend {cred.environment}
+                                                                </Button>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            );
+                                        })
                                     )}
                                 </div>
                             </div>
@@ -322,33 +366,6 @@ export default function Companies() {
                 </Card>
             </div>
 
-            {showStatusModal && selectedCompany && isAdminUser && (
-                <div className="modal-overlay" onClick={() => setShowStatusModal(false)}>
-                    <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-                        <h3>{statusAction === 'suspend' ? 'Suspend Company' : 'Activate Company'}</h3>
-                        <p>
-                            {statusAction === 'suspend'
-                                ? 'Suspending will block this company from API access.'
-                                : 'Activating will restore this company API access.'}
-                        </p>
-                        {statusAction === 'suspend' && (
-                            <textarea
-                                value={actionReason}
-                                onChange={(e) => setActionReason(e.target.value)}
-                                placeholder="Reason (optional)"
-                            />
-                        )}
-                        <div className="modal-actions">
-                            <Button variant="secondary" onClick={() => setShowStatusModal(false)}>
-                                Cancel
-                            </Button>
-                            <Button onClick={confirmStatusAction} disabled={actionLoading}>
-                                {actionLoading ? 'Processing...' : (statusAction === 'suspend' ? 'Suspend' : 'Activate')}
-                            </Button>
-                        </div>
-                    </div>
-                </div>
-            )}
         </div>
     );
 }
