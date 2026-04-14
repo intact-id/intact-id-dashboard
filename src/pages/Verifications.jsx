@@ -70,24 +70,24 @@ export default function Verifications() {
         }
     }, [isSuperAdmin]);
 
-    // Auto-poll every 5 s when there are active verifications, pause when modal is open
+    // Auto-poll every 5s — pauses only when detail modal is open
     useEffect(() => {
-        const hasActive = verifications.some((v) =>
-            ['PENDING', 'PROCESSING'].includes(v.status)
-        );
-
-        if (hasActive && !selectedVerification) {
-            setIsPolling(true);
-            pollRef.current = setInterval(() => {
-                fetchVerifications(true);
-            }, 5000);
-        } else {
+        if (selectedVerification) {
             setIsPolling(false);
             clearInterval(pollRef.current);
+            return;
         }
 
-        return () => clearInterval(pollRef.current);
-    }, [verifications, selectedVerification]);
+        setIsPolling(true);
+        pollRef.current = setInterval(() => {
+            fetchVerifications(true);
+        }, 5000);
+
+        return () => {
+            clearInterval(pollRef.current);
+            setIsPolling(false);
+        };
+    }, [selectedVerification]);
 
     useEffect(() => {
         const loadInlinePreviews = async () => {
