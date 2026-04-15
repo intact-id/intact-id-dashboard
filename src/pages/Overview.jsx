@@ -9,23 +9,48 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
-  Legend,
 } from "recharts";
 import {
-  AlertTriangle,
-  DollarSign,
   Shield,
   CheckCircle,
   Key,
   Activity,
+  X,
 } from "lucide-react";
 import analyticsService from "../services/analyticsService";
 import kycService from "../services/kycService";
 import "./Overview.css";
 import "./Verifications.css";
+import "../components/ModalStyles.css";
+
+const getStatusVariant = (status) => {
+  switch (status) {
+    case 'APPROVED': return 'success';
+    case 'COMPLETED': return 'info';
+    case 'REJECTED': return 'error';
+    case 'FAILED': return 'error';
+    case 'PENDING': return 'warning';
+    case 'PROCESSING': return 'warning';
+    case 'MANUAL_REVIEW': return 'warning';
+    case 'SUBMITTED': return 'default';
+    default: return 'default';
+  }
+};
+
+const getDecisionVariant = (decision) => {
+  switch (decision) {
+    case 'APPROVED': return 'success';
+    case 'REJECTED': return 'error';
+    case 'MANUAL_REVIEW': return 'info';
+    default: return null;
+  }
+};
+
+const getInitials = (firstName, lastName) => {
+  const f = firstName?.[0] || '';
+  const l = lastName?.[0] || '';
+  return (f + l).toUpperCase() || '?';
+};
 
 export default function Overview() {
   const [stats, setStats] = useState({
@@ -36,6 +61,7 @@ export default function Overview() {
   });
   const [usageData, setUsageData] = useState([]);
   const [activityLog, setActivityLog] = useState([]);
+  const [selectedActivity, setSelectedActivity] = useState(null);
   const [systemStatus, setSystemStatus] = useState({
     status: "operational",
     uptime: 99.9,
@@ -89,20 +115,19 @@ export default function Overview() {
       }
 
       if (recentVerifications.success) {
-        // Convert to activity log format
         const activities = recentVerifications.data.content
           .slice(0, 10)
           .map((v) => ({
             id: v.verificationId,
-            type:
-              v.status === "APPROVED"
-                ? "verification_completed"
-                : v.status === "REJECTED"
-                  ? "verification_failed"
-                  : "verification_pending",
-            description: `${v.customerData?.firstName} ${v.customerData?.lastName} - ${v.status}`,
-            verificationId: v.verificationId.substring(0, 13) + "...",
+            firstName: v.customerData?.firstName || '',
+            lastName: v.customerData?.lastName || '',
+            email: v.customerData?.email || '',
+            status: v.status,
+            tier: v.verificationType || '-',
+            overallDecision: v.overallDecision || null,
+            verificationId: v.verificationId,
             timestamp: v.createdAt,
+            raw: v,
           }));
         setActivityLog(activities);
       }
@@ -298,32 +323,45 @@ export default function Overview() {
             <div className="card__header">
               <h3 className="card__title">Recent Activity</h3>
             </div>
-            <div className="card__body">
-              <div className="activity-list">
-                {activityLog.map((activity) => (
-                  <div key={activity.id} className="activity-item">
-                    <div className="activity-icon">
-                      {activity.type === "verification_completed" && "●"}
-                      {activity.type === "verification_failed" && "●"}
-                      {activity.type === "verification_pending" && "●"}
-                      {activity.type === "api_key_created" && "●"}
-                    </div>
-                    <div className="activity-content">
-                      <div className="activity-description">
-                        {activity.description}
-                      </div>
-                      {activity.verificationId && (
-                        <div className="activity-meta">
-                          ID: {activity.verificationId}
+            <div className="card__body" style={{ overflowY: 'auto', padding: 0 }}>
+              <table className="verifications-table">
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th>Status</th>
+                    <th>Type</th>
+                    <th>Time</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {activityLog.length === 0 ? (
+                    <tr><td colSpan="4" className="empty-state">No recent activity</td></tr>
+                  ) : activityLog.map((activity) => (
+                    <tr key={activity.id} onClick={() => setSelectedActivity(activity)} style={{ cursor: 'pointer' }}>
+                      <td>
+                        <div className="user-group">
+                          <div className="user-avatar">
+                            {getInitials(activity.firstName, activity.lastName)}
+                          </div>
+                          <div className="user-info">
+                            <span className="user-name">
+                              {activity.firstName || 'Unknown'} {activity.lastName}
+                            </span>
+                            <span className="user-sub">{activity.email || activity.verificationId.substring(0, 13) + '...'}</span>
+                          </div>
                         </div>
-                      )}
-                    </div>
-                    <div className="activity-time">
-                      {formatTime(activity.timestamp)}
-                    </div>
-                  </div>
-                ))}
-              </div>
+                      </td>
+                      <td>
+                        <Badge variant={getStatusVariant(activity.status)} dot={true}>
+                          {activity.status?.replace(/_/g, ' ')}
+                        </Badge>
+                      </td>
+                      <td className="text-secondary">{activity.tier}</td>
+                      <td className="text-secondary">{formatTime(activity.timestamp)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </Card>
 
@@ -354,6 +392,67 @@ export default function Overview() {
           </Card>
         </div>
       </div>
+
+      {selectedActivity && (
+        <div className="modal-overlay" onClick={() => setSelectedActivity(null)}>
+          <div className="professional-modal verification-modal" onClick={(e) => e.stopPropagation()}>
+            <button className="modal-close-btn" onClick={() => setSelectedActivity(null)}><X size={18} /></button>
+            <div className="modal-scroll-content">
+              <div className="modal-top">
+                <h2 className="modal-title">Verification Details</h2>
+                <p className="modal-subtitle">ID: {selectedActivity.verificationId}</p>
+                <div className="modal-badges">
+                  <Badge variant={getStatusVariant(selectedActivity.status)} dot={true}>
+                    {selectedActivity.status?.replace(/_/g, ' ')}
+                  </Badge>
+                  {selectedActivity.overallDecision && getDecisionVariant(selectedActivity.overallDecision) && (
+                    <Badge variant={getDecisionVariant(selectedActivity.overallDecision)}>
+                      {selectedActivity.overallDecision}
+                    </Badge>
+                  )}
+                  {selectedActivity.tier && selectedActivity.tier !== '-' && (
+                    <Badge variant="info">{selectedActivity.tier}</Badge>
+                  )}
+                </div>
+              </div>
+
+              <div className="modal-section">
+                <div className="section-title">Summary</div>
+                <div className="info-grid">
+                  <div className="info-row"><span className="info-label">Company</span><span className="info-value">{selectedActivity.raw?.companyName || '-'}</span></div>
+                  <div className="info-row"><span className="info-label">Verification Type</span><span className="info-value">{selectedActivity.raw?.verificationType || '-'}</span></div>
+                  <div className="info-row">
+                    <span className="info-label">Decision</span>
+                    <span className="info-value">
+                      {selectedActivity.overallDecision && getDecisionVariant(selectedActivity.overallDecision)
+                        ? <Badge variant={getDecisionVariant(selectedActivity.overallDecision)}>{selectedActivity.overallDecision}</Badge>
+                        : selectedActivity.overallDecision || '-'}
+                    </span>
+                  </div>
+                  <div className="info-row"><span className="info-label">Created</span><span className="info-value">{formatDate(selectedActivity.timestamp)}</span></div>
+                  <div className="info-row"><span className="info-label">Completed</span><span className="info-value">{formatDate(selectedActivity.raw?.completedAt)}</span></div>
+                  <div className="info-row"><span className="info-label">Risk Score</span><span className="info-value">{selectedActivity.raw?.riskScore ?? '-'}</span></div>
+                  <div className="info-row"><span className="info-label">Failure Reason</span><span className="info-value">{selectedActivity.raw?.failureReason || '-'}</span></div>
+                </div>
+              </div>
+
+              <div className="modal-section">
+                <div className="section-title">Customer Information</div>
+                <div className="info-grid">
+                  {selectedActivity.raw?.customerData && Object.entries(selectedActivity.raw.customerData).map(([key, value]) => (
+                    <div key={key} className="info-row">
+                      <span className="info-label" style={{ textTransform: 'capitalize' }}>
+                        {key.replace(/([A-Z])/g, ' $1').trim()}
+                      </span>
+                      <span className="info-value">{typeof value === 'object' ? JSON.stringify(value) : String(value)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
