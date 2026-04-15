@@ -18,6 +18,7 @@ import Companies from './pages/Companies';
 import Notifications from './pages/Notifications';
 import TeamMembers from './pages/TeamMembers';
 import Usage from './pages/Usage';
+import RequestLogs from './pages/RequestLogs';
 
 // Protected Route Component
 function ProtectedRoute({ children }) {
@@ -89,6 +90,7 @@ function AppRoutes() {
         <Route path="team" element={<Navigate to="/dashboard/users" replace />} />
         <Route path="users" element={<TeamMembers />} />
         <Route path="usage" element={<Usage />} />
+        <Route path="logs" element={<RequestLogs />} />
         <Route path="api" element={<ApiManagement />} />
         <Route path="webhooks" element={<Webhooks />} />
         <Route path="billing" element={<Billing />} />

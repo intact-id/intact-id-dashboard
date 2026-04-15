@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Search, Plus, Edit2, Trash2, UserX, UserCheck, Building2, Users } from 'lucide-react';
+import { Search, Plus, Edit2, Trash2, UserX, UserCheck, Building2, Users, ScrollText, Clock3, Activity } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
@@ -8,6 +8,7 @@ import { useAuth } from '../contexts/AuthContext';
 import userService from '../services/userService';
 import companyService from '../services/companyService';
 import roleService from '../services/roleService';
+import auditService from '../services/auditService';
 import './TeamMembers.css';
 
 const DEFAULT_FORM = {
@@ -45,6 +46,14 @@ export default function TeamMembers() {
     const [modalMode, setModalMode] = useState('create');
     const [selectedUser, setSelectedUser] = useState(null);
     const [formData, setFormData] = useState(DEFAULT_FORM);
+    const [logsModalOpen, setLogsModalOpen] = useState(false);
+    const [logsTab, setLogsTab] = useState('sessions');
+    const [logsTargetUser, setLogsTargetUser] = useState(null);
+    const [userSessions, setUserSessions] = useState([]);
+    const [userLogs, setUserLogs] = useState([]);
+    const [selectedSession, setSelectedSession] = useState(null);
+    const [logsLoading, setLogsLoading] = useState(false);
+    const [logsError, setLogsError] = useState('');
 
     const isSuperAdmin = Array.isArray(user?.roles) && user.roles.includes('SUPER_ADMIN');
 
@@ -155,6 +164,7 @@ export default function TeamMembers() {
     };
 
     const getRoleVariant = (roleName) => ROLE_COLORS[roleName] || 'default';
+    const formatDuration = (durationMs) => durationMs != null ? `${durationMs} ms` : 'N/A';
 
     const openCreateModal = () => {
         setModalMode('create');
@@ -186,6 +196,50 @@ export default function TeamMembers() {
         setModalOpen(false);
         setSelectedUser(null);
         setFormData({ ...DEFAULT_FORM, roleIds: [] });
+    };
+
+    const loadUserLogs = async (userId, sessionId) => {
+        try {
+            setLogsLoading(true);
+            setLogsError('');
+            const [sessionsResponse, logsResponse] = await Promise.all([
+                auditService.getSessions({ userId }, { page: 0, size: 20 }),
+                auditService.getUserLogs(userId, { sessionId }, { page: 0, size: 40 })
+            ]);
+
+            if (sessionsResponse.success) {
+                const sessionsList = sessionsResponse.data?.content || [];
+                setUserSessions(sessionsList);
+                if (sessionId) {
+                    setSelectedSession(sessionsList.find((entry) => entry.sessionId === sessionId) || null);
+                }
+            }
+
+            if (logsResponse.success) {
+                setUserLogs(logsResponse.data?.content || []);
+            }
+        } catch (error) {
+            setLogsError(error.response?.data?.errorMessage || error.message || 'Failed to load user logs');
+        } finally {
+            setLogsLoading(false);
+        }
+    };
+
+    const openLogsModal = async (userRecord) => {
+        setLogsTargetUser(userRecord);
+        setLogsModalOpen(true);
+        setLogsTab('sessions');
+        setSelectedSession(null);
+        await loadUserLogs(userRecord.id);
+    };
+
+    const closeLogsModal = () => {
+        setLogsModalOpen(false);
+        setLogsTargetUser(null);
+        setUserSessions([]);
+        setUserLogs([]);
+        setSelectedSession(null);
+        setLogsError('');
     };
 
     const handleRoleToggle = (roleId) => {
@@ -383,6 +437,11 @@ export default function TeamMembers() {
                                                     {u.status === 'ACTIVE' ? <UserX size={15} /> : <UserCheck size={15} />}
                                                 </button>
                                                 {isSuperAdmin && (
+                                                    <button className="action-btn" onClick={() => openLogsModal(u)} title="Logs">
+                                                        <ScrollText size={15} />
+                                                    </button>
+                                                )}
+                                                {isSuperAdmin && (
                                                     <button className="action-btn action-btn--delete" onClick={() => handleDeleteUser(u.id)} title="Delete">
                                                         <Trash2 size={15} />
                                                     </button>
@@ -444,6 +503,11 @@ export default function TeamMembers() {
                                                 <button className="action-btn" onClick={() => handleToggleStatus(u.id, u.status)} title={u.status === 'ACTIVE' ? 'Suspend' : 'Activate'}>
                                                     {u.status === 'ACTIVE' ? <UserX size={15} /> : <UserCheck size={15} />}
                                                 </button>
+                                                {isSuperAdmin && (
+                                                    <button className="action-btn" onClick={() => openLogsModal(u)} title="Logs">
+                                                        <ScrollText size={15} />
+                                                    </button>
+                                                )}
                                                 {isSuperAdmin && (
                                                     <button className="action-btn action-btn--delete" onClick={() => handleDeleteUser(u.id)} title="Delete">
                                                         <Trash2 size={15} />
@@ -543,6 +607,103 @@ export default function TeamMembers() {
                                 <Button type="submit">{modalMode === 'create' ? 'Create User' : 'Save Changes'}</Button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            )}
+
+            {logsModalOpen && (
+                <div className="modal-overlay" onClick={closeLogsModal}>
+                    <div className="modal user-modal user-logs-modal" onClick={(e) => e.stopPropagation()}>
+                        <div className="modal-header">
+                            <div>
+                                <h2>User Logs</h2>
+                                <p>{logsTargetUser?.firstName} {logsTargetUser?.lastName} • @{logsTargetUser?.username}</p>
+                            </div>
+                            <button className="modal-close" onClick={closeLogsModal}>×</button>
+                        </div>
+
+                        <div className="modal-body">
+                            <div className="user-logs-summary">
+                                <Card className="user-logs-stat">
+                                    <div className="user-logs-stat-icon user-logs-stat-icon--blue"><Clock3 size={16} /></div>
+                                    <div><div className="stat-label">Sessions</div><div className="stat-value">{userSessions.length}</div></div>
+                                </Card>
+                                <Card className="user-logs-stat">
+                                    <div className="user-logs-stat-icon user-logs-stat-icon--green"><Activity size={16} /></div>
+                                    <div><div className="stat-label">Activities</div><div className="stat-value">{userLogs.length}</div></div>
+                                </Card>
+                            </div>
+
+                            <div className="view-tabs">
+                                <button className={`view-tab ${logsTab === 'sessions' ? 'active' : ''}`} onClick={() => setLogsTab('sessions')}>Logs Tab: Sessions</button>
+                                <button className={`view-tab ${logsTab === 'activities' ? 'active' : ''}`} onClick={() => setLogsTab('activities')}>Logs Tab: Activities</button>
+                            </div>
+
+                            {logsError ? (
+                                <div className="empty-state"><p>{logsError}</p></div>
+                            ) : logsLoading ? (
+                                <div className="loading-state"><div className="spinner"></div><p>Loading user logs...</p></div>
+                            ) : logsTab === 'sessions' ? (
+                                <div className="user-logs-session-list">
+                                    {userSessions.length === 0 ? (
+                                        <div className="empty-state"><ScrollText size={32} /><p>No sessions recorded for this user yet.</p></div>
+                                    ) : userSessions.map((session) => (
+                                        <button
+                                            key={session.sessionId}
+                                            className={`user-session-card ${selectedSession?.sessionId === session.sessionId ? 'active' : ''}`}
+                                            onClick={() => {
+                                                setSelectedSession(session);
+                                                loadUserLogs(logsTargetUser.id, session.sessionId);
+                                            }}
+                                        >
+                                            <div className="user-session-card__head">
+                                                <div>
+                                                    <div className="user-name">{session.sessionId}</div>
+                                                    <div className="user-sub">{formatDate(session.loginAt)}</div>
+                                                </div>
+                                                <Badge variant={session.status === 'ACTIVE' ? 'success' : 'default'}>{session.status}</Badge>
+                                            </div>
+                                            <div className="user-session-card__meta">
+                                                <span>Last activity: {formatDate(session.lastActivityAt)}</span>
+                                                <span>IP: {session.ipAddress || 'Unknown'}</span>
+                                                <span>Actions: {session.activityCount}</span>
+                                            </div>
+                                        </button>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="table-container user-logs-table-container">
+                                    <table className="data-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Time</th>
+                                                <th>Method</th>
+                                                <th>Path</th>
+                                                <th>Status</th>
+                                                <th>Duration</th>
+                                                <th>Resource</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {userLogs.length === 0 ? (
+                                                <tr>
+                                                    <td colSpan="6" className="text-secondary">No activities recorded for the selected scope.</td>
+                                                </tr>
+                                            ) : userLogs.map((entry) => (
+                                                <tr key={entry.id}>
+                                                    <td>{formatDate(entry.startedAt)}</td>
+                                                    <td><Badge variant="info">{entry.httpMethod || entry.activityType}</Badge></td>
+                                                    <td className="user-logs-path">{entry.path}</td>
+                                                    <td><Badge variant={entry.statusCode >= 400 ? 'error' : 'success'}>{entry.statusCode || 'N/A'}</Badge></td>
+                                                    <td>{formatDuration(entry.durationMs)}</td>
+                                                    <td>{entry.resourceType}: {entry.resourceId}</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
             )}
