@@ -28,7 +28,7 @@ export default function ApiManagement() {
     const [generatingEnv, setGeneratingEnv] = useState(null);
     const [showActionModal, setShowActionModal] = useState(false);
     const [actionType, setActionType] = useState(null);
-    const [actionReason, setActionReason] = useState('');
+    const [actionEnv, setActionEnv] = useState(null);
     const [actionLoading, setActionLoading] = useState(false);
 
     const isAdminUser = useMemo(() => isAdminOrSuperAdmin(user), [user]);
@@ -134,9 +134,9 @@ export default function ApiManagement() {
         }
     };
 
-    const openAction = (type) => {
+    const openAction = (type, env) => {
         setActionType(type);
-        setActionReason('');
+        setActionEnv(env);
         setShowActionModal(true);
     };
 
@@ -145,9 +145,9 @@ export default function ApiManagement() {
         setActionLoading(true);
         try {
             if (actionType === 'suspend') {
-                await credentialsService.suspendCredentials(selectedCompany.id, actionReason || 'Suspended via dashboard');
+                await credentialsService.suspendCredentials(selectedCompany.id, actionEnv.toLowerCase());
             } else {
-                await credentialsService.activateCredentials(selectedCompany.id);
+                await credentialsService.activateCredentials(selectedCompany.id, actionEnv.toLowerCase());
             }
             setShowActionModal(false);
             await selectCompany(selectedCompany);
@@ -289,17 +289,6 @@ export default function ApiManagement() {
                                         <RefreshCcw size={14} />
                                         {generatingEnv === 'PROD' ? 'Generating PROD...' : 'Generate PROD'}
                                     </Button>
-                                    {(credentialsByEnv.PROD?.status || credentialsByEnv.DEV?.status) === 'SUSPENDED' ? (
-                                        <Button onClick={() => openAction('activate')}>
-                                            <PlayCircle size={14} />
-                                            Activate
-                                        </Button>
-                                    ) : (
-                                        <Button variant="secondary" onClick={() => openAction('suspend')}>
-                                            <PauseCircle size={14} />
-                                            Suspend
-                                        </Button>
-                                    )}
                                 </div>
                             </div>
 
@@ -324,6 +313,17 @@ export default function ApiManagement() {
                                         <KeyRound size={14} />
                                         {credentialsByEnv.PROD ? 'Regenerate PROD' : 'Generate PROD'}
                                     </Button>
+                                    {credentialsByEnv.PROD && (
+                                        credentialsByEnv.PROD.status === 'SUSPENDED' ? (
+                                            <Button size="sm" onClick={() => openAction('activate', 'PROD')}>
+                                                <PlayCircle size={14} /> Activate PROD
+                                            </Button>
+                                        ) : (
+                                            <Button size="sm" variant="secondary" onClick={() => openAction('suspend', 'PROD')}>
+                                                <PauseCircle size={14} /> Suspend PROD
+                                            </Button>
+                                        )
+                                    )}
                                 </div>
                             </div>
 
@@ -348,6 +348,17 @@ export default function ApiManagement() {
                                         <KeyRound size={14} />
                                         {credentialsByEnv.DEV ? 'Regenerate DEV' : 'Generate DEV'}
                                     </Button>
+                                    {credentialsByEnv.DEV && (
+                                        credentialsByEnv.DEV.status === 'SUSPENDED' ? (
+                                            <Button size="sm" onClick={() => openAction('activate', 'DEV')}>
+                                                <PlayCircle size={14} /> Activate DEV
+                                            </Button>
+                                        ) : (
+                                            <Button size="sm" variant="secondary" onClick={() => openAction('suspend', 'DEV')}>
+                                                <PauseCircle size={14} /> Suspend DEV
+                                            </Button>
+                                        )
+                                    )}
                                 </div>
                             </div>
 
@@ -391,23 +402,16 @@ export default function ApiManagement() {
             {showActionModal && (
                 <div className="modal-overlay" onClick={() => setShowActionModal(false)}>
                     <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-                        <h3>{actionType === 'suspend' ? 'Suspend Credentials' : 'Activate Credentials'}</h3>
+                        <h3>{actionType === 'suspend' ? `Suspend ${actionEnv} Credentials` : `Activate ${actionEnv} Credentials`}</h3>
                         <p>
                             {actionType === 'suspend'
-                                ? 'Suspending credentials blocks API requests for this company.'
-                                : 'Activating credentials restores API access.'}
+                                ? `Suspending ${actionEnv} credentials will block all ${actionEnv} API requests for this company.`
+                                : `Activating ${actionEnv} credentials will restore ${actionEnv} API access. No new keys will be generated.`}
                         </p>
-                        {actionType === 'suspend' && (
-                            <textarea
-                                value={actionReason}
-                                onChange={(e) => setActionReason(e.target.value)}
-                                placeholder="Reason (optional)"
-                            />
-                        )}
                         <div className="modal-actions">
                             <Button variant="secondary" onClick={() => setShowActionModal(false)}>Cancel</Button>
                             <Button onClick={confirmAction} disabled={actionLoading}>
-                                {actionLoading ? 'Processing...' : (actionType === 'suspend' ? 'Suspend' : 'Activate')}
+                                {actionLoading ? 'Processing...' : (actionType === 'suspend' ? `Suspend ${actionEnv}` : `Activate ${actionEnv}`)}
                             </Button>
                         </div>
                     </div>

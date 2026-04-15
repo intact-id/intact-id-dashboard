@@ -1,10 +1,10 @@
 import api from './api';
 
 const credentialsService = {
-    // Suspend company credentials
-    async suspendCredentials(companyId, reason = 'Suspended via dashboard') {
+    // Suspend company credentials for a specific environment ('dev' | 'prod')
+    async suspendCredentials(companyId, environment) {
         try {
-            const params = new URLSearchParams({ reason });
+            const params = new URLSearchParams({ environment });
             const response = await api.post(`/api/companies/${companyId}/credentials/suspend?${params}`);
             return response.data;
         } catch (error) {
@@ -13,10 +13,11 @@ const credentialsService = {
         }
     },
 
-    // Activate company credentials
-    async activateCredentials(companyId) {
+    // Activate company credentials for a specific environment ('dev' | 'prod')
+    async activateCredentials(companyId, environment) {
         try {
-            const response = await api.post(`/api/companies/${companyId}/credentials/activate`);
+            const params = new URLSearchParams({ environment });
+            const response = await api.post(`/api/companies/${companyId}/credentials/activate?${params}`);
             return response.data;
         } catch (error) {
             console.error('Activate credentials error:', error);
