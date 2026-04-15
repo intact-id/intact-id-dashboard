@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Activity, CalendarRange, Clock3, Filter, Search, Shield, Users } from 'lucide-react';
+import { Activity, CalendarRange, Clock3, Filter, Search, Shield, Users, X } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
 import Input from '../components/ui/Input';
@@ -8,6 +8,15 @@ import auditService from '../services/auditService';
 import userService from '../services/userService';
 import companyService from '../services/companyService';
 import './RequestLogs.css';
+import './Verifications.css';
+import '../components/ModalStyles.css';
+
+const getInitials = (name) => {
+    if (!name) return '?';
+    const parts = name.trim().split(/\s+/);
+    if (parts.length >= 2) return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+    return name.substring(0, 2).toUpperCase();
+};
 
 const DEFAULT_FILTERS = {
     userId: '',
@@ -30,6 +39,7 @@ export default function RequestLogs() {
     const [users, setUsers] = useState([]);
     const [companies, setCompanies] = useState([]);
     const [selectedSession, setSelectedSession] = useState(null);
+    const [selectedActivity, setSelectedActivity] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [sessionPagination, setSessionPagination] = useState({ page: 0, size: 15, totalPages: 0, totalElements: 0 });
@@ -276,77 +286,55 @@ export default function RequestLogs() {
             {error ? <Card className="request-logs-error">{error}</Card> : null}
 
             {activeTab === 'sessions' ? (
-                <div className="request-logs-layout">
-                    <Card className="request-logs-table-card">
-                        {loading ? (
-                            <div className="request-logs-empty">Loading sessions...</div>
-                        ) : sessions.length === 0 ? (
-                            <div className="request-logs-empty">No sessions match the current filters.</div>
-                        ) : (
-                            <>
-                                <div className="request-logs-table-wrap">
-                                    <table className="request-logs-table">
-                                        <thead>
-                                            <tr>
-                                                <th>User</th>
-                                                <th>Company</th>
-                                                <th>Login</th>
-                                                <th>Last Activity</th>
-                                                <th>Status</th>
-                                                <th>Activities</th>
+                <Card className="request-logs-table-card">
+                    {loading ? (
+                        <div className="request-logs-empty">Loading sessions...</div>
+                    ) : sessions.length === 0 ? (
+                        <div className="request-logs-empty">No sessions match the current filters.</div>
+                    ) : (
+                        <>
+                            <div className="request-logs-table-wrap">
+                                <table className="verifications-table">
+                                    <thead>
+                                        <tr>
+                                            <th>User</th>
+                                            <th>Company</th>
+                                            <th>Login</th>
+                                            <th>Last Activity</th>
+                                            <th>Status</th>
+                                            <th>Activities</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {sessions.map((session) => (
+                                            <tr key={session.sessionId} onClick={() => setSelectedSession(session)} style={{ cursor: 'pointer' }}>
+                                                <td>
+                                                    <div className="user-group">
+                                                        <div className="user-avatar">{getInitials(session.username)}</div>
+                                                        <div className="user-info">
+                                                            <span className="user-name">{session.username}</span>
+                                                            <span className="user-sub">{session.userId}</span>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td className="text-secondary">{session.companyName || 'Platform'}</td>
+                                                <td className="text-secondary">{formatDateTime(session.loginAt)}</td>
+                                                <td className="text-secondary">{formatDateTime(session.lastActivityAt)}</td>
+                                                <td><Badge variant={session.status === 'ACTIVE' ? 'success' : 'default'} dot={true}>{session.status}</Badge></td>
+                                                <td className="text-secondary">{session.activityCount}</td>
                                             </tr>
-                                        </thead>
-                                        <tbody>
-                                            {sessions.map((session) => (
-                                                <tr
-                                                    key={session.sessionId}
-                                                    className={selectedSession?.sessionId === session.sessionId ? 'selected' : ''}
-                                                    onClick={() => setSelectedSession(session)}
-                                                >
-                                                    <td>
-                                                        <div className="request-logs-primary">{session.username}</div>
-                                                        <div className="request-logs-secondary">{session.userId}</div>
-                                                    </td>
-                                                    <td>{session.companyName || 'Platform'}</td>
-                                                    <td>{formatDateTime(session.loginAt)}</td>
-                                                    <td>{formatDateTime(session.lastActivityAt)}</td>
-                                                    <td><Badge variant={session.status === 'ACTIVE' ? 'success' : 'default'}>{session.status}</Badge></td>
-                                                    <td>{session.activityCount}</td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-                                <div className="request-logs-pagination">
-                                    <button disabled={sessionPagination.page === 0} onClick={() => changePage('sessions', sessionPagination.page - 1)}>Previous</button>
-                                    <span>Page {sessionPagination.page + 1} of {Math.max(1, sessionPagination.totalPages)}</span>
-                                    <button disabled={sessionPagination.page >= sessionPagination.totalPages - 1 || sessionPagination.totalPages === 0} onClick={() => changePage('sessions', sessionPagination.page + 1)}>Next</button>
-                                </div>
-                            </>
-                        )}
-                    </Card>
-
-                    <Card className="request-logs-detail-card">
-                        {selectedSession ? (
-                            <div className="request-logs-session-detail">
-                                <div className="request-logs-detail-head">
-                                    <h3>Session Detail</h3>
-                                    <Badge variant={selectedSession.status === 'ACTIVE' ? 'success' : 'default'}>{selectedSession.status}</Badge>
-                                </div>
-                                <div className="request-logs-detail-grid">
-                                    <div><span>Session ID</span><strong>{selectedSession.sessionId}</strong></div>
-                                    <div><span>Login</span><strong>{formatDateTime(selectedSession.loginAt)}</strong></div>
-                                    <div><span>Logout</span><strong>{formatDateTime(selectedSession.logoutAt)}</strong></div>
-                                    <div><span>IP Address</span><strong>{selectedSession.ipAddress || 'Unknown'}</strong></div>
-                                    <div><span>User Agent</span><strong>{selectedSession.userAgent || 'Unknown'}</strong></div>
-                                    <div><span>Total Activities</span><strong>{selectedSession.activityCount}</strong></div>
-                                </div>
+                                        ))}
+                                    </tbody>
+                                </table>
                             </div>
-                        ) : (
-                            <div className="request-logs-empty">Select a session to inspect its summary.</div>
-                        )}
-                    </Card>
-                </div>
+                            <div className="request-logs-pagination">
+                                <button disabled={sessionPagination.page === 0} onClick={() => changePage('sessions', sessionPagination.page - 1)}>Previous</button>
+                                <span>Page {sessionPagination.page + 1} of {Math.max(1, sessionPagination.totalPages)}</span>
+                                <button disabled={sessionPagination.page >= sessionPagination.totalPages - 1 || sessionPagination.totalPages === 0} onClick={() => changePage('sessions', sessionPagination.page + 1)}>Next</button>
+                            </div>
+                        </>
+                    )}
+                </Card>
             ) : (
                 <Card className="request-logs-table-card">
                     {loading ? (
@@ -356,31 +344,34 @@ export default function RequestLogs() {
                     ) : (
                         <>
                             <div className="request-logs-table-wrap">
-                                <table className="request-logs-table">
+                                <table className="verifications-table">
                                     <thead>
                                         <tr>
-                                            <th>Time</th>
                                             <th>User</th>
                                             <th>Method</th>
                                             <th>Path</th>
                                             <th>Status</th>
                                             <th>Duration</th>
-                                            <th>Resource</th>
+                                            <th>Time</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         {activities.map((activity) => (
-                                            <tr key={activity.id}>
-                                                <td>{formatDateTime(activity.startedAt)}</td>
+                                            <tr key={activity.id} onClick={() => setSelectedActivity(activity)} style={{ cursor: 'pointer' }}>
                                                 <td>
-                                                    <div className="request-logs-primary">{activity.username}</div>
-                                                    <div className="request-logs-secondary">{activity.sessionId}</div>
+                                                    <div className="user-group">
+                                                        <div className="user-avatar">{getInitials(activity.username)}</div>
+                                                        <div className="user-info">
+                                                            <span className="user-name">{activity.username}</span>
+                                                            <span className="user-sub">{activity.sessionId?.substring(0, 13)}...</span>
+                                                        </div>
+                                                    </div>
                                                 </td>
                                                 <td><Badge variant="info">{activity.httpMethod || activity.activityType}</Badge></td>
-                                                <td className="request-logs-path-cell">{activity.path}</td>
+                                                <td className="request-logs-path-cell text-secondary">{activity.path}</td>
                                                 <td><Badge variant={activity.statusCode >= 400 ? 'error' : 'success'}>{activity.statusCode || 'N/A'}</Badge></td>
-                                                <td>{activity.durationMs != null ? `${activity.durationMs} ms` : 'N/A'}</td>
-                                                <td>{activity.resourceType}: {activity.resourceId}</td>
+                                                <td className="text-secondary">{activity.durationMs != null ? `${activity.durationMs} ms` : 'N/A'}</td>
+                                                <td className="text-secondary">{formatDateTime(activity.startedAt)}</td>
                                             </tr>
                                         ))}
                                     </tbody>
@@ -394,6 +385,70 @@ export default function RequestLogs() {
                         </>
                     )}
                 </Card>
+            )}
+
+            {selectedSession && (
+                <div className="modal-overlay" onClick={() => setSelectedSession(null)}>
+                    <div className="professional-modal verification-modal" onClick={(e) => e.stopPropagation()}>
+                        <button className="modal-close-btn" onClick={() => setSelectedSession(null)}><X size={18} /></button>
+                        <div className="modal-scroll-content">
+                            <div className="modal-top">
+                                <h2 className="modal-title">Session Detail</h2>
+                                <p className="modal-subtitle">ID: {selectedSession.sessionId}</p>
+                                <div className="modal-badges">
+                                    <Badge variant={selectedSession.status === 'ACTIVE' ? 'success' : 'default'} dot={true}>{selectedSession.status}</Badge>
+                                </div>
+                            </div>
+                            <div className="modal-section">
+                                <div className="section-title">Session Info</div>
+                                <div className="info-grid">
+                                    <div className="info-row"><span className="info-label">Username</span><span className="info-value">{selectedSession.username}</span></div>
+                                    <div className="info-row"><span className="info-label">User ID</span><span className="info-value">{selectedSession.userId}</span></div>
+                                    <div className="info-row"><span className="info-label">Company</span><span className="info-value">{selectedSession.companyName || 'Platform'}</span></div>
+                                    <div className="info-row"><span className="info-label">IP Address</span><span className="info-value">{selectedSession.ipAddress || 'Unknown'}</span></div>
+                                    <div className="info-row"><span className="info-label">Login</span><span className="info-value">{formatDateTime(selectedSession.loginAt)}</span></div>
+                                    <div className="info-row"><span className="info-label">Logout</span><span className="info-value">{formatDateTime(selectedSession.logoutAt)}</span></div>
+                                    <div className="info-row"><span className="info-label">Last Activity</span><span className="info-value">{formatDateTime(selectedSession.lastActivityAt)}</span></div>
+                                    <div className="info-row"><span className="info-label">Total Activities</span><span className="info-value">{selectedSession.activityCount}</span></div>
+                                    <div className="info-row"><span className="info-label">User Agent</span><span className="info-value">{selectedSession.userAgent || 'Unknown'}</span></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {selectedActivity && (
+                <div className="modal-overlay" onClick={() => setSelectedActivity(null)}>
+                    <div className="professional-modal verification-modal" onClick={(e) => e.stopPropagation()}>
+                        <button className="modal-close-btn" onClick={() => setSelectedActivity(null)}><X size={18} /></button>
+                        <div className="modal-scroll-content">
+                            <div className="modal-top">
+                                <h2 className="modal-title">Activity Detail</h2>
+                                <p className="modal-subtitle">{selectedActivity.path}</p>
+                                <div className="modal-badges">
+                                    <Badge variant="info">{selectedActivity.httpMethod || selectedActivity.activityType}</Badge>
+                                    <Badge variant={selectedActivity.statusCode >= 400 ? 'error' : 'success'}>{selectedActivity.statusCode || 'N/A'}</Badge>
+                                </div>
+                            </div>
+                            <div className="modal-section">
+                                <div className="section-title">Request Info</div>
+                                <div className="info-grid">
+                                    <div className="info-row"><span className="info-label">User</span><span className="info-value">{selectedActivity.username}</span></div>
+                                    <div className="info-row"><span className="info-label">Session ID</span><span className="info-value">{selectedActivity.sessionId}</span></div>
+                                    <div className="info-row"><span className="info-label">Method</span><span className="info-value">{selectedActivity.httpMethod}</span></div>
+                                    <div className="info-row"><span className="info-label">Path</span><span className="info-value">{selectedActivity.path}</span></div>
+                                    <div className="info-row"><span className="info-label">Status Code</span><span className="info-value">{selectedActivity.statusCode || 'N/A'}</span></div>
+                                    <div className="info-row"><span className="info-label">Duration</span><span className="info-value">{selectedActivity.durationMs != null ? `${selectedActivity.durationMs} ms` : 'N/A'}</span></div>
+                                    <div className="info-row"><span className="info-label">Activity Type</span><span className="info-value">{selectedActivity.activityType || 'N/A'}</span></div>
+                                    <div className="info-row"><span className="info-label">Resource</span><span className="info-value">{selectedActivity.resourceType}: {selectedActivity.resourceId}</span></div>
+                                    <div className="info-row"><span className="info-label">Started At</span><span className="info-value">{formatDateTime(selectedActivity.startedAt)}</span></div>
+                                    <div className="info-row"><span className="info-label">Completed At</span><span className="info-value">{formatDateTime(selectedActivity.completedAt)}</span></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             )}
         </div>
     );
