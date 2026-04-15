@@ -426,6 +426,81 @@
     gap: 0.6rem;
 }
 
+.user-logs-modal {
+    width: min(980px, 94vw);
+}
+
+.user-logs-summary {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--spacing-3);
+}
+
+.user-logs-stat {
+    padding: 0.9rem 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+}
+
+.user-logs-stat-icon {
+    width: 34px;
+    height: 34px;
+    border-radius: 9px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.user-logs-stat-icon--blue { background: rgba(59, 130, 246, 0.18); color: #93c5fd; }
+.user-logs-stat-icon--green { background: rgba(34, 197, 94, 0.18); color: #86efac; }
+
+.user-logs-session-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.user-session-card {
+    border: 1px solid var(--color-border-primary);
+    background: rgba(15, 23, 42, 0.55);
+    border-radius: 14px;
+    padding: 0.9rem 1rem;
+    text-align: left;
+    cursor: pointer;
+    color: var(--color-text-secondary);
+}
+
+.user-session-card.active {
+    border-color: rgba(56, 189, 248, 0.45);
+    background: rgba(14, 165, 233, 0.12);
+}
+
+.user-session-card__head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: var(--spacing-3);
+}
+
+.user-session-card__meta {
+    margin-top: 0.65rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.8rem;
+    font-size: 0.78rem;
+    color: var(--color-text-tertiary);
+}
+
+.user-logs-table-container {
+    max-height: 460px;
+}
+
+.user-logs-path {
+    min-width: 260px;
+    word-break: break-word;
+}
+
 @media (max-width: 1100px) {
     .filters {
         grid-template-columns: 1fr 1fr;
@@ -453,6 +528,10 @@
     }
 
     .modal-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .user-logs-summary {
         grid-template-columns: 1fr;
     }
 

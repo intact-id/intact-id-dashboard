@@ -76,7 +76,7 @@ export default function DashboardLayout() {
                 { path: '/dashboard/api', label: 'API Keys', icon: Key },
                 ...(isSuperAdmin ? [{ path: '/dashboard/usage', label: 'Usage', icon: Activity }] : []),
                 { path: '/dashboard/webhooks', label: 'Webhooks', icon: Webhook },
-                { path: '/dashboard/logs', label: 'Request Logs', icon: Code, comingSoon: true },
+                ...(isSuperAdmin ? [{ path: '/dashboard/logs', label: 'Request Logs', icon: Code }] : []),
             ]
         },
         {
