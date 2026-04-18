@@ -539,6 +539,30 @@ export default function Verifications() {
                                                             <div className="doc-meta">
                                                                 Uploaded: {formatDate(doc.uploadedAt)}
                                                             </div>
+                                                            {doc.extractedData && (
+                                                                <div className="doc-ocr">
+                                                                    <div className="doc-ocr-title">OCR Extracted Data</div>
+                                                                    <div className="doc-ocr-grid">
+                                                                        {[
+                                                                            ['Document Type', doc.extractedData.document_type],
+                                                                            ['Full Name', doc.extractedData.full_name],
+                                                                            ['ID Number', doc.extractedData.id_number],
+                                                                            ['Date of Birth', doc.extractedData.date_of_birth],
+                                                                            ['Nationality', doc.extractedData.nationality],
+                                                                            ['Expiry Date', doc.extractedData.expiry_date],
+                                                                            ['Country', doc.extractedData.country_iso3],
+                                                                            ['Confidence', doc.extractedData.overall_confidence != null
+                                                                                ? `${Math.round(doc.extractedData.overall_confidence * 100)}%`
+                                                                                : null],
+                                                                        ].filter(([, v]) => v).map(([label, value]) => (
+                                                                            <div className="doc-ocr-field" key={label}>
+                                                                                <span className="doc-ocr-label">{label}</span>
+                                                                                <span className="doc-ocr-value">{value}</span>
+                                                                            </div>
+                                                                        ))}
+                                                                    </div>
+                                                                </div>
+                                                            )}
                                                         </div>
                                                         <div className="doc-actions">
                                                             <Button size="sm" variant="secondary" onClick={() => openDocument(selectedVerification.verificationId, doc)}>
