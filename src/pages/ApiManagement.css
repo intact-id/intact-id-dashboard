@@ -372,6 +372,110 @@
     margin-top: 0.8rem;
 }
 
+/* ===== Rate Limits ===== */
+.rate-limit-card {
+    border: 1px solid #27272a;
+    border-radius: 8px;
+    overflow: hidden;
+    margin-top: 0.5rem;
+}
+
+.rate-limit-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.625rem 0.875rem;
+    background: #0a0a0a;
+    border-bottom: 1px solid #27272a;
+}
+
+.rate-limit-title {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.rate-limit-title h4 {
+    margin: 0;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #fff;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.rl-edit-btn {
+    padding: 0.3rem 0.875rem;
+    background: transparent;
+    border: 1px solid rgba(0,242,255,0.3);
+    color: #00f2ff;
+    border-radius: 4px;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+.rl-edit-btn:hover { background: rgba(0,242,255,0.08); }
+
+/* Rate limit modal */
+.rl-modal { max-width: 520px; }
+.rl-modal h3 { display: flex; align-items: center; gap: 0.5rem; margin: 0 0 0.25rem; font-size: 0.9rem; }
+.rl-modal-hint { font-size: 0.6875rem; color: #9ca3af; margin: 0 0 1rem; }
+
+.rl-env-block { margin-bottom: 1rem; }
+.rl-env-label {
+    font-size: 0.625rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #00f2ff;
+    margin-bottom: 0.5rem;
+}
+
+.rl-fields {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.625rem;
+}
+
+.rl-field label {
+    display: block;
+    font-size: 0.625rem;
+    color: #9ca3af;
+    font-weight: 500;
+    margin-bottom: 0.25rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.rl-input {
+    width: 100%;
+    background: #0a0a0a;
+    border: 1px solid #27272a;
+    border-radius: 5px;
+    color: #fff;
+    font-size: 0.75rem;
+    padding: 0.4rem 0.625rem;
+    box-sizing: border-box;
+}
+.rl-input:focus { outline: none; border-color: rgba(0,242,255,0.4); }
+.rl-input::placeholder { color: #6b7280; }
+
+.btn-cancel, .btn-save {
+    padding: 0.45rem 1.25rem;
+    border-radius: 5px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    transition: all 0.15s;
+}
+.btn-cancel { background: transparent; border: 1px solid #27272a; color: #9ca3af; }
+.btn-cancel:hover { border-color: #52525b; color: #fff; }
+.btn-save { background: #00f2ff; color: #000; }
+.btn-save:hover { background: #00d4e0; }
+.btn-save:disabled { opacity: 0.5; cursor: not-allowed; }
+
 @media (max-width: 1180px) {
     .api-layout {
         grid-template-columns: 1fr;
