@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Building2, KeyRound, RefreshCcw, PauseCircle, PlayCircle } from 'lucide-react';
+import { Building2, KeyRound, RefreshCcw, PauseCircle, PlayCircle, Gauge } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { isAdminOrSuperAdmin } from '../utils/roles';
+import { isAdminOrSuperAdmin, hasAnyRole } from '../utils/roles';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Badge from '../components/ui/Badge';
@@ -30,8 +30,13 @@ export default function ApiManagement() {
     const [actionType, setActionType] = useState(null);
     const [actionEnv, setActionEnv] = useState(null);
     const [actionLoading, setActionLoading] = useState(false);
+    const [rateLimits, setRateLimits] = useState(null);
+    const [showRateLimitModal, setShowRateLimitModal] = useState(false);
+    const [rlForm, setRlForm] = useState({ dev: { perHour: '', perDay: '', perMonth: '' }, prod: { perHour: '', perDay: '', perMonth: '' } });
+    const [rlSaving, setRlSaving] = useState(false);
 
     const isAdminUser = useMemo(() => isAdminOrSuperAdmin(user), [user]);
+    const isSuperAdmin = useMemo(() => hasAnyRole(user, ['SUPER_ADMIN']), [user]);
 
     useEffect(() => {
         fetchCompanies();
@@ -86,9 +91,10 @@ export default function ApiManagement() {
         setLoadingDetails(true);
         setError('');
         try {
-            const [keysResponse, usageResponse] = await Promise.allSettled([
+            const [keysResponse, usageResponse, rlResponse] = await Promise.allSettled([
                 apiKeyService.getApiKeys(company.id),
-                apiKeyService.getUsage(company.id)
+                apiKeyService.getUsage(company.id),
+                companyService.getRateLimits(company.id)
             ]);
 
             if (keysResponse.status === 'fulfilled' && keysResponse.value.success) {
@@ -107,6 +113,17 @@ export default function ApiManagement() {
                 setUsage(usageResponse.value.data || null);
             } else {
                 setUsage(null);
+            }
+
+            if (rlResponse.status === 'fulfilled' && rlResponse.value.success) {
+                const rl = rlResponse.value.data;
+                setRateLimits(rl);
+                setRlForm({
+                    dev: { perHour: rl?.dev?.perHour ?? '', perDay: rl?.dev?.perDay ?? '', perMonth: rl?.dev?.perMonth ?? '' },
+                    prod: { perHour: rl?.prod?.perHour ?? '', perDay: rl?.prod?.perDay ?? '', perMonth: rl?.prod?.perMonth ?? '' }
+                });
+            } else {
+                setRateLimits(null);
             }
         } catch (err) {
             setError(err.response?.data?.errorMessage || err.message || 'Failed to load company API details');
@@ -155,6 +172,27 @@ export default function ApiManagement() {
             setError(err.response?.data?.errorMessage || err.message || `Failed to ${actionType} credentials`);
         } finally {
             setActionLoading(false);
+        }
+    };
+
+    const saveRateLimits = async () => {
+        if (!selectedCompany) return;
+        setRlSaving(true);
+        try {
+            const toInt = (v) => (v === '' || v === null || v === undefined) ? -1 : parseInt(v, 10);
+            const payload = {
+                dev: { perHour: toInt(rlForm.dev.perHour), perDay: toInt(rlForm.dev.perDay), perMonth: toInt(rlForm.dev.perMonth) },
+                prod: { perHour: toInt(rlForm.prod.perHour), perDay: toInt(rlForm.prod.perDay), perMonth: toInt(rlForm.prod.perMonth) }
+            };
+            const res = await companyService.updateRateLimits(selectedCompany.id, payload);
+            if (res.success) {
+                setRateLimits(res.data);
+                setShowRateLimitModal(false);
+            }
+        } catch (err) {
+            setError(err.response?.data?.responseMessage || err.message || 'Failed to update rate limits');
+        } finally {
+            setRlSaving(false);
         }
     };
 
@@ -378,6 +416,34 @@ export default function ApiManagement() {
                                     <div className="usage-row"><span>Success Rate</span><strong>{safePct(usage?.prodTotalSuccessfulRequests, usage?.prodTotalRequests)}%</strong></div>
                                 </div>
                             </div>
+
+                            {/* Rate Limits Card */}
+                            <div className="rate-limit-card">
+                                <div className="rate-limit-header">
+                                    <div className="rate-limit-title">
+                                        <Gauge size={15} />
+                                        <h4>Rate Limits</h4>
+                                    </div>
+                                    {isSuperAdmin && (
+                                        <button className="rl-edit-btn" onClick={() => setShowRateLimitModal(true)}>
+                                            Configure
+                                        </button>
+                                    )}
+                                </div>
+                                <div className="usage-grid">
+                                    {['dev', 'prod'].map(env => {
+                                        const lim = rateLimits?.[env];
+                                        return (
+                                            <div key={env} className="usage-box">
+                                                <h4>{env.toUpperCase()} Limits</h4>
+                                                <div className="usage-row"><span>Per Hour</span><strong>{lim?.perHour != null ? lim.perHour.toLocaleString() : 'Unlimited'}</strong></div>
+                                                <div className="usage-row"><span>Per Day</span><strong>{lim?.perDay != null ? lim.perDay.toLocaleString() : 'Unlimited'}</strong></div>
+                                                <div className="usage-row"><span>Per Month</span><strong>{lim?.perMonth != null ? lim.perMonth.toLocaleString() : 'Unlimited'}</strong></div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
                         </div>
                     )}
                 </Card>
@@ -394,6 +460,46 @@ export default function ApiManagement() {
                         </div>
                         <div className="modal-actions">
                             <Button onClick={() => setShowGenerateModal(false)}>Close</Button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {showRateLimitModal && isSuperAdmin && (
+                <div className="modal-overlay" onClick={() => setShowRateLimitModal(false)}>
+                    <div className="modal-content rl-modal" onClick={e => e.stopPropagation()}>
+                        <h3><Gauge size={16} /> Rate Limits — {selectedCompany?.legalName}</h3>
+                        <p className="rl-modal-hint">Set to blank or 0 for unlimited. Values are per verification request.</p>
+
+                        {['dev', 'prod'].map(env => (
+                            <div key={env} className="rl-env-block">
+                                <div className="rl-env-label">{env.toUpperCase()}</div>
+                                <div className="rl-fields">
+                                    {['perHour', 'perDay', 'perMonth'].map(field => (
+                                        <div key={field} className="rl-field">
+                                            <label>{field === 'perHour' ? 'Per Hour' : field === 'perDay' ? 'Per Day' : 'Per Month'}</label>
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                className="rl-input"
+                                                placeholder="Unlimited"
+                                                value={rlForm[env][field]}
+                                                onChange={e => setRlForm(prev => ({
+                                                    ...prev,
+                                                    [env]: { ...prev[env], [field]: e.target.value }
+                                                }))}
+                                            />
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        ))}
+
+                        <div className="modal-actions">
+                            <button className="btn-cancel" onClick={() => setShowRateLimitModal(false)}>Cancel</button>
+                            <button className="btn-save" onClick={saveRateLimits} disabled={rlSaving}>
+                                {rlSaving ? 'Saving…' : 'Save Limits'}
+                            </button>
                         </div>
                     </div>
                 </div>
