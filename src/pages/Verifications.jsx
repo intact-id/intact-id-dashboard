@@ -500,7 +500,11 @@ export default function Verifications() {
                                                     <span className="info-label" style={{ textTransform: 'capitalize' }}>
                                                         {key.replace(/([A-Z])/g, ' $1').trim()}
                                                     </span>
-                                                    <span className="info-value">{typeof value === 'object' ? JSON.stringify(value) : String(value)}</span>
+                                                    <span className="info-value">
+                                                        {Array.isArray(value) && value.length === 3
+                                                            ? `${String(value[0])}-${String(value[1]).padStart(2,'0')}-${String(value[2]).padStart(2,'0')}`
+                                                            : typeof value === 'object' ? JSON.stringify(value) : String(value)}
+                                                    </span>
                                                 </div>
                                             ))}
                                         </div>
@@ -539,7 +543,7 @@ export default function Verifications() {
                                                             <div className="doc-meta">
                                                                 Uploaded: {formatDate(doc.uploadedAt)}
                                                             </div>
-                                                            {doc.extractedData && (
+                                                            {doc.extractedData && Object.keys(doc.extractedData).length > 0 && (
                                                                 <div className="doc-ocr">
                                                                     <div className="doc-ocr-title">OCR Extracted Data</div>
                                                                     <div className="doc-ocr-grid">
@@ -580,26 +584,118 @@ export default function Verifications() {
                                     <div className="modal-section">
                                         <div className="section-title">Verification Steps</div>
                                         {selectedVerification.steps?.length ? (
-                                            <table className="steps-table">
-                                                <thead>
-                                                    <tr>
-                                                        <th>Step</th>
-                                                        <th>Status</th>
-                                                        <th>Confidence</th>
-                                                        <th>Executed</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    {selectedVerification.steps.map((step, idx) => (
-                                                        <tr key={`${step.stepName}-${idx}`}>
-                                                            <td>{step.stepName || '-'}</td>
-                                                            <td><Badge variant={getStatusVariant(step.status)}>{step.status || '-'}</Badge></td>
-                                                            <td>{step.confidenceScore ?? '-'}</td>
-                                                            <td>{formatDate(step.executedAt)}</td>
-                                                        </tr>
-                                                    ))}
-                                                </tbody>
-                                            </table>
+                                            <div className="steps-cards">
+                                                {selectedVerification.steps.map((step, idx) => (
+                                                    <div className="step-card" key={`${step.stepName}-${idx}`}>
+                                                        <div className="step-card-header">
+                                                            <span className="step-card-name">{(step.stepName || '-').replace(/_/g, ' ')}</span>
+                                                            <div className="step-card-meta">
+                                                                {step.confidenceScore != null && (
+                                                                    <span className="step-confidence">{Math.round(step.confidenceScore * 100)}%</span>
+                                                                )}
+                                                                <Badge variant={getStatusVariant(step.status)}>{step.status || '-'}</Badge>
+                                                            </div>
+                                                        </div>
+                                                        {step.result && Object.keys(step.result).length > 0 && (
+                                                            <div className="step-card-result">
+                                                                {step.stepName === 'face_match' && (
+                                                                    <div className="step-detail-grid">
+                                                                        <div className="step-detail-item">
+                                                                            <span className="step-detail-label">Match Score</span>
+                                                                            <span className="step-detail-value">{Math.round((step.result.match_score ?? 0) * 100)}%</span>
+                                                                        </div>
+                                                                        <div className="step-detail-item">
+                                                                            <span className="step-detail-label">Distance</span>
+                                                                            <span className="step-detail-value">{step.result.distance?.toFixed(4)} / {step.result.threshold}</span>
+                                                                        </div>
+                                                                        <div className="step-detail-item">
+                                                                            <span className="step-detail-label">Verified</span>
+                                                                            <span className={`step-detail-value ${step.result.verified ? 'text-success' : 'text-danger'}`}>
+                                                                                {step.result.verified ? '✓ Yes' : '✗ No'}
+                                                                            </span>
+                                                                        </div>
+                                                                        <div className="step-detail-item">
+                                                                            <span className="step-detail-label">Metric</span>
+                                                                            <span className="step-detail-value">{step.result.similarity_metric}</span>
+                                                                        </div>
+                                                                    </div>
+                                                                )}
+                                                                {step.stepName === 'liveness_detection' && (
+                                                                    <div className="step-detail-grid">
+                                                                        <div className="step-detail-item">
+                                                                            <span className="step-detail-label">Liveness Score</span>
+                                                                            <span className="step-detail-value">{step.result.liveness_score}/100</span>
+                                                                        </div>
+                                                                        <div className="step-detail-item">
+                                                                            <span className="step-detail-label">Face Detected</span>
+                                                                            <span className={`step-detail-value ${step.result.checks?.face_detected ? 'text-success' : 'text-danger'}`}>
+                                                                                {step.result.checks?.face_detected ? '✓' : '✗'}
+                                                                            </span>
+                                                                        </div>
+                                                                        <div className="step-detail-item">
+                                                                            <span className="step-detail-label">Single Face</span>
+                                                                            <span className={`step-detail-value ${step.result.checks?.single_face ? 'text-success' : 'text-danger'}`}>
+                                                                                {step.result.checks?.single_face ? '✓' : '✗'}
+                                                                            </span>
+                                                                        </div>
+                                                                        <div className="step-detail-item">
+                                                                            <span className="step-detail-label">Image Quality</span>
+                                                                            <span className="step-detail-value">{step.result.checks?.image_quality}</span>
+                                                                        </div>
+                                                                        <div className="step-detail-item">
+                                                                            <span className="step-detail-label">Lighting</span>
+                                                                            <span className="step-detail-value">{step.result.checks?.lighting}</span>
+                                                                        </div>
+                                                                        <div className="step-detail-item">
+                                                                            <span className="step-detail-label">Blur Score</span>
+                                                                            <span className="step-detail-value">{step.result.checks?.blur_score?.toFixed(1)}</span>
+                                                                        </div>
+                                                                    </div>
+                                                                )}
+                                                                {step.stepName === 'ocr_extraction' && (
+                                                                    <div className="step-detail-grid">
+                                                                        <div className="step-detail-item">
+                                                                            <span className="step-detail-label">ID Number Match</span>
+                                                                            <span className={`step-detail-value ${step.result.id_number_match === true ? 'text-success' : step.result.id_number_match === false ? 'text-danger' : ''}`}>
+                                                                                {step.result.id_number_match === true ? '✓ Match' : step.result.id_number_match === false ? '✗ Mismatch' : step.result.id_number_match}
+                                                                            </span>
+                                                                        </div>
+                                                                        <div className="step-detail-item">
+                                                                            <span className="step-detail-label">DOB Match</span>
+                                                                            <span className={`step-detail-value ${step.result.dob_match === true ? 'text-success' : step.result.dob_match === false ? 'text-danger' : ''}`}>
+                                                                                {step.result.dob_match === true ? '✓ Match' : step.result.dob_match === false ? '✗ Mismatch' : step.result.dob_match}
+                                                                            </span>
+                                                                        </div>
+                                                                        <div className="step-detail-item">
+                                                                            <span className="step-detail-label">Name Similarity</span>
+                                                                            <span className={`step-detail-value ${step.result.name_similarity >= 0.85 ? 'text-success' : 'text-warning'}`}>
+                                                                                {step.result.name_similarity != null ? `${Math.round(step.result.name_similarity * 100)}%` : '-'}
+                                                                            </span>
+                                                                        </div>
+                                                                        <div className="step-detail-item">
+                                                                            <span className="step-detail-label">Document Type</span>
+                                                                            <span className="step-detail-value">{step.result.document_type?.replace(/_/g, ' ')}</span>
+                                                                        </div>
+                                                                        {step.result.failure_reasons && (
+                                                                            <div className="step-detail-item step-detail-full">
+                                                                                <span className="step-detail-label">Failures</span>
+                                                                                <span className="step-detail-value text-danger">{step.result.failure_reasons.join(', ')}</span>
+                                                                            </div>
+                                                                        )}
+                                                                        {step.result.warnings && (
+                                                                            <div className="step-detail-item step-detail-full">
+                                                                                <span className="step-detail-label">Warnings</span>
+                                                                                <span className="step-detail-value text-warning">{step.result.warnings.join(', ')}</span>
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        )}
+                                                        <div className="step-card-time">{formatDate(step.executedAt)}</div>
+                                                    </div>
+                                                ))}
+                                            </div>
                                         ) : (
                                             <p className="text-tertiary">No step history available.</p>
                                         )}
