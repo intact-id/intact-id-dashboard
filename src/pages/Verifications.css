@@ -417,6 +417,46 @@
     justify-content: flex-end;
 }
 
+.doc-ocr {
+    margin-top: 8px;
+    padding: 8px 10px;
+    background: rgba(99, 179, 237, 0.06);
+    border: 1px solid rgba(99, 179, 237, 0.15);
+    border-radius: 6px;
+}
+
+.doc-ocr-title {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--color-text-muted);
+    margin-bottom: 6px;
+}
+
+.doc-ocr-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px 12px;
+}
+
+.doc-ocr-field {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+}
+
+.doc-ocr-label {
+    font-size: 0.6875rem;
+    color: var(--color-text-muted);
+}
+
+.doc-ocr-value {
+    font-size: 0.8125rem;
+    color: var(--color-text-primary);
+    font-weight: 500;
+}
+
 .steps-table {
     width: 100%;
     border-collapse: collapse;

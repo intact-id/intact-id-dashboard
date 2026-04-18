@@ -28,8 +28,7 @@ export default function Approvals() {
         setLoading(true);
         try {
             if (activeTab === 'kyc') {
-                const data = await kycService.listVerifications(
-                    { status: 'PENDING' },
+                const data = await kycService.getPendingReviews(
                     { page: pagination.page, size: pagination.size }
                 );
                 if (data.success) {
@@ -66,14 +65,17 @@ export default function Approvals() {
             if (activeTab === 'kyb') {
                 const id = item.approvalId || item.id;
                 await approvalService.checkerDecision(id, 'APPROVE', 'Approved via Dashboard');
-                fetchData();
-                setSelectedItem(null);
             } else {
-                console.log('KYC Approve not implemented yet');
+                await kycService.resolveReview(item.verificationId, 'approved', 'Approved via Dashboard');
             }
+            fetchData();
+            setSelectedItem(null);
+            setNotificationMessage('Successfully approved.');
+            setNotificationType('success');
+            setShowNotificationModal(true);
         } catch (error) {
             console.error('Approval failed:', error);
-            setNotificationMessage('Failed to approve: ' + (error.response?.data?.errorMessage || error.message));
+            setNotificationMessage('Failed to approve: ' + (error.response?.data?.responseMessage || error.message));
             setNotificationType('error');
             setShowNotificationModal(true);
         }
@@ -84,14 +86,17 @@ export default function Approvals() {
             if (activeTab === 'kyb') {
                 const id = item.approvalId || item.id;
                 await approvalService.checkerDecision(id, 'REJECT', 'Rejected via Dashboard');
-                fetchData();
-                setSelectedItem(null);
             } else {
-                console.log('KYC Reject not implemented yet');
+                await kycService.resolveReview(item.verificationId, 'rejected', 'Rejected via Dashboard');
             }
+            fetchData();
+            setSelectedItem(null);
+            setNotificationMessage('Successfully rejected.');
+            setNotificationType('success');
+            setShowNotificationModal(true);
         } catch (error) {
             console.error('Rejection failed:', error);
-            setNotificationMessage('Failed to reject: ' + (error.response?.data?.errorMessage || error.message));
+            setNotificationMessage('Failed to reject: ' + (error.response?.data?.responseMessage || error.message));
             setNotificationType('error');
             setShowNotificationModal(true);
         }
