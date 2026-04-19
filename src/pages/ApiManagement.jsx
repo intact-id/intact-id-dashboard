@@ -418,27 +418,61 @@ export default function ApiManagement() {
                             </div>
 
                             {/* Rate Limits Card */}
-                            <div className="rate-limit-card">
-                                <div className="rate-limit-header">
-                                    <div className="rate-limit-title">
-                                        <Gauge size={15} />
-                                        <h4>Rate Limits</h4>
+                            <div className="rl-card">
+                                <div className="rl-card-header">
+                                    <div className="rl-card-title">
+                                        <Gauge size={16} />
+                                        <span>Rate Limits</span>
                                     </div>
                                     {isSuperAdmin && (
-                                        <button className="rl-edit-btn" onClick={() => setShowRateLimitModal(true)}>
+                                        <button className="rl-configure-btn" onClick={() => setShowRateLimitModal(true)}>
                                             Configure
                                         </button>
                                     )}
                                 </div>
-                                <div className="usage-grid">
-                                    {['dev', 'prod'].map(env => {
-                                        const lim = rateLimits?.[env];
+                                <div className="rl-envs">
+                                    {[
+                                        { key: 'dev',  label: 'Development', usageKey: 'dev' },
+                                        { key: 'prod', label: 'Production',  usageKey: 'prod' }
+                                    ].map(({ key, label, usageKey }) => {
+                                        const lim = rateLimits?.[key];
+                                        const used = usage?.[`${usageKey}TotalRequests`] || 0;
+                                        const monthLimit = lim?.perMonth;
+                                        const pct = monthLimit > 0 ? Math.min(100, Math.round((used / monthLimit) * 100)) : null;
                                         return (
-                                            <div key={env} className="usage-box">
-                                                <h4>{env.toUpperCase()} Limits</h4>
-                                                <div className="usage-row"><span>Per Hour</span><strong>{lim?.perHour != null ? lim.perHour.toLocaleString() : 'Unlimited'}</strong></div>
-                                                <div className="usage-row"><span>Per Day</span><strong>{lim?.perDay != null ? lim.perDay.toLocaleString() : 'Unlimited'}</strong></div>
-                                                <div className="usage-row"><span>Per Month</span><strong>{lim?.perMonth != null ? lim.perMonth.toLocaleString() : 'Unlimited'}</strong></div>
+                                            <div key={key} className="rl-env-panel">
+                                                <div className="rl-env-label-row">
+                                                    <span className={`rl-env-badge rl-env-badge--${key}`}>{label}</span>
+                                                    {pct !== null && (
+                                                        <span className={`rl-usage-pct ${pct >= 90 ? 'danger' : pct >= 70 ? 'warn' : ''}`}>
+                                                            {pct}% of monthly limit used
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                {pct !== null && (
+                                                    <div className="rl-bar-wrap">
+                                                        <div className="rl-bar">
+                                                            <div
+                                                                className={`rl-bar-fill ${pct >= 90 ? 'danger' : pct >= 70 ? 'warn' : ''}`}
+                                                                style={{ width: `${pct}%` }}
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                )}
+                                                <div className="rl-limits-grid">
+                                                    {[
+                                                        { label: 'Per Hour', val: lim?.perHour },
+                                                        { label: 'Per Day',  val: lim?.perDay },
+                                                        { label: 'Per Month', val: lim?.perMonth },
+                                                    ].map(({ label: l, val }) => (
+                                                        <div key={l} className="rl-limit-cell">
+                                                            <span className="rl-limit-label">{l}</span>
+                                                            <span className={`rl-limit-val ${val == null || val < 0 ? 'unlimited' : ''}`}>
+                                                                {val == null || val < 0 ? '∞' : val.toLocaleString()}
+                                                            </span>
+                                                        </div>
+                                                    ))}
+                                                </div>
                                             </div>
                                         );
                                     })}
@@ -471,22 +505,30 @@ export default function ApiManagement() {
                         <h3><Gauge size={16} /> Rate Limits — {selectedCompany?.legalName}</h3>
                         <p className="rl-modal-hint">Set to blank or 0 for unlimited. Values are per verification request.</p>
 
-                        {['dev', 'prod'].map(env => (
-                            <div key={env} className="rl-env-block">
-                                <div className="rl-env-label">{env.toUpperCase()}</div>
+                        {[
+                            { key: 'dev', label: 'Development (DEV)' },
+                            { key: 'prod', label: 'Production (PROD)' }
+                        ].map(({ key, label }, i) => (
+                            <div key={key} className="rl-env-block">
+                                {i > 0 && <div className="rl-modal-divider" />}
+                                <div className="rl-env-label">{label}</div>
                                 <div className="rl-fields">
-                                    {['perHour', 'perDay', 'perMonth'].map(field => (
+                                    {[
+                                        { field: 'perHour', label: 'Per Hour' },
+                                        { field: 'perDay',  label: 'Per Day' },
+                                        { field: 'perMonth', label: 'Per Month' }
+                                    ].map(({ field, label: fl }) => (
                                         <div key={field} className="rl-field">
-                                            <label>{field === 'perHour' ? 'Per Hour' : field === 'perDay' ? 'Per Day' : 'Per Month'}</label>
+                                            <label>{fl}</label>
                                             <input
                                                 type="number"
                                                 min="0"
                                                 className="rl-input"
                                                 placeholder="Unlimited"
-                                                value={rlForm[env][field]}
+                                                value={rlForm[key][field]}
                                                 onChange={e => setRlForm(prev => ({
                                                     ...prev,
-                                                    [env]: { ...prev[env], [field]: e.target.value }
+                                                    [key]: { ...prev[key], [field]: e.target.value }
                                                 }))}
                                             />
                                         </div>

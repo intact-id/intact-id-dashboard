@@ -45,6 +45,12 @@ const webhookService = {
         }
     },
 
+    // Update applicant email notification flags
+    async updateApplicantNotifications(companyId, flags) {
+        const response = await api.put(`/api/companies/${companyId}/communication/notification-settings`, flags);
+        return response.data;
+    },
+
     // Get webhook logs/history
     async getWebhookLogs(companyId, pagination = { page: 0, size: 20 }) {
         try {
