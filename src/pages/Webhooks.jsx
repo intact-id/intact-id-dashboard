@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Building2, Mail, Phone, Globe, Webhook as WebhookIcon, RefreshCcw, Save, TestTube, Copy, RotateCcw, Eye, EyeOff } from 'lucide-react';
+import { Building2, Mail, Phone, Globe, Webhook as WebhookIcon, RefreshCcw, Save, TestTube, Copy, RotateCcw, Eye, EyeOff, Bell } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Badge from '../components/ui/Badge';
 import { useAuth } from '../contexts/AuthContext';
-import { isAdminOrSuperAdmin } from '../utils/roles';
+import { isAdminOrSuperAdmin, hasAnyRole } from '../utils/roles';
 import companyService from '../services/companyService';
 import webhookService from '../services/webhookService';
 import apiKeyService from '../services/apiKeyService';
@@ -29,6 +29,10 @@ export default function Webhooks() {
     const [rotating, setRotating] = useState(false);
     const [secretVisible, setSecretVisible] = useState(false);
     const [revealedSecret, setRevealedSecret] = useState(null);
+    const [notifyOnApproval, setNotifyOnApproval] = useState(true);
+    const [notifyOnRejection, setNotifyOnRejection] = useState(true);
+    const [notifyOnPending, setNotifyOnPending] = useState(false);
+    const [notifSaving, setNotifSaving] = useState(false);
 
     const [webhookUrl, setWebhookUrl] = useState('');
     const [payloadFields, setPayloadFields] = useState({
@@ -46,6 +50,7 @@ export default function Webhooks() {
     const [emailNotifications, setEmailNotifications] = useState(true);
     const [smsNotifications, setSmsNotifications] = useState(false);
     const isAdminUser = isAdminOrSuperAdmin(user);
+    const isSuperAdmin = hasAnyRole(user, ['SUPER_ADMIN']);
 
     useEffect(() => {
         fetchCompanies();
@@ -117,6 +122,10 @@ export default function Webhooks() {
                 setWebhookEnabled(data?.webhookEnabled || false);
                 setEmailNotifications(data?.emailNotifications !== false);
                 setSmsNotifications(data?.smsNotifications || false);
+                const ns = data?.notificationSettings || {};
+                setNotifyOnApproval(ns.notifyApplicantOnApproval !== false);
+                setNotifyOnRejection(ns.notifyApplicantOnRejection !== false);
+                setNotifyOnPending(ns.notifyApplicantOnPendingReview === true);
                 setPayloadFields({
                     includeVerificationId: data?.payloadFields?.includeVerificationId !== false,
                     includeCompanyId: data?.payloadFields?.includeCompanyId !== false,
@@ -233,6 +242,29 @@ export default function Webhooks() {
             });
         } finally {
             setTesting(false);
+        }
+    };
+
+    const handleSaveApplicantNotifications = async () => {
+        if (!selectedCompany) return;
+        setNotifSaving(true);
+        setError('');
+        setNotice(null);
+        try {
+            const res = await webhookService.updateApplicantNotifications(selectedCompany.id, {
+                notifyApplicantOnApproval: notifyOnApproval,
+                notifyApplicantOnRejection: notifyOnRejection,
+                notifyApplicantOnPendingReview: notifyOnPending,
+            });
+            if (res.success) {
+                setNotice({ type: 'success', message: 'Applicant notification settings saved.' });
+            } else {
+                setError(res.responseMessage || 'Failed to save notification settings');
+            }
+        } catch (err) {
+            setError(err.response?.data?.errorMessage || err.message || 'Failed to save notification settings');
+        } finally {
+            setNotifSaving(false);
         }
     };
 
@@ -609,6 +641,57 @@ export default function Webhooks() {
                                         </div>
                                     )}
                                 </div>
+
+                                {isSuperAdmin && (
+                                    <div className="detail-box detail-box-full">
+                                        <div className="notif-section-header">
+                                            <Bell size={15} />
+                                            <h4>Applicant Email Notifications</h4>
+                                            <span className="notif-section-hint">Emails sent to the end-user after KYC completion. Requires applicant email collected during verification.</span>
+                                        </div>
+                                        <div className="switch-stack">
+                                            <label className="switch-row">
+                                                <span className="switch-text">
+                                                    Notify on Approval
+                                                    <span className="switch-subtext">Send email when verification is approved</span>
+                                                </span>
+                                                <input className="switch-input" type="checkbox" checked={notifyOnApproval} onChange={e => setNotifyOnApproval(e.target.checked)} />
+                                                <span className="switch-control">
+                                                    <span className="switch-pill" aria-hidden="true"></span>
+                                                    <span className={`switch-state ${notifyOnApproval ? 'on' : 'off'}`}>{notifyOnApproval ? 'ON' : 'OFF'}</span>
+                                                </span>
+                                            </label>
+                                            <label className="switch-row">
+                                                <span className="switch-text">
+                                                    Notify on Rejection
+                                                    <span className="switch-subtext">Send email with rejection reason when verification fails</span>
+                                                </span>
+                                                <input className="switch-input" type="checkbox" checked={notifyOnRejection} onChange={e => setNotifyOnRejection(e.target.checked)} />
+                                                <span className="switch-control">
+                                                    <span className="switch-pill" aria-hidden="true"></span>
+                                                    <span className={`switch-state ${notifyOnRejection ? 'on' : 'off'}`}>{notifyOnRejection ? 'ON' : 'OFF'}</span>
+                                                </span>
+                                            </label>
+                                            <label className="switch-row">
+                                                <span className="switch-text">
+                                                    Notify on Manual Review
+                                                    <span className="switch-subtext">Send email when sent to pending review (off by default)</span>
+                                                </span>
+                                                <input className="switch-input" type="checkbox" checked={notifyOnPending} onChange={e => setNotifyOnPending(e.target.checked)} />
+                                                <span className="switch-control">
+                                                    <span className="switch-pill" aria-hidden="true"></span>
+                                                    <span className={`switch-state ${notifyOnPending ? 'on' : 'off'}`}>{notifyOnPending ? 'ON' : 'OFF'}</span>
+                                                </span>
+                                            </label>
+                                        </div>
+                                        <div className="actions-row" style={{ marginTop: '0.75rem' }}>
+                                            <Button onClick={handleSaveApplicantNotifications} disabled={notifSaving}>
+                                                <Save size={14} />
+                                                {notifSaving ? 'Saving…' : 'Save Notification Settings'}
+                                            </Button>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     )}
