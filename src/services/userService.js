@@ -178,6 +178,21 @@ const userService = {
     },
 
     /**
+     * Force-logout a user (revokes all active sessions)
+     * @param {string} userId - User ID
+     * @returns {Promise<object>}
+     */
+    async logoutUser(userId) {
+        try {
+            const response = await api.post(`/api/admin/users/${userId}/logout`);
+            return response.data;
+        } catch (error) {
+            console.error('Logout user error:', error);
+            throw error;
+        }
+    },
+
+    /**
      * Change user password
      * @param {string} userId - User ID
      * @param {object} passwordData - Password change data (currentPassword, newPassword, confirmPassword)

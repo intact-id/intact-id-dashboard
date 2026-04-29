@@ -88,7 +88,19 @@ const kycService = {
             { responseType: 'blob' }
         );
         return response.data;
-    }
+    },
+
+    async getPendingReviews(pagination = { page: 0, size: 20 }) {
+        const params = new URLSearchParams({ page: pagination.page, size: pagination.size });
+        const response = await api.get(`/api/admin/verifications/pending-review?${params}`);
+        return response.data;
+    },
+
+    async resolveReview(verificationId, decision, notes = '') {
+        const params = new URLSearchParams({ decision, ...(notes && { notes }) });
+        const response = await api.post(`/api/admin/verifications/${verificationId}/review?${params}`);
+        return response.data;
+    },
 };
 
 export default kycService;
