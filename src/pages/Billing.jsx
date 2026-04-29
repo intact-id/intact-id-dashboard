@@ -180,6 +180,8 @@ export default function Billing() {
 
     const selectedTier = tiers.find((tier) => tier.tierKey === (profile?.billingTierCode || profileForm.billingTierCode));
     const canTopUp = (profile?.billingMode || profileForm.billingMode) === 'PREPAID';
+    const isPrepaid = summary?.billingMode === 'PREPAID' || (profile?.billingMode || profileForm.billingMode) === 'PREPAID';
+    const isPostpaid = summary?.billingMode === 'POSTPAID' || (profile?.billingMode || profileForm.billingMode) === 'POSTPAID';
 
     const handleProfileChange = (field, value) => {
         setProfileForm((prev) => ({ ...prev, [field]: value }));
@@ -281,17 +283,41 @@ export default function Billing() {
 
     return (
         <div className="billing">
-            <div className="page-header">
-                <div>
-                    <h1>Billing & Usage</h1>
-                    <p className="page-subtitle">
-                        {isSuperAdmin ? 'Manage company billing profiles, wallets, and invoices.' : 'Review your billing profile, balance, and invoices.'}
-                    </p>
+            <div className="billing-hero">
+                <div className="billing-hero__content">
+                    <span className="billing-hero__eyebrow">Revenue Operations</span>
+                    <div className="page-header billing-header">
+                        <div>
+                            <h1>Billing & Usage</h1>
+                            <p className="page-subtitle">
+                                {isSuperAdmin ? 'Control company billing profiles, credit exposure, wallet funding, and invoice dispatch.' : 'Track your live balance, credit position, and billing history in one place.'}
+                            </p>
+                        </div>
+                        <Button variant="secondary" onClick={bootstrap}>
+                            <RefreshCcw size={14} />
+                            Refresh
+                        </Button>
+                    </div>
+
+                    <div className="billing-hero__meta">
+                        <div className="hero-chip">
+                            <span className="hero-chip__label">Mode</span>
+                            <strong>{profile?.billingMode || profileForm.billingMode}</strong>
+                        </div>
+                        <div className="hero-chip">
+                            <span className="hero-chip__label">Tier</span>
+                            <strong>{profile?.billingTierCode || profileForm.billingTierCode}</strong>
+                        </div>
+                        <div className="hero-chip">
+                            <span className="hero-chip__label">{isPrepaid ? 'Available Spend' : 'Outstanding'}</span>
+                            <strong>{formatCurrency(isPrepaid ? summary?.availableToSpend : summary?.outstandingAmount)}</strong>
+                        </div>
+                        <div className={`hero-chip ${isPrepaid && Number(summary?.currentBalance || 0) < 0 ? 'hero-chip--alert' : ''}`}>
+                            <span className="hero-chip__label">{isPrepaid ? 'Balance' : 'Ready To Invoice'}</span>
+                            <strong>{formatCurrency(isPrepaid ? summary?.currentBalance : summary?.readyToInvoiceAmount)}</strong>
+                        </div>
+                    </div>
                 </div>
-                <Button variant="secondary" onClick={bootstrap}>
-                    <RefreshCcw size={14} />
-                    Refresh
-                </Button>
             </div>
 
             {error && <div className="error-banner">{error}</div>}
@@ -350,18 +376,22 @@ export default function Billing() {
                                     <div className="plan-meta-card">
                                         <span className="meta-label">Billing Mode</span>
                                         <strong>{profile?.billingMode || profileForm.billingMode}</strong>
+                                        <p className="meta-note">{isPrepaid ? 'Charges hit the wallet immediately.' : 'Charges accumulate for invoicing.'}</p>
                                     </div>
                                     <div className="plan-meta-card">
-                                        <span className="meta-label">Current Balance</span>
-                                        <strong>{formatCurrency(summary?.currentBalance)}</strong>
+                                        <span className="meta-label">{isPrepaid ? 'Current Balance' : 'Outstanding Amount'}</span>
+                                        <strong>{formatCurrency(isPrepaid ? summary?.currentBalance : summary?.outstandingAmount)}</strong>
+                                        <p className="meta-note">{isPrepaid ? 'Negative values mean credit is in use.' : 'Total unpaid exposure.'}</p>
                                     </div>
                                     <div className="plan-meta-card">
-                                        <span className="meta-label">Ready To Invoice</span>
-                                        <strong>{formatCurrency(summary?.readyToInvoiceAmount)}</strong>
+                                        <span className="meta-label">{isPrepaid ? 'Available To Spend' : 'Ready To Invoice'}</span>
+                                        <strong>{formatCurrency(isPrepaid ? summary?.availableToSpend : summary?.readyToInvoiceAmount)}</strong>
+                                        <p className="meta-note">{isPrepaid ? 'Wallet plus remaining credit.' : 'Charges not yet invoiced.'}</p>
                                     </div>
                                     <div className="plan-meta-card">
-                                        <span className="meta-label">Credit Limit</span>
-                                        <strong>{formatCurrency(profile?.creditLimit || profileForm.creditLimit)}</strong>
+                                        <span className="meta-label">{isPrepaid ? 'Credit Limit' : 'Invoiced Amount'}</span>
+                                        <strong>{formatCurrency(isPrepaid ? (profile?.creditLimit || profileForm.creditLimit) : summary?.invoicedAmount)}</strong>
+                                        <p className="meta-note">{isPrepaid ? 'Maximum negative allowance.' : 'Charges already billed to invoices.'}</p>
                                     </div>
                                 </div>
 
@@ -382,20 +412,25 @@ export default function Billing() {
                             </Card>
 
                             <div className="summary-grid">
-                                <Card className="summary-card">
+                                <Card className={`summary-card ${isPrepaid ? 'summary-card--wallet' : 'summary-card--invoice'}`}>
                                     <div className="summary-icon"><Wallet size={18} /></div>
-                                    <span className="summary-label">Debited</span>
-                                    <strong>{formatCurrency(summary?.debitedAmount)}</strong>
+                                    <span className="summary-label">{isPrepaid ? 'Wallet Balance' : 'Outstanding Balance'}</span>
+                                    <strong>{formatCurrency(isPrepaid ? summary?.walletBalance : summary?.outstandingAmount)}</strong>
                                 </Card>
-                                <Card className="summary-card">
+                                <Card className={`summary-card ${isPrepaid ? 'summary-card--credit' : 'summary-card--flow'}`}>
                                     <div className="summary-icon"><Receipt size={18} /></div>
-                                    <span className="summary-label">Invoiced</span>
-                                    <strong>{formatCurrency(summary?.invoicedAmount)}</strong>
+                                    <span className="summary-label">{isPrepaid ? 'Used Credit' : 'Debited'}</span>
+                                    <strong>{formatCurrency(isPrepaid ? summary?.usedCredit : summary?.debitedAmount)}</strong>
                                 </Card>
-                                <Card className="summary-card">
+                                <Card className={`summary-card ${isPrepaid ? 'summary-card--credit' : 'summary-card--flow'}`}>
                                     <div className="summary-icon"><CreditCard size={18} /></div>
-                                    <span className="summary-label">Low Balance Threshold</span>
-                                    <strong>{formatCurrency(profile?.lowBalanceThreshold || profileForm.lowBalanceThreshold)}</strong>
+                                    <span className="summary-label">{isPrepaid ? 'Remaining Credit' : 'Ready To Invoice'}</span>
+                                    <strong>{formatCurrency(isPrepaid ? summary?.remainingCredit : summary?.readyToInvoiceAmount)}</strong>
+                                </Card>
+                                <Card className={`summary-card ${isPrepaid ? 'summary-card--forecast' : 'summary-card--policy'}`}>
+                                    <div className="summary-icon"><CreditCard size={18} /></div>
+                                    <span className="summary-label">{isPrepaid ? 'Submissions Left' : 'Low Balance Threshold'}</span>
+                                    <strong>{isPrepaid ? (summary?.estimatedSubmissionsRemaining ?? 0) : formatCurrency(profile?.lowBalanceThreshold || profileForm.lowBalanceThreshold)}</strong>
                                 </Card>
                             </div>
 
@@ -544,7 +579,10 @@ export default function Billing() {
                             <div className="billing-data-grid">
                                 <Card className="billing-table-card">
                                     <div className="panel-header">
-                                        <h3>Invoices</h3>
+                                        <div>
+                                            <span className="section-kicker">Ledger</span>
+                                            <h3>Invoices</h3>
+                                        </div>
                                         <Badge variant="info">{invoices.length}</Badge>
                                     </div>
                                     {invoices.length === 0 ? (
@@ -593,11 +631,14 @@ export default function Billing() {
 
                                 <Card className="billing-table-card">
                                     <div className="panel-header">
-                                        <h3>Wallet Transactions</h3>
+                                        <div>
+                                            <span className="section-kicker">Cash Movement</span>
+                                            <h3>{isPrepaid ? 'Wallet Transactions' : 'Charge Activity'}</h3>
+                                        </div>
                                         <Badge variant="info">{walletTransactions.length}</Badge>
                                     </div>
                                     {walletTransactions.length === 0 ? (
-                                        <div className="billing-empty">No wallet transactions available.</div>
+                                        <div className="billing-empty">{isPrepaid ? 'No wallet transactions available.' : 'No debit transactions recorded.'}</div>
                                     ) : (
                                         <div className="table-wrap">
                                             <table className="billing-table">
@@ -628,7 +669,12 @@ export default function Billing() {
                             </div>
 
                             <div className="pricing-section">
-                                <h2 className="section-title">Tier Catalog</h2>
+                                <div className="pricing-section__header">
+                                    <div>
+                                        <span className="section-kicker">Commercial Catalog</span>
+                                        <h2 className="section-title">Tier Catalog</h2>
+                                    </div>
+                                </div>
                                 <div className="pricing-grid">
                                     {tiers.map((tier) => (
                                         <Card
