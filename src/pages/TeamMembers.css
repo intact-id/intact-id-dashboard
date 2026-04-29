@@ -269,6 +269,11 @@
     border-color: rgba(239, 68, 68, 0.4);
 }
 
+.action-btn--warn:hover {
+    color: #fbbf24;
+    border-color: rgba(251, 191, 36, 0.4);
+}
+
 .text-secondary {
     color: var(--color-text-tertiary);
 }

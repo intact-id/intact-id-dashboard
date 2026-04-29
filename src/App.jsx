@@ -14,6 +14,7 @@ import Documents from './pages/Documents';
 import Analytics from './pages/Analytics';
 import VerificationDetail from './pages/VerificationDetail';
 import MakerChecker from './pages/MakerChecker';
+import Approvals from './pages/Approvals';
 import Companies from './pages/Companies';
 import Notifications from './pages/Notifications';
 import TeamMembers from './pages/TeamMembers';
@@ -83,7 +84,7 @@ function AppRoutes() {
         <Route path="verifications/:id" element={<VerificationDetail />} />
         <Route path="documents" element={<Documents />} />
         <Route path="analytics" element={<Analytics />} />
-        <Route path="approvals" element={<Navigate to="/dashboard/maker-checker" replace />} />
+        <Route path="approvals" element={<Approvals />} />
         <Route path="maker-checker" element={<MakerChecker />} />
         <Route path="companies" element={<Companies />} />
         <Route path="notifications" element={<Notifications />} />

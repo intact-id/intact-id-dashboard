@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Building2, KeyRound, RefreshCcw, PauseCircle, PlayCircle } from 'lucide-react';
+import { Building2, KeyRound, RefreshCcw, PauseCircle, PlayCircle, Gauge } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { isAdminOrSuperAdmin } from '../utils/roles';
+import { isAdminOrSuperAdmin, hasAnyRole } from '../utils/roles';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Badge from '../components/ui/Badge';
@@ -30,8 +30,13 @@ export default function ApiManagement() {
     const [actionType, setActionType] = useState(null);
     const [actionEnv, setActionEnv] = useState(null);
     const [actionLoading, setActionLoading] = useState(false);
+    const [rateLimits, setRateLimits] = useState(null);
+    const [showRateLimitModal, setShowRateLimitModal] = useState(false);
+    const [rlForm, setRlForm] = useState({ dev: { perHour: '', perDay: '', perMonth: '' }, prod: { perHour: '', perDay: '', perMonth: '' } });
+    const [rlSaving, setRlSaving] = useState(false);
 
     const isAdminUser = useMemo(() => isAdminOrSuperAdmin(user), [user]);
+    const isSuperAdmin = useMemo(() => hasAnyRole(user, ['SUPER_ADMIN']), [user]);
 
     useEffect(() => {
         fetchCompanies();
@@ -86,9 +91,10 @@ export default function ApiManagement() {
         setLoadingDetails(true);
         setError('');
         try {
-            const [keysResponse, usageResponse] = await Promise.allSettled([
+            const [keysResponse, usageResponse, rlResponse] = await Promise.allSettled([
                 apiKeyService.getApiKeys(company.id),
-                apiKeyService.getUsage(company.id)
+                apiKeyService.getUsage(company.id),
+                companyService.getRateLimits(company.id)
             ]);
 
             if (keysResponse.status === 'fulfilled' && keysResponse.value.success) {
@@ -107,6 +113,17 @@ export default function ApiManagement() {
                 setUsage(usageResponse.value.data || null);
             } else {
                 setUsage(null);
+            }
+
+            if (rlResponse.status === 'fulfilled' && rlResponse.value.success) {
+                const rl = rlResponse.value.data;
+                setRateLimits(rl);
+                setRlForm({
+                    dev: { perHour: rl?.dev?.perHour ?? '', perDay: rl?.dev?.perDay ?? '', perMonth: rl?.dev?.perMonth ?? '' },
+                    prod: { perHour: rl?.prod?.perHour ?? '', perDay: rl?.prod?.perDay ?? '', perMonth: rl?.prod?.perMonth ?? '' }
+                });
+            } else {
+                setRateLimits(null);
             }
         } catch (err) {
             setError(err.response?.data?.errorMessage || err.message || 'Failed to load company API details');
@@ -155,6 +172,27 @@ export default function ApiManagement() {
             setError(err.response?.data?.errorMessage || err.message || `Failed to ${actionType} credentials`);
         } finally {
             setActionLoading(false);
+        }
+    };
+
+    const saveRateLimits = async () => {
+        if (!selectedCompany) return;
+        setRlSaving(true);
+        try {
+            const toInt = (v) => (v === '' || v === null || v === undefined) ? -1 : parseInt(v, 10);
+            const payload = {
+                dev: { perHour: toInt(rlForm.dev.perHour), perDay: toInt(rlForm.dev.perDay), perMonth: toInt(rlForm.dev.perMonth) },
+                prod: { perHour: toInt(rlForm.prod.perHour), perDay: toInt(rlForm.prod.perDay), perMonth: toInt(rlForm.prod.perMonth) }
+            };
+            const res = await companyService.updateRateLimits(selectedCompany.id, payload);
+            if (res.success) {
+                setRateLimits(res.data);
+                setShowRateLimitModal(false);
+            }
+        } catch (err) {
+            setError(err.response?.data?.responseMessage || err.message || 'Failed to update rate limits');
+        } finally {
+            setRlSaving(false);
         }
     };
 
@@ -378,6 +416,68 @@ export default function ApiManagement() {
                                     <div className="usage-row"><span>Success Rate</span><strong>{safePct(usage?.prodTotalSuccessfulRequests, usage?.prodTotalRequests)}%</strong></div>
                                 </div>
                             </div>
+
+                            {/* Rate Limits Card */}
+                            <div className="rl-card">
+                                <div className="rl-card-header">
+                                    <div className="rl-card-title">
+                                        <Gauge size={16} />
+                                        <span>Rate Limits</span>
+                                    </div>
+                                    {isSuperAdmin && (
+                                        <button className="rl-configure-btn" onClick={() => setShowRateLimitModal(true)}>
+                                            Configure
+                                        </button>
+                                    )}
+                                </div>
+                                <div className="rl-envs">
+                                    {[
+                                        { key: 'dev',  label: 'Development', usageKey: 'dev' },
+                                        { key: 'prod', label: 'Production',  usageKey: 'prod' }
+                                    ].map(({ key, label, usageKey }) => {
+                                        const lim = rateLimits?.[key];
+                                        const used = usage?.[`${usageKey}TotalRequests`] || 0;
+                                        const monthLimit = lim?.perMonth;
+                                        const pct = monthLimit > 0 ? Math.min(100, Math.round((used / monthLimit) * 100)) : null;
+                                        return (
+                                            <div key={key} className="rl-env-panel">
+                                                <div className="rl-env-label-row">
+                                                    <span className={`rl-env-badge rl-env-badge--${key}`}>{label}</span>
+                                                    {pct !== null && (
+                                                        <span className={`rl-usage-pct ${pct >= 90 ? 'danger' : pct >= 70 ? 'warn' : ''}`}>
+                                                            {pct}% of monthly limit used
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                {pct !== null && (
+                                                    <div className="rl-bar-wrap">
+                                                        <div className="rl-bar">
+                                                            <div
+                                                                className={`rl-bar-fill ${pct >= 90 ? 'danger' : pct >= 70 ? 'warn' : ''}`}
+                                                                style={{ width: `${pct}%` }}
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                )}
+                                                <div className="rl-limits-grid">
+                                                    {[
+                                                        { label: 'Per Hour', val: lim?.perHour },
+                                                        { label: 'Per Day',  val: lim?.perDay },
+                                                        { label: 'Per Month', val: lim?.perMonth },
+                                                    ].map(({ label: l, val }) => (
+                                                        <div key={l} className="rl-limit-cell">
+                                                            <span className="rl-limit-label">{l}</span>
+                                                            <span className={`rl-limit-val ${val == null || val < 0 ? 'unlimited' : ''}`}>
+                                                                {val == null || val < 0 ? '∞' : val.toLocaleString()}
+                                                            </span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
                         </div>
                     )}
                 </Card>
@@ -394,6 +494,54 @@ export default function ApiManagement() {
                         </div>
                         <div className="modal-actions">
                             <Button onClick={() => setShowGenerateModal(false)}>Close</Button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {showRateLimitModal && isSuperAdmin && (
+                <div className="modal-overlay" onClick={() => setShowRateLimitModal(false)}>
+                    <div className="modal-content rl-modal" onClick={e => e.stopPropagation()}>
+                        <h3><Gauge size={16} /> Rate Limits — {selectedCompany?.legalName}</h3>
+                        <p className="rl-modal-hint">Set to blank or 0 for unlimited. Values are per verification request.</p>
+
+                        {[
+                            { key: 'dev', label: 'Development (DEV)' },
+                            { key: 'prod', label: 'Production (PROD)' }
+                        ].map(({ key, label }, i) => (
+                            <div key={key} className="rl-env-block">
+                                {i > 0 && <div className="rl-modal-divider" />}
+                                <div className="rl-env-label">{label}</div>
+                                <div className="rl-fields">
+                                    {[
+                                        { field: 'perHour', label: 'Per Hour' },
+                                        { field: 'perDay',  label: 'Per Day' },
+                                        { field: 'perMonth', label: 'Per Month' }
+                                    ].map(({ field, label: fl }) => (
+                                        <div key={field} className="rl-field">
+                                            <label>{fl}</label>
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                className="rl-input"
+                                                placeholder="Unlimited"
+                                                value={rlForm[key][field]}
+                                                onChange={e => setRlForm(prev => ({
+                                                    ...prev,
+                                                    [key]: { ...prev[key], [field]: e.target.value }
+                                                }))}
+                                            />
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        ))}
+
+                        <div className="modal-actions">
+                            <button className="btn-cancel" onClick={() => setShowRateLimitModal(false)}>Cancel</button>
+                            <button className="btn-save" onClick={saveRateLimits} disabled={rlSaving}>
+                                {rlSaving ? 'Saving…' : 'Save Limits'}
+                            </button>
                         </div>
                     </div>
                 </div>

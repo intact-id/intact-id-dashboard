@@ -326,8 +326,8 @@
 
 /* ========== VERIFICATION MODAL ========== */
 .verification-modal {
-    width: min(980px, 94vw);
-    max-width: min(980px, 94vw);
+    width: min(1200px, 96vw);
+    max-width: min(1200px, 96vw);
     border: 1px solid var(--color-border-primary);
     background: var(--glass-bg);
     border-radius: var(--radius-xl);
@@ -415,6 +415,128 @@
     margin-top: auto;
     display: flex;
     justify-content: flex-end;
+}
+
+.steps-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.step-card {
+    border: 1px solid var(--color-border-primary);
+    border-radius: 8px;
+    padding: 12px 14px;
+    background: rgba(255,255,255,0.02);
+}
+
+.step-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+}
+
+.step-card-name {
+    font-size: 0.875rem;
+    font-weight: 600;
+    text-transform: capitalize;
+    color: var(--color-text-primary);
+}
+
+.step-card-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.step-confidence {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--color-text-secondary);
+}
+
+.step-card-result {
+    margin-bottom: 8px;
+}
+
+.step-detail-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px 16px;
+}
+
+.step-detail-item {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.step-detail-full {
+    grid-column: 1 / -1;
+}
+
+.step-detail-label {
+    font-size: 0.6875rem;
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.step-detail-value {
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: var(--color-text-primary);
+}
+
+.text-success { color: #4ade80; }
+.text-danger  { color: #f87171; }
+.text-warning { color: #fbbf24; }
+
+.step-card-time {
+    font-size: 0.6875rem;
+    color: var(--color-text-muted);
+    margin-top: 4px;
+}
+
+.doc-ocr {
+    margin-top: 8px;
+    padding: 8px 10px;
+    background: rgba(99, 179, 237, 0.06);
+    border: 1px solid rgba(99, 179, 237, 0.15);
+    border-radius: 6px;
+}
+
+.doc-ocr-title {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--color-text-muted);
+    margin-bottom: 6px;
+}
+
+.doc-ocr-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px 12px;
+}
+
+.doc-ocr-field {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+}
+
+.doc-ocr-label {
+    font-size: 0.6875rem;
+    color: var(--color-text-muted);
+}
+
+.doc-ocr-value {
+    font-size: 0.8125rem;
+    color: var(--color-text-primary);
+    font-weight: 500;
 }
 
 .steps-table {

@@ -85,6 +85,7 @@ export default function DashboardLayout() {
             items: [
                 { path: '/dashboard/users', label: 'User Management', icon: Users },
                 { path: '/dashboard/notifications', label: 'Notifications', icon: Bell },
+                ...(isSuperAdmin ? [{ path: '/dashboard/approvals', label: 'KYC Reviews', icon: ShieldCheck }] : []),
                 ...(isSuperAdmin ? [{ path: '/dashboard/maker-checker', label: 'Maker Checker', icon: ClipboardCheck }] : []),
                 { path: '/dashboard/companies', label: 'Companies', icon: Building2 },
             ]
