@@ -101,6 +101,17 @@ const kycService = {
         const response = await api.post(`/api/admin/verifications/${verificationId}/review?${params}`);
         return response.data;
     },
+
+    async releaseHeldVerification(verificationId) {
+        const response = await api.post(`/api/v1/kyc/verifications/${verificationId}/release`);
+        return response.data;
+    },
+
+    async releaseAllHeld(companyId = null) {
+        const params = companyId ? `?companyId=${companyId}` : '';
+        const response = await api.post(`/api/v1/kyc/verifications/release-held${params}`);
+        return response.data;
+    },
 };
 
 export default kycService;
