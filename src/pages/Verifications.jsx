@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { Eye, Download, X, FileText } from 'lucide-react';
+import { Eye, Download, X, FileText, PlayCircle } from 'lucide-react';
+import { useToast } from '../contexts/ToastContext';
 import DocumentViewer from '../components/ui/DocumentViewer';
 import Badge from '../components/ui/Badge';
 import Card from '../components/ui/Card';
@@ -10,7 +11,7 @@ import companyService from '../services/companyService';
 import './Verifications.css';
 import '../components/ModalStyles.css';
 
-const STATUS_OPTIONS = ['all', 'SUBMITTED', 'PENDING', 'PROCESSING', 'APPROVED', 'REJECTED', 'FAILED', 'COMPLETED', 'MANUAL_REVIEW'];
+const STATUS_OPTIONS = ['all', 'SUBMITTED', 'PENDING', 'PROCESSING', 'APPROVED', 'REJECTED', 'FAILED', 'COMPLETED', 'MANUAL_REVIEW', 'ON_HOLD'];
 const TIER_OPTIONS = ['all', 'basic', 'standard', 'enhanced'];
 
 export default function Verifications() {
@@ -40,8 +41,10 @@ export default function Verifications() {
         totalElements: 0
     });
 
+    const { toast } = useToast();
     const isSuperAdmin = Array.isArray(user?.roles) && user.roles.includes('SUPER_ADMIN');
     const [environment, setEnvironment] = useState('prod');
+    const [releasing, setReleasing] = useState(false);
     const [isPolling, setIsPolling] = useState(false);
     const pollRef = useRef(null);
     const fetchRef = useRef(null);
@@ -193,7 +196,36 @@ export default function Verifications() {
         if (['APPROVED'].includes(normalized)) return 'success';
         if (['FAILED', 'REJECTED'].includes(normalized)) return 'error';
         if (normalized === 'MANUAL_REVIEW') return 'info';
+        if (normalized === 'ON_HOLD') return 'warning';
         return 'warning';
+    };
+
+    const handleRelease = async (verificationId) => {
+        setReleasing(true);
+        try {
+            await kycService.releaseHeldVerification(verificationId);
+            toast.success('Verification released — it will be retried shortly.');
+            setSelectedVerification(null);
+            fetchVerifications(true);
+        } catch (err) {
+            toast.error(err.response?.data?.responseMessage || 'Failed to release verification.');
+        } finally {
+            setReleasing(false);
+        }
+    };
+
+    const handleReleaseAll = async () => {
+        const companyId = isSuperAdmin && filters.companyId !== 'all' ? filters.companyId : null;
+        setReleasing(true);
+        try {
+            const res = await kycService.releaseAllHeld(companyId);
+            toast.success(res.responseMessage || 'All held verifications released.');
+            fetchVerifications(true);
+        } catch (err) {
+            toast.error(err.response?.data?.responseMessage || 'Failed to release held verifications.');
+        } finally {
+            setReleasing(false);
+        }
     };
 
     const getDecisionVariant = (decision) => {
@@ -287,6 +319,11 @@ export default function Verifications() {
                             Development
                         </button>
                     </div>
+                    {isSuperAdmin && (
+                        <Button variant="secondary" onClick={handleReleaseAll} disabled={releasing}>
+                            <PlayCircle size={16} /> Release Held{isSuperAdmin && filters.companyId !== 'all' ? ' (Company)' : ' (All)'}
+                        </Button>
+                    )}
                     <Button variant="secondary">
                         <Download size={16} /> Export
                     </Button>
@@ -489,7 +526,25 @@ export default function Verifications() {
                                             <div className="info-row"><span className="info-label">Risk Score</span><span className="info-value">{selectedVerification.riskScore ?? '-'}</span></div>
                                             <div className="info-row"><span className="info-label">Failure Reason</span><span className="info-value">{selectedVerification.failureReason || '-'}</span></div>
                                             <div className="info-row"><span className="info-label">Failure Description</span><span className="info-value">{selectedVerification.errorDetails || '-'}</span></div>
+                                            {selectedVerification.status === 'ON_HOLD' && (
+                                                <div className="info-row">
+                                                    <span className="info-label">Hold Reason</span>
+                                                    <span className="info-value">{selectedVerification.metadata?.holdReason || '-'}</span>
+                                                </div>
+                                            )}
                                         </div>
+                                        {isSuperAdmin && selectedVerification.status === 'ON_HOLD' && (
+                                            <div style={{ marginTop: '12px' }}>
+                                                <Button
+                                                    variant="primary"
+                                                    size="sm"
+                                                    disabled={releasing}
+                                                    onClick={() => handleRelease(selectedVerification.verificationId)}
+                                                >
+                                                    <PlayCircle size={14} /> {releasing ? 'Releasing…' : 'Release Verification'}
+                                                </Button>
+                                            </div>
+                                        )}
                                     </div>
 
                                     <div className="modal-section">
