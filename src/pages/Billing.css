@@ -1,282 +1,441 @@
 .billing {
-    animation: fadeIn 0.5s ease-out;
     color: var(--color-text-secondary);
+    animation: fadeIn 0.4s ease-out;
 }
 
-/* Current Plan */
+.billing-layout {
+    display: grid;
+    gap: 1.5rem;
+}
+
+.billing-layout--admin {
+    grid-template-columns: 320px minmax(0, 1fr);
+    align-items: start;
+}
+
+.billing-sidebar {
+    position: sticky;
+    top: 1.5rem;
+}
+
+.billing-company-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    margin-top: 1rem;
+}
+
+.billing-company-item {
+    width: 100%;
+    border: 1px solid var(--color-border-secondary);
+    background: rgba(255, 255, 255, 0.02);
+    color: var(--color-text-secondary);
+    border-radius: 14px;
+    padding: 0.9rem 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    cursor: pointer;
+    transition: border-color 0.2s ease, transform 0.2s ease, background 0.2s ease;
+}
+
+.billing-company-item:hover,
+.billing-company-item.active {
+    border-color: var(--color-accent-cyan);
+    background: rgba(0, 242, 255, 0.06);
+    transform: translateY(-1px);
+}
+
+.billing-company-main {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    min-width: 0;
+}
+
+.billing-company-main span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.billing-main {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
 .plan-card {
-    margin-bottom: 2rem;
-    padding: 2rem !important;
+    padding: 1.75rem !important;
 }
 
 .plan-header {
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
-    margin-bottom: 2rem;
-    padding-bottom: 1.5rem;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+    padding-bottom: 1.25rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .plan-badge {
-    margin-bottom: 1rem;
+    margin-bottom: 0.85rem;
 }
 
 .plan-name {
-    font-size: 3rem;
-    margin: 0 0 0.5rem;
-    background: linear-gradient(135deg, var(--color-accent-cyan), var(--color-brand-secondary));
-    -webkit-background-clip: text;
-    background-clip: text;
-    -webkit-text-fill-color: transparent;
+    margin: 0 0 0.4rem;
+    font-size: clamp(2rem, 4vw, 3rem);
     font-weight: 800;
+    color: var(--color-text-primary);
 }
 
 .plan-cycle {
-    color: var(--color-text-tertiary);
-    text-transform: capitalize;
     margin: 0;
+    color: var(--color-text-tertiary);
 }
 
 .plan-cost {
     text-align: right;
 }
 
-.cost-label {
-    font-size: 0.875rem;
-    color: var(--color-text-muted);
+.cost-label,
+.meta-label,
+.usage-stat .stat-label {
+    font-size: 0.76rem;
     text-transform: uppercase;
-    letter-spacing: 0.5px;
-    margin-bottom: 4px;
+    letter-spacing: 0.08em;
+    color: var(--color-text-muted);
 }
 
 .cost-value {
-    font-size: 2.5rem;
-    font-weight: 700;
+    margin-top: 0.3rem;
+    font-size: 2rem;
+    font-weight: 800;
     color: var(--color-text-primary);
 }
 
-.plan-features h4 {
-    font-size: 1.125rem;
+.plan-meta-grid,
+.summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 1rem;
+}
+
+.plan-meta-card,
+.summary-card {
+    border: 1px solid var(--color-border-secondary);
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 14px;
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.summary-card strong,
+.plan-meta-card strong {
     color: var(--color-text-primary);
-    margin: 0 0 1.5rem;
+    font-size: 1.2rem;
+}
+
+.summary-icon {
+    width: 2.25rem;
+    height: 2.25rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    background: rgba(0, 242, 255, 0.1);
+    color: var(--color-accent-cyan);
+}
+
+.summary-label {
+    color: var(--color-text-muted);
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+
+.plan-features h4,
+.section-title {
+    margin: 0 0 1rem;
+    color: var(--color-text-primary);
 }
 
 .features-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-    gap: 1rem;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 0.85rem;
+    margin-top: 1rem;
 }
 
-.feature-item {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    padding: 1rem;
-    background: rgba(255, 255, 255, 0.02);
-    border-radius: 8px;
+.feature-item,
+.feature-empty {
+    padding: 0.95rem 1rem;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.03);
     border: 1px solid var(--color-border-secondary);
+    display: flex;
+    gap: 0.75rem;
+    align-items: flex-start;
 }
 
 .feature-icon {
     color: var(--color-success);
     font-weight: 700;
-    font-size: 1.125rem;
 }
 
 .feature-text {
-    color: var(--color-text-secondary);
-    font-size: 0.875rem;
+    font-size: 0.9rem;
+    line-height: 1.5;
 }
 
-/* Usage Meter */
-.usage-meter {
-    display: flex;
-    flex-direction: column;
-    gap: 1.5rem;
-}
-
-.usage-bar {
-    height: 24px;
-    background: var(--color-bg-secondary);
-    border-radius: 12px;
-    overflow: hidden;
-    border: 1px solid var(--color-border-secondary);
-    position: relative;
-}
-
-.usage-fill {
-    height: 100%;
-    background: linear-gradient(90deg, var(--color-accent-cyan), var(--color-brand-secondary));
-    border-radius: 12px;
-    transition: width 0.5s ease-out;
-    position: relative;
-    overflow: hidden;
-}
-
-.usage-fill::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
-    animation: shimmer 2s infinite;
-}
-
-@keyframes shimmer {
-    0% {
-        transform: translateX(-100%);
-    }
-
-    100% {
-        transform: translateX(100%);
-    }
-}
-
-.usage-fill--warning {
-    background: linear-gradient(90deg, var(--color-warning), var(--color-warning));
-}
-
-.usage-stats {
+.admin-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    grid-template-columns: minmax(0, 2fr) minmax(300px, 1fr);
     gap: 1.5rem;
 }
 
-.usage-stat {
+.admin-side-stack {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 1.5rem;
 }
 
-.usage-stat .stat-label {
-    font-size: 0.75rem;
+.billing-form-card {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.form-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
+}
+
+.form-grid--compact {
+    grid-template-columns: 1fr;
+}
+
+.form-grid label,
+.billing-switches {
+    display: contents;
+}
+
+.form-grid label span {
+    display: block;
+    font-size: 0.82rem;
+    margin-bottom: 0.4rem;
     color: var(--color-text-muted);
+}
+
+.billing-input {
+    width: 100%;
+    border: 1px solid var(--color-border-secondary);
+    background: rgba(255, 255, 255, 0.02);
+    color: var(--color-text-primary);
+    border-radius: 12px;
+    padding: 0.8rem 0.95rem;
+    outline: none;
+}
+
+.billing-input:focus {
+    border-color: var(--color-accent-cyan);
+    box-shadow: 0 0 0 3px rgba(0, 242, 255, 0.12);
+}
+
+.billing-switches {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 0.85rem;
+}
+
+.switch-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.85rem 0.95rem;
+    border-radius: 12px;
+    border: 1px solid var(--color-border-secondary);
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.billing-actions {
+    display: flex;
+    justify-content: flex-end;
+}
+
+.helper-text {
+    margin: 0.4rem 0 0;
+    font-size: 0.84rem;
+    color: var(--color-text-muted);
+}
+
+.billing-data-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1.5rem;
+}
+
+.billing-table-card {
+    min-height: 320px;
+}
+
+.table-wrap {
+    overflow-x: auto;
+}
+
+.billing-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.billing-table th,
+.billing-table td {
+    padding: 0.9rem 0.75rem;
+    text-align: left;
+    border-bottom: 1px solid var(--color-border-secondary);
+    vertical-align: middle;
+}
+
+.billing-table th {
+    color: var(--color-text-muted);
+    font-size: 0.78rem;
     text-transform: uppercase;
-    letter-spacing: 0.5px;
+    letter-spacing: 0.08em;
 }
 
-.usage-stat .stat-value {
-    font-size: 1.25rem;
-    font-weight: 700;
-    color: var(--color-text-primary);
+.billing-empty {
+    min-height: 180px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--color-text-muted);
 }
 
-/* Pricing Section */
+.error-banner,
+.success-banner {
+    border-radius: 14px;
+    padding: 0.95rem 1rem;
+    margin-bottom: 1rem;
+}
+
+.error-banner {
+    border: 1px solid rgba(255, 120, 120, 0.25);
+    background: rgba(255, 120, 120, 0.08);
+    color: #ffb4b4;
+}
+
+.success-banner {
+    border: 1px solid rgba(72, 187, 120, 0.25);
+    background: rgba(72, 187, 120, 0.08);
+    color: #a7f3c1;
+}
+
 .pricing-section {
-    margin-top: 3rem;
-}
-
-.section-title {
-    font-size: 1.5rem;
-    margin: 0 0 1.5rem;
-    color: var(--color-text-primary);
+    margin-top: 0.25rem;
 }
 
 .pricing-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-    gap: 1.5rem;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1rem;
 }
 
 .pricing-card {
     display: flex;
     flex-direction: column;
-    position: relative;
-    transition: all 0.2s;
+    gap: 1rem;
     background: rgba(255, 255, 255, 0.02);
     border: 1px solid var(--color-border-secondary);
 }
 
-.pricing-card:hover {
-    transform: translateY(-4px);
-    background: rgba(255, 255, 255, 0.04);
-    border-color: var(--color-border-hover);
-}
-
 .pricing-card--current {
-    border: 2px solid var(--color-accent-cyan);
-    background: rgba(0, 242, 255, 0.02);
-}
-
-.current-plan-badge {
-    position: absolute;
-    top: 1.5rem;
-    right: 1.5rem;
+    border-color: var(--color-accent-cyan);
+    box-shadow: inset 0 0 0 1px rgba(0, 242, 255, 0.2);
 }
 
 .pricing-header {
-    margin-bottom: 1.5rem;
-    padding-bottom: 1.5rem;
-    border-bottom: 1px solid var(--color-border-secondary);
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
 }
 
 .pricing-header h3 {
-    font-size: 1.5rem;
-    margin: 0 0 1rem;
+    margin: 0;
     color: var(--color-text-primary);
 }
 
 .pricing-cost {
     display: flex;
-    align-items: baseline;
-    gap: 0.5rem;
+    flex-direction: column;
+    gap: 0.15rem;
 }
 
 .price-value {
-    font-size: 2rem;
+    color: var(--color-text-primary);
+    font-size: 1.1rem;
     font-weight: 700;
-    color: var(--color-accent-cyan);
 }
 
 .price-unit {
-    font-size: 0.875rem;
     color: var(--color-text-muted);
+    font-size: 0.82rem;
 }
 
 .pricing-features {
-    flex: 1;
     display: flex;
     flex-direction: column;
-    gap: 1rem;
-    margin-bottom: 1.5rem;
+    gap: 0.75rem;
+    min-height: 160px;
 }
 
 .pricing-feature {
-    color: var(--color-text-secondary);
-    font-size: 0.875rem;
-    display: flex;
-    align-items: flex-start;
-    gap: 0.75rem;
-    line-height: 1.6;
+    position: relative;
+    padding-left: 1rem;
+    line-height: 1.45;
 }
 
-.pricing-btn {
-    width: 100%;
-    margin-top: auto;
+.pricing-feature::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0.55rem;
+    width: 0.38rem;
+    height: 0.38rem;
+    border-radius: 999px;
+    background: var(--color-accent-cyan);
 }
 
-/* Responsive */
-@media (max-width: 1024px) {
-    .pricing-grid {
+@media (max-width: 1200px) {
+    .billing-layout--admin,
+    .admin-grid,
+    .billing-data-grid {
         grid-template-columns: 1fr;
+    }
+
+    .billing-sidebar {
+        position: static;
     }
 }
 
 @media (max-width: 768px) {
     .plan-header {
         flex-direction: column;
-        gap: 1.5rem;
     }
 
     .plan-cost {
         text-align: left;
     }
 
-    .features-grid {
+    .form-grid {
         grid-template-columns: 1fr;
     }
 
-    .usage-stats {
-        grid-template-columns: repeat(2, 1fr);
+    .billing-switches {
+        grid-template-columns: 1fr;
     }
 }

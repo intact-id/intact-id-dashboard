@@ -88,7 +88,30 @@ const kycService = {
             { responseType: 'blob' }
         );
         return response.data;
-    }
+    },
+
+    async getPendingReviews(pagination = { page: 0, size: 20 }) {
+        const params = new URLSearchParams({ page: pagination.page, size: pagination.size });
+        const response = await api.get(`/api/admin/verifications/pending-review?${params}`);
+        return response.data;
+    },
+
+    async resolveReview(verificationId, decision, notes = '') {
+        const params = new URLSearchParams({ decision, ...(notes && { notes }) });
+        const response = await api.post(`/api/admin/verifications/${verificationId}/review?${params}`);
+        return response.data;
+    },
+
+    async releaseHeldVerification(verificationId) {
+        const response = await api.post(`/api/v1/kyc/verifications/${verificationId}/release`);
+        return response.data;
+    },
+
+    async releaseAllHeld(companyId = null) {
+        const params = companyId ? `?companyId=${companyId}` : '';
+        const response = await api.post(`/api/v1/kyc/verifications/release-held${params}`);
+        return response.data;
+    },
 };
 
 export default kycService;

@@ -414,6 +414,33 @@
     color: var(--color-text-tertiary);
 }
 
+.notif-section-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.85rem;
+    flex-wrap: wrap;
+}
+
+.notif-section-header h4 {
+    margin: 0;
+    font-size: var(--font-size-md);
+    color: var(--color-text-primary);
+}
+
+.notif-section-header svg {
+    color: var(--color-accent);
+    flex-shrink: 0;
+}
+
+.notif-section-hint {
+    font-size: 0.72rem;
+    color: var(--color-text-tertiary);
+    flex-basis: 100%;
+    margin-top: -0.3rem;
+    line-height: 1.5;
+}
+
 .switch-row.disabled {
     opacity: 0.38;
     pointer-events: none;
