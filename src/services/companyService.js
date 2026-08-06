@@ -152,6 +152,16 @@ const companyService = {
             console.error('Activate credentials error:', error);
             throw error;
         }
+    },
+
+    async getRateLimits(companyId) {
+        const response = await api.get(`/api/companies/${companyId}/rate-limits`);
+        return response.data;
+    },
+
+    async updateRateLimits(companyId, limits) {
+        const response = await api.put(`/api/companies/${companyId}/rate-limits`, limits);
+        return response.data;
     }
 };
 

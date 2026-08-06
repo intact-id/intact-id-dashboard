@@ -1,0 +1,148 @@
+.two-fa-modal {
+    max-width: 460px;
+    background: var(--glass-bg);
+    backdrop-filter: blur(var(--glass-blur));
+    -webkit-backdrop-filter: blur(var(--glass-blur));
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-2xl);
+    box-shadow: var(--shadow-xl);
+    animation: modalSlideIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.two-fa-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--spacing-8) 0;
+}
+
+.two-fa-scan {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--spacing-4);
+}
+
+.qr-code-wrapper {
+    padding: var(--spacing-4);
+    background: #ffffff;
+    border-radius: var(--radius-lg);
+    line-height: 0;
+}
+
+.manual-key {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--spacing-2);
+    text-align: center;
+}
+
+.manual-key-label {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-tertiary);
+}
+
+.manual-key-value {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-2);
+    padding: var(--spacing-2) var(--spacing-3);
+    background: var(--color-bg-hover);
+    border: 1px solid var(--color-border-secondary);
+    border-radius: var(--radius-md);
+}
+
+.manual-key-value code {
+    font-family: monospace;
+    font-size: var(--font-size-sm);
+    color: var(--color-text-primary);
+    letter-spacing: 0.05em;
+    word-break: break-all;
+}
+
+.copy-btn {
+    flex-shrink: 0;
+    background: transparent;
+    border: none;
+    color: var(--color-text-tertiary);
+    cursor: pointer;
+    padding: var(--spacing-1);
+    display: flex;
+    align-items: center;
+    border-radius: var(--radius-sm);
+    transition: all var(--transition-fast);
+}
+
+.copy-btn:hover {
+    color: var(--color-text-primary);
+    background: var(--color-bg-hover);
+}
+
+.two-fa-verify-form {
+    display: flex;
+    justify-content: center;
+}
+
+.two-fa-code-input input {
+    text-align: center;
+    font-size: var(--font-size-xl);
+    letter-spacing: 0.4em;
+    font-family: monospace;
+}
+
+.two-fa-backup-codes {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-4);
+}
+
+.backup-codes-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--spacing-2);
+    padding: var(--spacing-3);
+    background: var(--color-bg-hover);
+    border: 1px solid var(--color-border-secondary);
+    border-radius: var(--radius-md);
+}
+
+.backup-code-item {
+    font-family: monospace;
+    font-size: var(--font-size-sm);
+    color: var(--color-text-primary);
+    text-align: center;
+    padding: var(--spacing-2);
+    letter-spacing: 0.05em;
+}
+
+.backup-codes-actions {
+    display: flex;
+    justify-content: center;
+    gap: var(--spacing-4);
+}
+
+.backup-codes-actions .copy-btn {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-1);
+    font-size: var(--font-size-sm);
+}
+
+.backup-codes-confirm {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-2);
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    user-select: none;
+}
+
+.backup-codes-confirm input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+}

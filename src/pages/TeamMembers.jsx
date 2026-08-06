@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Search, Plus, Edit2, Trash2, UserX, UserCheck, Building2, Users, ScrollText, Clock3, Activity } from 'lucide-react';
+import { Search, Plus, Edit2, Trash2, UserX, UserCheck, Building2, Users, ScrollText, Clock3, Activity, LogOut } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
@@ -305,6 +305,15 @@ export default function TeamMembers() {
         }
     };
 
+    const handleLogoutUser = async (userId, username) => {
+        if (!window.confirm(`Force-logout ${username}? All their active sessions will be revoked.`)) return;
+        try {
+            await userService.logoutUser(userId);
+        } catch (error) {
+            console.error('Error logging out user:', error);
+        }
+    };
+
     const changePage = (nextPage) => {
         setPagination((prev) => ({ ...prev, page: Math.max(0, nextPage) }));
     };
@@ -442,6 +451,11 @@ export default function TeamMembers() {
                                                     </button>
                                                 )}
                                                 {isSuperAdmin && (
+                                                    <button className="action-btn action-btn--warn" onClick={() => handleLogoutUser(u.id, u.username)} title="Force Logout">
+                                                        <LogOut size={15} />
+                                                    </button>
+                                                )}
+                                                {isSuperAdmin && (
                                                     <button className="action-btn action-btn--delete" onClick={() => handleDeleteUser(u.id)} title="Delete">
                                                         <Trash2 size={15} />
                                                     </button>
@@ -506,6 +520,11 @@ export default function TeamMembers() {
                                                 {isSuperAdmin && (
                                                     <button className="action-btn" onClick={() => openLogsModal(u)} title="Logs">
                                                         <ScrollText size={15} />
+                                                    </button>
+                                                )}
+                                                {isSuperAdmin && (
+                                                    <button className="action-btn action-btn--warn" onClick={() => handleLogoutUser(u.id, u.username)} title="Force Logout">
+                                                        <LogOut size={15} />
                                                     </button>
                                                 )}
                                                 {isSuperAdmin && (

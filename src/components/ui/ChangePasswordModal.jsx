@@ -89,10 +89,17 @@ export default function ChangePasswordModal({ isOpen, onClose, userId, onSuccess
         }
     };
 
+    const handleClose = () => {
+        setMustStayOpen(false);
+        setFormData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+        setError('');
+        onClose();
+    };
+
     if (!isOpen && !mustStayOpen) return null;
 
     return (
-        <div className="modal-overlay" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-overlay" onClick={handleClose}>
             <div className="modal change-password-modal" onClick={(e) => e.stopPropagation()}>
                 {isSuccess ? (
                     <div className="success-content">
@@ -185,7 +192,7 @@ export default function ChangePasswordModal({ isOpen, onClose, userId, onSuccess
                             </div>
 
                             <div className="modal-footer">
-                                <Button type="button" variant="secondary" onClick={onClose} disabled={loading}>
+                                <Button type="button" variant="secondary" onClick={handleClose} disabled={loading}>
                                     Cancel
                                 </Button>
                                 <Button type="submit" disabled={loading}>

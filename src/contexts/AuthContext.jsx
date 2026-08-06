@@ -29,13 +29,26 @@ export function AuthProvider({ children }) {
         const result = await authService.login(username, password);
 
         if (result.success) {
-            console.log('AuthContext: Login successful, setting user=', result.data);
-            setUser(result.data);
+            // When 2FA is required, no tokens were issued at all (only mfaToken) — the
+            // sign-in isn't complete yet, so don't mark the user as authenticated until
+            // the pending challenge is verified.
+            if (result.data?.mfaRequired) {
+                console.log('AuthContext: Login successful, 2FA verification pending');
+            } else {
+                console.log('AuthContext: Login successful, setting user=', result.data);
+                setUser(result.data);
+            }
         } else {
             console.log('AuthContext: Login failed');
         }
 
         return result;
+    };
+
+    // Called once a pending 2FA challenge has been verified, to actually complete sign-in.
+    const completeTwoFactorLogin = (userData) => {
+        setUser(userData);
+        localStorage.setItem('user', JSON.stringify(userData));
     };
 
     const logout = async () => {
@@ -52,6 +65,7 @@ export function AuthProvider({ children }) {
     const value = {
         user,
         login,
+        completeTwoFactorLogin,
         logout,
         updateUser,
         loading,

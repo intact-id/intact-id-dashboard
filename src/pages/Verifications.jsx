@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { Eye, Download, X, FileText } from 'lucide-react';
+import { Eye, Download, X, FileText, PlayCircle } from 'lucide-react';
+import { useToast } from '../contexts/ToastContext';
 import DocumentViewer from '../components/ui/DocumentViewer';
 import Badge from '../components/ui/Badge';
 import Card from '../components/ui/Card';
@@ -10,7 +11,7 @@ import companyService from '../services/companyService';
 import './Verifications.css';
 import '../components/ModalStyles.css';
 
-const STATUS_OPTIONS = ['all', 'SUBMITTED', 'PENDING', 'PROCESSING', 'APPROVED', 'REJECTED', 'FAILED', 'COMPLETED', 'MANUAL_REVIEW'];
+const STATUS_OPTIONS = ['all', 'SUBMITTED', 'PENDING', 'PROCESSING', 'APPROVED', 'REJECTED', 'FAILED', 'COMPLETED', 'MANUAL_REVIEW', 'ON_HOLD'];
 const TIER_OPTIONS = ['all', 'basic', 'standard', 'enhanced'];
 
 export default function Verifications() {
@@ -40,8 +41,10 @@ export default function Verifications() {
         totalElements: 0
     });
 
+    const { toast } = useToast();
     const isSuperAdmin = Array.isArray(user?.roles) && user.roles.includes('SUPER_ADMIN');
     const [environment, setEnvironment] = useState('prod');
+    const [releasing, setReleasing] = useState(false);
     const [isPolling, setIsPolling] = useState(false);
     const pollRef = useRef(null);
     const fetchRef = useRef(null);
@@ -193,7 +196,36 @@ export default function Verifications() {
         if (['APPROVED'].includes(normalized)) return 'success';
         if (['FAILED', 'REJECTED'].includes(normalized)) return 'error';
         if (normalized === 'MANUAL_REVIEW') return 'info';
+        if (normalized === 'ON_HOLD') return 'warning';
         return 'warning';
+    };
+
+    const handleRelease = async (verificationId) => {
+        setReleasing(true);
+        try {
+            await kycService.releaseHeldVerification(verificationId);
+            toast.success('Verification released — it will be retried shortly.');
+            setSelectedVerification(null);
+            fetchVerifications(true);
+        } catch (err) {
+            toast.error(err.response?.data?.responseMessage || 'Failed to release verification.');
+        } finally {
+            setReleasing(false);
+        }
+    };
+
+    const handleReleaseAll = async () => {
+        const companyId = isSuperAdmin && filters.companyId !== 'all' ? filters.companyId : null;
+        setReleasing(true);
+        try {
+            const res = await kycService.releaseAllHeld(companyId);
+            toast.success(res.responseMessage || 'All held verifications released.');
+            fetchVerifications(true);
+        } catch (err) {
+            toast.error(err.response?.data?.responseMessage || 'Failed to release held verifications.');
+        } finally {
+            setReleasing(false);
+        }
     };
 
     const getDecisionVariant = (decision) => {
@@ -287,6 +319,11 @@ export default function Verifications() {
                             Development
                         </button>
                     </div>
+                    {isSuperAdmin && (
+                        <Button variant="secondary" onClick={handleReleaseAll} disabled={releasing}>
+                            <PlayCircle size={16} /> Release Held{isSuperAdmin && filters.companyId !== 'all' ? ' (Company)' : ' (All)'}
+                        </Button>
+                    )}
                     <Button variant="secondary">
                         <Download size={16} /> Export
                     </Button>
@@ -489,7 +526,25 @@ export default function Verifications() {
                                             <div className="info-row"><span className="info-label">Risk Score</span><span className="info-value">{selectedVerification.riskScore ?? '-'}</span></div>
                                             <div className="info-row"><span className="info-label">Failure Reason</span><span className="info-value">{selectedVerification.failureReason || '-'}</span></div>
                                             <div className="info-row"><span className="info-label">Failure Description</span><span className="info-value">{selectedVerification.errorDetails || '-'}</span></div>
+                                            {selectedVerification.status === 'ON_HOLD' && (
+                                                <div className="info-row">
+                                                    <span className="info-label">Hold Reason</span>
+                                                    <span className="info-value">{selectedVerification.metadata?.holdReason || '-'}</span>
+                                                </div>
+                                            )}
                                         </div>
+                                        {isSuperAdmin && selectedVerification.status === 'ON_HOLD' && (
+                                            <div style={{ marginTop: '12px' }}>
+                                                <Button
+                                                    variant="primary"
+                                                    size="sm"
+                                                    disabled={releasing}
+                                                    onClick={() => handleRelease(selectedVerification.verificationId)}
+                                                >
+                                                    <PlayCircle size={14} /> {releasing ? 'Releasing…' : 'Release Verification'}
+                                                </Button>
+                                            </div>
+                                        )}
                                     </div>
 
                                     <div className="modal-section">
@@ -500,7 +555,11 @@ export default function Verifications() {
                                                     <span className="info-label" style={{ textTransform: 'capitalize' }}>
                                                         {key.replace(/([A-Z])/g, ' $1').trim()}
                                                     </span>
-                                                    <span className="info-value">{typeof value === 'object' ? JSON.stringify(value) : String(value)}</span>
+                                                    <span className="info-value">
+                                                        {Array.isArray(value) && value.length === 3
+                                                            ? `${String(value[0])}-${String(value[1]).padStart(2,'0')}-${String(value[2]).padStart(2,'0')}`
+                                                            : typeof value === 'object' ? JSON.stringify(value) : String(value)}
+                                                    </span>
                                                 </div>
                                             ))}
                                         </div>
@@ -539,6 +598,30 @@ export default function Verifications() {
                                                             <div className="doc-meta">
                                                                 Uploaded: {formatDate(doc.uploadedAt)}
                                                             </div>
+                                                            {doc.extractedData && Object.keys(doc.extractedData).length > 0 && (
+                                                                <div className="doc-ocr">
+                                                                    <div className="doc-ocr-title">OCR Extracted Data</div>
+                                                                    <div className="doc-ocr-grid">
+                                                                        {[
+                                                                            ['Document Type', doc.extractedData.document_type],
+                                                                            ['Full Name', doc.extractedData.full_name],
+                                                                            ['ID Number', doc.extractedData.id_number],
+                                                                            ['Date of Birth', doc.extractedData.date_of_birth],
+                                                                            ['Nationality', doc.extractedData.nationality],
+                                                                            ['Expiry Date', doc.extractedData.expiry_date],
+                                                                            ['Country', doc.extractedData.country_iso3],
+                                                                            ['Confidence', doc.extractedData.overall_confidence != null
+                                                                                ? `${Math.round(doc.extractedData.overall_confidence * 100)}%`
+                                                                                : null],
+                                                                        ].filter(([, v]) => v).map(([label, value]) => (
+                                                                            <div className="doc-ocr-field" key={label}>
+                                                                                <span className="doc-ocr-label">{label}</span>
+                                                                                <span className="doc-ocr-value">{value}</span>
+                                                                            </div>
+                                                                        ))}
+                                                                    </div>
+                                                                </div>
+                                                            )}
                                                         </div>
                                                         <div className="doc-actions">
                                                             <Button size="sm" variant="secondary" onClick={() => openDocument(selectedVerification.verificationId, doc)}>
@@ -556,26 +639,118 @@ export default function Verifications() {
                                     <div className="modal-section">
                                         <div className="section-title">Verification Steps</div>
                                         {selectedVerification.steps?.length ? (
-                                            <table className="steps-table">
-                                                <thead>
-                                                    <tr>
-                                                        <th>Step</th>
-                                                        <th>Status</th>
-                                                        <th>Confidence</th>
-                                                        <th>Executed</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    {selectedVerification.steps.map((step, idx) => (
-                                                        <tr key={`${step.stepName}-${idx}`}>
-                                                            <td>{step.stepName || '-'}</td>
-                                                            <td><Badge variant={getStatusVariant(step.status)}>{step.status || '-'}</Badge></td>
-                                                            <td>{step.confidenceScore ?? '-'}</td>
-                                                            <td>{formatDate(step.executedAt)}</td>
-                                                        </tr>
-                                                    ))}
-                                                </tbody>
-                                            </table>
+                                            <div className="steps-cards">
+                                                {selectedVerification.steps.map((step, idx) => (
+                                                    <div className="step-card" key={`${step.stepName}-${idx}`}>
+                                                        <div className="step-card-header">
+                                                            <span className="step-card-name">{(step.stepName || '-').replace(/_/g, ' ')}</span>
+                                                            <div className="step-card-meta">
+                                                                {step.confidenceScore != null && (
+                                                                    <span className="step-confidence">{Math.round(step.confidenceScore * 100)}%</span>
+                                                                )}
+                                                                <Badge variant={getStatusVariant(step.status)}>{step.status || '-'}</Badge>
+                                                            </div>
+                                                        </div>
+                                                        {step.result && Object.keys(step.result).length > 0 && (
+                                                            <div className="step-card-result">
+                                                                {step.stepName === 'face_match' && (
+                                                                    <div className="step-detail-grid">
+                                                                        <div className="step-detail-item">
+                                                                            <span className="step-detail-label">Match Score</span>
+                                                                            <span className="step-detail-value">{Math.round((step.result.match_score ?? 0) * 100)}%</span>
+                                                                        </div>
+                                                                        <div className="step-detail-item">
+                                                                            <span className="step-detail-label">Distance</span>
+                                                                            <span className="step-detail-value">{step.result.distance?.toFixed(4)} / {step.result.threshold}</span>
+                                                                        </div>
+                                                                        <div className="step-detail-item">
+                                                                            <span className="step-detail-label">Verified</span>
+                                                                            <span className={`step-detail-value ${step.result.verified ? 'text-success' : 'text-danger'}`}>
+                                                                                {step.result.verified ? '✓ Yes' : '✗ No'}
+                                                                            </span>
+                                                                        </div>
+                                                                        <div className="step-detail-item">
+                                                                            <span className="step-detail-label">Metric</span>
+                                                                            <span className="step-detail-value">{step.result.similarity_metric}</span>
+                                                                        </div>
+                                                                    </div>
+                                                                )}
+                                                                {step.stepName === 'liveness_detection' && (
+                                                                    <div className="step-detail-grid">
+                                                                        <div className="step-detail-item">
+                                                                            <span className="step-detail-label">Liveness Score</span>
+                                                                            <span className="step-detail-value">{step.result.liveness_score}/100</span>
+                                                                        </div>
+                                                                        <div className="step-detail-item">
+                                                                            <span className="step-detail-label">Face Detected</span>
+                                                                            <span className={`step-detail-value ${step.result.checks?.face_detected ? 'text-success' : 'text-danger'}`}>
+                                                                                {step.result.checks?.face_detected ? '✓' : '✗'}
+                                                                            </span>
+                                                                        </div>
+                                                                        <div className="step-detail-item">
+                                                                            <span className="step-detail-label">Single Face</span>
+                                                                            <span className={`step-detail-value ${step.result.checks?.single_face ? 'text-success' : 'text-danger'}`}>
+                                                                                {step.result.checks?.single_face ? '✓' : '✗'}
+                                                                            </span>
+                                                                        </div>
+                                                                        <div className="step-detail-item">
+                                                                            <span className="step-detail-label">Image Quality</span>
+                                                                            <span className="step-detail-value">{step.result.checks?.image_quality}</span>
+                                                                        </div>
+                                                                        <div className="step-detail-item">
+                                                                            <span className="step-detail-label">Lighting</span>
+                                                                            <span className="step-detail-value">{step.result.checks?.lighting}</span>
+                                                                        </div>
+                                                                        <div className="step-detail-item">
+                                                                            <span className="step-detail-label">Blur Score</span>
+                                                                            <span className="step-detail-value">{step.result.checks?.blur_score?.toFixed(1)}</span>
+                                                                        </div>
+                                                                    </div>
+                                                                )}
+                                                                {step.stepName === 'ocr_extraction' && (
+                                                                    <div className="step-detail-grid">
+                                                                        <div className="step-detail-item">
+                                                                            <span className="step-detail-label">ID Number Match</span>
+                                                                            <span className={`step-detail-value ${step.result.id_number_match === true ? 'text-success' : step.result.id_number_match === false ? 'text-danger' : ''}`}>
+                                                                                {step.result.id_number_match === true ? '✓ Match' : step.result.id_number_match === false ? '✗ Mismatch' : step.result.id_number_match}
+                                                                            </span>
+                                                                        </div>
+                                                                        <div className="step-detail-item">
+                                                                            <span className="step-detail-label">DOB Match</span>
+                                                                            <span className={`step-detail-value ${step.result.dob_match === true ? 'text-success' : step.result.dob_match === false ? 'text-danger' : ''}`}>
+                                                                                {step.result.dob_match === true ? '✓ Match' : step.result.dob_match === false ? '✗ Mismatch' : step.result.dob_match}
+                                                                            </span>
+                                                                        </div>
+                                                                        <div className="step-detail-item">
+                                                                            <span className="step-detail-label">Name Similarity</span>
+                                                                            <span className={`step-detail-value ${step.result.name_similarity >= 0.85 ? 'text-success' : 'text-warning'}`}>
+                                                                                {step.result.name_similarity != null ? `${Math.round(step.result.name_similarity * 100)}%` : '-'}
+                                                                            </span>
+                                                                        </div>
+                                                                        <div className="step-detail-item">
+                                                                            <span className="step-detail-label">Document Type</span>
+                                                                            <span className="step-detail-value">{step.result.document_type?.replace(/_/g, ' ')}</span>
+                                                                        </div>
+                                                                        {step.result.failure_reasons && (
+                                                                            <div className="step-detail-item step-detail-full">
+                                                                                <span className="step-detail-label">Failures</span>
+                                                                                <span className="step-detail-value text-danger">{step.result.failure_reasons.join(', ')}</span>
+                                                                            </div>
+                                                                        )}
+                                                                        {step.result.warnings && (
+                                                                            <div className="step-detail-item step-detail-full">
+                                                                                <span className="step-detail-label">Warnings</span>
+                                                                                <span className="step-detail-value text-warning">{step.result.warnings.join(', ')}</span>
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        )}
+                                                        <div className="step-card-time">{formatDate(step.executedAt)}</div>
+                                                    </div>
+                                                ))}
+                                            </div>
                                         ) : (
                                             <p className="text-tertiary">No step history available.</p>
                                         )}
