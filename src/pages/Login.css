@@ -209,6 +209,60 @@
     cursor: not-allowed;
 }
 
+/* 2FA VERIFICATION STEP */
+.login-verify-hint {
+    font-size: 0.875rem;
+    color: #9CA3AF;
+    text-align: center;
+    margin: -0.5rem 0 0.25rem;
+}
+
+.login-code-input {
+    text-align: center;
+    letter-spacing: 0.5em;
+    font-size: 1.125rem;
+    padding-left: 1rem;
+}
+
+.login-remember-device {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.8125rem;
+    color: #9CA3AF;
+    cursor: pointer;
+    user-select: none;
+    margin: -0.5rem 0 0;
+}
+
+.login-remember-device input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    accent-color: #38BDF8;
+    cursor: pointer;
+}
+
+.login-back-link {
+    background: transparent;
+    border: none;
+    color: #9CA3AF;
+    font-size: 0.8125rem;
+    cursor: pointer;
+    padding: 0.25rem;
+    text-align: center;
+    transition: color 0.2s;
+}
+
+.login-back-link:hover:not(:disabled) {
+    color: #F3F4F6;
+    text-decoration: underline;
+}
+
+.login-back-link:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
 /* FOOTER */
 .login-footer {
     margin-top: 2rem;

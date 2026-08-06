@@ -19,6 +19,12 @@ api.interceptors.request.use(
         if (token) {
             config.headers.Authorization = `Bearer ${token}`;
         }
+        // Only actually consulted by /api/auth/login (to skip 2FA on a trusted device),
+        // but harmless to attach everywhere and keeps this logic in one place.
+        const deviceToken = localStorage.getItem('deviceToken');
+        if (deviceToken && !config.headers['X-Device-Token']) {
+            config.headers['X-Device-Token'] = deviceToken;
+        }
         return config;
     },
     (error) => Promise.reject(error)
