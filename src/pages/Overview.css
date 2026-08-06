@@ -191,6 +191,64 @@
     color: var(--color-text-secondary);
 }
 
+.chart-header-controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.chart-view-toggle {
+    padding: 2px;
+}
+
+.chart-view-toggle .env-toggle-btn {
+    padding: 4px 10px;
+    font-size: 0.72rem;
+}
+
+.card__body.is-refreshing {
+    opacity: 0.55;
+    transition: opacity var(--transition-base);
+    pointer-events: none;
+}
+
+.chart-empty {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--color-text-muted);
+    font-size: 0.85rem;
+}
+
+.chart-table-view {
+    height: 100%;
+    overflow: auto;
+}
+
+.chart-tooltip {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 8px 12px;
+    background: rgba(10, 14, 39, 0.92);
+    border: 1px solid rgba(148, 163, 184, 0.15);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-md);
+}
+
+.chart-tooltip__value {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--color-text-primary);
+    line-height: 1.2;
+}
+
+.chart-tooltip__label {
+    font-size: 0.7rem;
+    color: var(--color-text-tertiary);
+}
+
 /* Right Column: Stacked Panels */
 .bento-side-panel {
     display: grid;

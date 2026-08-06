@@ -52,6 +52,21 @@ const getInitials = (firstName, lastName) => {
   return (f + l).toUpperCase() || '?';
 };
 
+const formatTrendDate = (dateString) => {
+  const date = new Date(dateString);
+  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+};
+
+const TrendTooltip = ({ active, payload, label }) => {
+  if (!active || !payload || !payload.length) return null;
+  return (
+    <div className="chart-tooltip">
+      <strong className="chart-tooltip__value">{Number(payload[0].value).toLocaleString()}</strong>
+      <span className="chart-tooltip__label">{formatTrendDate(label)}</span>
+    </div>
+  );
+};
+
 export default function Overview() {
   const [stats, setStats] = useState({
     totalVerifications: 0,
@@ -74,19 +89,51 @@ export default function Overview() {
   });
   const [loading, setLoading] = useState(true);
   const [environment, setEnvironment] = useState('prod');
+  const [trendDays, setTrendDays] = useState(30);
+  const [trendsLoading, setTrendsLoading] = useState(false);
+  const [trendView, setTrendView] = useState('chart');
 
   useEffect(() => {
     fetchDashboardData();
   }, [environment]);
+
+  useEffect(() => {
+    fetchTrends();
+  }, [environment, trendDays]);
+
+  const fetchTrends = async () => {
+    setTrendsLoading(true);
+    try {
+      const toDate = new Date();
+      const fromDate = new Date();
+      fromDate.setDate(fromDate.getDate() - (trendDays - 1));
+      const trendsResponse = await analyticsService.getVerificationTrends(
+        {
+          fromDate: `${fromDate.toISOString().split('T')[0]}T00:00:00`,
+          toDate: `${toDate.toISOString().split('T')[0]}T23:59:59`,
+        },
+        environment,
+      );
+
+      if (trendsResponse.success) {
+        const chartData = trendsResponse.data.map((item) => ({
+          date: item.date,
+          verifications: item.total,
+        }));
+        setUsageData(chartData);
+      }
+    } catch (error) {
+      console.error("Error fetching verification trends:", error);
+    } finally {
+      setTrendsLoading(false);
+    }
+  };
 
   const fetchDashboardData = async () => {
     setLoading(true);
     try {
       // Fetch real stats from analytics service
       const statsResponse = await analyticsService.getOverviewStats(environment);
-
-      // Fetch trends for chart
-      const trendsResponse = await analyticsService.getVerificationTrends({}, environment);
 
       // Fetch recent verifications for activity log
       const recentVerifications = await kycService.listVerifications(
@@ -103,15 +150,6 @@ export default function Overview() {
           activeApiKeys: statsResponse.data.activeApiKeys,
           apiCallsToday: statsResponse.data.apiCallsThisMonth, // Mapped from apiCallsThisMonth
         });
-      }
-
-      if (trendsResponse.success) {
-        // Map to chart format
-        const chartData = trendsResponse.data.map((item) => ({
-          date: item.date,
-          verifications: item.total,
-        }));
-        setUsageData(chartData);
       }
 
       if (recentVerifications.success) {
@@ -257,63 +295,99 @@ export default function Overview() {
         <Card className="chart-card">
           <div className="card__header">
             <h3 className="card__title">Verification Trends</h3>
-            <select className="chart-period-select">
-              <option>Last 7 days</option>
-              <option>Last 30 days</option>
-              <option>Last 90 days</option>
-            </select>
+            <div className="chart-header-controls">
+              <div className="env-toggle chart-view-toggle">
+                <button
+                  className={`env-toggle-btn${trendView === 'chart' ? ' active' : ''}`}
+                  onClick={() => setTrendView('chart')}
+                >
+                  Chart
+                </button>
+                <button
+                  className={`env-toggle-btn${trendView === 'table' ? ' active' : ''}`}
+                  onClick={() => setTrendView('table')}
+                >
+                  Table
+                </button>
+              </div>
+              <select
+                className="chart-period-select"
+                value={trendDays}
+                onChange={(e) => setTrendDays(Number(e.target.value))}
+              >
+                <option value={7}>Last 7 days</option>
+                <option value={30}>Last 30 days</option>
+                <option value={90}>Last 90 days</option>
+              </select>
+            </div>
           </div>
-          <div className="card__body">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={usageData}>
-                <CartesianGrid
-                  strokeDasharray="3 3"
-                  stroke="rgba(255,255,255,0.05)"
-                  vertical={false}
-                />
-                <XAxis
-                  dataKey="date"
-                  stroke="#94A3B8"
-                  tickLine={false}
-                  axisLine={false}
-                  tickFormatter={formatDate}
-                  dy={10}
-                  tick={{ fontSize: 11 }}
-                />
-                <YAxis
-                  stroke="#94A3B8"
-                  tickLine={false}
-                  axisLine={false}
-                  dx={-10}
-                  tick={{ fontSize: 11 }}
-                />
-                <Tooltip
-                  contentStyle={{
-                    background: "rgba(10, 14, 39, 0.9)",
-                    border: "1px solid rgba(255,255,255,0.1)",
-                    boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.3)",
-                    color: "#F8FAFC",
-                    borderRadius: "8px",
-                    fontSize: "12px",
-                  }}
-                  itemStyle={{ color: "#F8FAFC" }}
-                  labelStyle={{ color: "#94A3B8" }}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="verifications"
-                  stroke="#6366F1"
-                  strokeWidth={3}
-                  dot={{
-                    fill: "#0A0E27",
-                    stroke: "#6366F1",
-                    strokeWidth: 2,
-                    r: 3,
-                  }}
-                  activeDot={{ r: 5, fill: "#06B6D4", stroke: "#fff" }}
-                />
-              </LineChart>
-            </ResponsiveContainer>
+          <div className={`card__body${trendsLoading ? ' is-refreshing' : ''}`}>
+            {usageData.length === 0 ? (
+              <div className="chart-empty">No verifications in this period.</div>
+            ) : trendView === 'table' ? (
+              <div className="chart-table-view">
+                <table className="verifications-table">
+                  <thead>
+                    <tr>
+                      <th>Date</th>
+                      <th>Verifications</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[...usageData].reverse().map((row) => (
+                      <tr key={row.date}>
+                        <td>{formatTrendDate(row.date)}</td>
+                        <td className="text-primary">{row.verifications.toLocaleString()}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={usageData}>
+                  <CartesianGrid
+                    stroke="rgba(148, 163, 184, 0.08)"
+                    vertical={false}
+                  />
+                  <XAxis
+                    dataKey="date"
+                    stroke="#94A3B8"
+                    tickLine={false}
+                    axisLine={false}
+                    tickFormatter={formatTrendDate}
+                    dy={10}
+                    tick={{ fontSize: 11 }}
+                  />
+                  <YAxis
+                    stroke="#94A3B8"
+                    tickLine={false}
+                    axisLine={false}
+                    dx={-10}
+                    tick={{ fontSize: 11 }}
+                    allowDecimals={false}
+                    tickFormatter={(v) => v.toLocaleString()}
+                  />
+                  <Tooltip
+                    content={<TrendTooltip />}
+                    cursor={{ stroke: "rgba(148, 163, 184, 0.25)", strokeWidth: 1 }}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="verifications"
+                    stroke="#14B8A6"
+                    strokeWidth={2}
+                    dot={{
+                      fill: "#0B1220",
+                      stroke: "#14B8A6",
+                      strokeWidth: 2,
+                      r: 4,
+                    }}
+                    activeDot={{ r: 5, fill: "#14B8A6", stroke: "#0B1220", strokeWidth: 2 }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            )}
           </div>
         </Card>
 
