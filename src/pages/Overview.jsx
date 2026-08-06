@@ -109,8 +109,8 @@ export default function Overview() {
       fromDate.setDate(fromDate.getDate() - (trendDays - 1));
       const trendsResponse = await analyticsService.getVerificationTrends(
         {
-          fromDate: `${fromDate.toISOString().split('T')[0]}T00:00:00`,
-          toDate: `${toDate.toISOString().split('T')[0]}T23:59:59`,
+          fromDate: fromDate.toISOString().split('T')[0],
+          toDate: toDate.toISOString().split('T')[0],
         },
         environment,
       );
