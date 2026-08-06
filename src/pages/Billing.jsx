@@ -1,8 +1,20 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Building2, CreditCard, RefreshCcw, Receipt, Send, Wallet } from 'lucide-react';
+import {
+    Building2,
+    CreditCard,
+    RefreshCcw,
+    Receipt,
+    Send,
+    Wallet,
+    Settings2,
+    FileText,
+    ArrowLeftRight,
+    TrendingUp
+} from 'lucide-react';
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
+import Tabs from '../components/ui/Tabs';
 import { useAuth } from '../contexts/AuthContext';
 import { hasAnyRole } from '../utils/roles';
 import billingService from '../services/billingService';
@@ -181,7 +193,6 @@ export default function Billing() {
     const selectedTier = tiers.find((tier) => tier.tierKey === (profile?.billingTierCode || profileForm.billingTierCode));
     const canTopUp = (profile?.billingMode || profileForm.billingMode) === 'PREPAID';
     const isPrepaid = summary?.billingMode === 'PREPAID' || (profile?.billingMode || profileForm.billingMode) === 'PREPAID';
-    const isPostpaid = summary?.billingMode === 'POSTPAID' || (profile?.billingMode || profileForm.billingMode) === 'POSTPAID';
 
     const handleProfileChange = (field, value) => {
         setProfileForm((prev) => ({ ...prev, [field]: value }));
@@ -281,47 +292,269 @@ export default function Billing() {
         );
     }
 
+    const invoicesTabContent = (
+        invoices.length === 0 ? (
+            <div className="billing-empty">No invoices available.</div>
+        ) : (
+            <div className="table-wrap">
+                <table className="billing-table">
+                    <thead>
+                        <tr>
+                            <th>Invoice</th>
+                            <th>Period</th>
+                            <th>Total</th>
+                            <th>Status</th>
+                            <th>Recipient</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {invoices.map((invoice) => (
+                            <tr key={invoice.id}>
+                                <td>{invoice.invoiceNumber}</td>
+                                <td>{formatDate(invoice.periodStart)} - {formatDate(invoice.periodEnd)}</td>
+                                <td>{formatCurrency(invoice.total)}</td>
+                                <td><Badge variant={invoice.status === 'PAID' ? 'success' : invoice.status === 'SENT' ? 'info' : 'warning'}>{invoice.status}</Badge></td>
+                                <td>{invoice.recipientEmail || 'Pending resolution'}</td>
+                                <td>
+                                    {isSuperAdmin ? (
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            disabled={sendingInvoiceId === invoice.id}
+                                            onClick={() => sendInvoice(invoice.id, invoice.recipientEmail)}
+                                        >
+                                            <Send size={14} />
+                                            Send
+                                        </Button>
+                                    ) : 'View only'}
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+        )
+    );
+
+    const transactionsTabContent = (
+        walletTransactions.length === 0 ? (
+            <div className="billing-empty">{isPrepaid ? 'No wallet transactions available.' : 'No debit transactions recorded.'}</div>
+        ) : (
+            <div className="table-wrap">
+                <table className="billing-table">
+                    <thead>
+                        <tr>
+                            <th>Type</th>
+                            <th>Amount</th>
+                            <th>Reference</th>
+                            <th>Balance After</th>
+                            <th>Created</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {walletTransactions.map((transaction) => (
+                            <tr key={transaction.id}>
+                                <td><Badge variant={transaction.type === 'TOPUP' ? 'success' : 'warning'}>{transaction.type}</Badge></td>
+                                <td>{formatCurrency(transaction.amount)}</td>
+                                <td>{transaction.reference || '-'}</td>
+                                <td>{formatCurrency(transaction.balanceAfter)}</td>
+                                <td>{formatDate(transaction.createdAt)}</td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+        )
+    );
+
+    const profileTabContent = (
+        <div className="admin-tab-panel">
+            <div className="form-grid">
+                <label>
+                    <span>Tier</span>
+                    <select value={profileForm.billingTierCode} onChange={(e) => handleProfileChange('billingTierCode', e.target.value)} className="billing-input">
+                        {tiers.map((tier) => (
+                            <option key={tier.tierKey} value={tier.tierKey}>{tier.tierKey} - {tier.name}</option>
+                        ))}
+                    </select>
+                </label>
+                <label>
+                    <span>Billing Mode</span>
+                    <select value={profileForm.billingMode} onChange={(e) => handleProfileChange('billingMode', e.target.value)} className="billing-input">
+                        <option value="POSTPAID">POSTPAID</option>
+                        <option value="PREPAID">PREPAID</option>
+                    </select>
+                </label>
+                <label>
+                    <span>Unit Price</span>
+                    <input className="billing-input" value={profileForm.unitPrice} onChange={(e) => handleProfileChange('unitPrice', e.target.value)} />
+                </label>
+                <label>
+                    <span>Currency</span>
+                    <input className="billing-input" value={profileForm.currency} onChange={(e) => handleProfileChange('currency', e.target.value.toUpperCase())} />
+                </label>
+                <label>
+                    <span>Billing Email</span>
+                    <input className="billing-input" value={profileForm.billingEmail} onChange={(e) => handleProfileChange('billingEmail', e.target.value)} />
+                </label>
+                <label>
+                    <span>Status</span>
+                    <select value={profileForm.status} onChange={(e) => handleProfileChange('status', e.target.value)} className="billing-input">
+                        <option value="ACTIVE">ACTIVE</option>
+                        <option value="SUSPENDED">SUSPENDED</option>
+                        <option value="INACTIVE">INACTIVE</option>
+                    </select>
+                </label>
+                <label>
+                    <span>Low Balance Threshold</span>
+                    <input className="billing-input" value={profileForm.lowBalanceThreshold} onChange={(e) => handleProfileChange('lowBalanceThreshold', e.target.value)} />
+                </label>
+                <label>
+                    <span>Credit Limit</span>
+                    <input className="billing-input" value={profileForm.creditLimit} onChange={(e) => handleProfileChange('creditLimit', e.target.value)} />
+                </label>
+                <label>
+                    <span>Invoice Due Days</span>
+                    <input className="billing-input" type="number" value={profileForm.invoiceDueDays} onChange={(e) => handleProfileChange('invoiceDueDays', e.target.value)} />
+                </label>
+                <label>
+                    <span>Effective From</span>
+                    <input className="billing-input" type="date" value={profileForm.effectiveFrom} onChange={(e) => handleProfileChange('effectiveFrom', e.target.value)} />
+                </label>
+                <label>
+                    <span>Effective To</span>
+                    <input className="billing-input" type="date" value={profileForm.effectiveTo} onChange={(e) => handleProfileChange('effectiveTo', e.target.value)} />
+                </label>
+            </div>
+
+            <div className="billing-switches">
+                {[
+                    ['billOnSubmission', 'Bill On Submission'],
+                    ['billOnCompleted', 'Bill On Completion'],
+                    ['billOnRejected', 'Bill On Rejection'],
+                    ['billOnFailedNonSystem', 'Bill On Non-System Failure'],
+                    ['billOnFailedSystem', 'Bill On System Failure']
+                ].map(([field, label]) => (
+                    <label key={field} className="switch-row">
+                        <input
+                            type="checkbox"
+                            checked={!!profileForm[field]}
+                            onChange={(e) => handleProfileChange(field, e.target.checked)}
+                        />
+                        <span>{label}</span>
+                    </label>
+                ))}
+            </div>
+
+            <div className="billing-actions">
+                <Button onClick={saveProfile} disabled={savingProfile}>
+                    Save Profile
+                </Button>
+            </div>
+        </div>
+    );
+
+    const topUpTabContent = (
+        <div className="admin-tab-panel admin-tab-panel--narrow">
+            <div className="form-grid form-grid--compact">
+                <label>
+                    <span>Amount</span>
+                    <input className="billing-input" value={topUpForm.amount} onChange={(e) => setTopUpForm((prev) => ({ ...prev, amount: e.target.value }))} />
+                </label>
+                <label>
+                    <span>Currency</span>
+                    <input className="billing-input" value={topUpForm.currency} onChange={(e) => setTopUpForm((prev) => ({ ...prev, currency: e.target.value.toUpperCase() }))} />
+                </label>
+                <label>
+                    <span>Reference</span>
+                    <input className="billing-input" value={topUpForm.reference} onChange={(e) => setTopUpForm((prev) => ({ ...prev, reference: e.target.value }))} />
+                </label>
+                <label>
+                    <span>Description</span>
+                    <input className="billing-input" value={topUpForm.description} onChange={(e) => setTopUpForm((prev) => ({ ...prev, description: e.target.value }))} />
+                </label>
+            </div>
+            <div className="billing-actions">
+                <Button onClick={submitTopUp} disabled={toppingUp || !canTopUp}>
+                    Top Up Wallet
+                </Button>
+            </div>
+            {!canTopUp && <p className="helper-text">Top-up is only available for PREPAID companies.</p>}
+        </div>
+    );
+
+    const invoiceGenTabContent = (
+        <div className="admin-tab-panel admin-tab-panel--narrow">
+            <div className="form-grid form-grid--compact">
+                <label>
+                    <span>Period Start</span>
+                    <input className="billing-input" type="date" value={invoiceForm.periodStart} onChange={(e) => setInvoiceForm((prev) => ({ ...prev, periodStart: e.target.value }))} />
+                </label>
+                <label>
+                    <span>Period End</span>
+                    <input className="billing-input" type="date" value={invoiceForm.periodEnd} onChange={(e) => setInvoiceForm((prev) => ({ ...prev, periodEnd: e.target.value }))} />
+                </label>
+            </div>
+            <div className="billing-actions">
+                <Button onClick={generateInvoice} disabled={generatingInvoice || profile?.billingMode !== 'POSTPAID'}>
+                    Generate Invoice
+                </Button>
+            </div>
+            {profile?.billingMode !== 'POSTPAID' && <p className="helper-text">Invoice generation is available for POSTPAID companies.</p>}
+        </div>
+    );
+
     return (
         <div className="billing">
-            <div className="billing-hero">
-                <div className="billing-hero__content">
-                    <span className="billing-hero__eyebrow">Revenue Operations</span>
-                    <div className="page-header billing-header">
-                        <div>
-                            <h1>Billing & Usage</h1>
-                            <p className="page-subtitle">
-                                {isSuperAdmin ? 'Control company billing profiles, credit exposure, wallet funding, and invoice dispatch.' : 'Track your live balance, credit position, and billing history in one place.'}
-                            </p>
-                        </div>
-                        <Button variant="secondary" onClick={bootstrap}>
-                            <RefreshCcw size={14} />
-                            Refresh
-                        </Button>
-                    </div>
-
-                    <div className="billing-hero__meta">
-                        <div className="hero-chip">
-                            <span className="hero-chip__label">Mode</span>
-                            <strong>{profile?.billingMode || profileForm.billingMode}</strong>
-                        </div>
-                        <div className="hero-chip">
-                            <span className="hero-chip__label">Tier</span>
-                            <strong>{profile?.billingTierCode || profileForm.billingTierCode}</strong>
-                        </div>
-                        <div className="hero-chip">
-                            <span className="hero-chip__label">{isPrepaid ? 'Available Spend' : 'Outstanding'}</span>
-                            <strong>{formatCurrency(isPrepaid ? summary?.availableToSpend : summary?.outstandingAmount)}</strong>
-                        </div>
-                        <div className={`hero-chip ${isPrepaid && Number(summary?.currentBalance || 0) < 0 ? 'hero-chip--alert' : ''}`}>
-                            <span className="hero-chip__label">{isPrepaid ? 'Balance' : 'Ready To Invoice'}</span>
-                            <strong>{formatCurrency(isPrepaid ? summary?.currentBalance : summary?.readyToInvoiceAmount)}</strong>
-                        </div>
-                    </div>
+            <div className="page-header">
+                <div>
+                    <h1>Billing & Usage</h1>
+                    <p className="page-subtitle">
+                        {isSuperAdmin ? 'Manage company billing profiles, credit, wallet funding, and invoices.' : 'Track your live balance, credit position, and billing history.'}
+                    </p>
                 </div>
+                <Button variant="secondary" onClick={bootstrap}>
+                    <RefreshCcw size={14} />
+                    Refresh
+                </Button>
             </div>
 
             {error && <div className="error-banner">{error}</div>}
             {success && <div className="success-banner">{success}</div>}
+
+            <div className="billing-stats">
+                <div className="stat-tile">
+                    <div className="stat-tile__icon stat-tile__icon--cyan"><Wallet size={16} /></div>
+                    <div className="stat-tile__body">
+                        <span className="stat-tile__label">{isPrepaid ? 'Balance' : 'Outstanding'}</span>
+                        <strong className={isPrepaid && Number(summary?.currentBalance || 0) < 0 ? 'stat-tile__value stat-tile__value--alert' : 'stat-tile__value'}>
+                            {formatCurrency(isPrepaid ? summary?.currentBalance : summary?.outstandingAmount)}
+                        </strong>
+                    </div>
+                </div>
+                <div className="stat-tile">
+                    <div className="stat-tile__icon stat-tile__icon--blue"><CreditCard size={16} /></div>
+                    <div className="stat-tile__body">
+                        <span className="stat-tile__label">{isPrepaid ? 'Available To Spend' : 'Ready To Invoice'}</span>
+                        <strong className="stat-tile__value">{formatCurrency(isPrepaid ? summary?.availableToSpend : summary?.readyToInvoiceAmount)}</strong>
+                    </div>
+                </div>
+                <div className="stat-tile">
+                    <div className="stat-tile__icon stat-tile__icon--amber"><Receipt size={16} /></div>
+                    <div className="stat-tile__body">
+                        <span className="stat-tile__label">{isPrepaid ? 'Credit Limit' : 'Invoiced Amount'}</span>
+                        <strong className="stat-tile__value">{formatCurrency(isPrepaid ? (profile?.creditLimit || profileForm.creditLimit) : summary?.invoicedAmount)}</strong>
+                    </div>
+                </div>
+                <div className="stat-tile">
+                    <div className="stat-tile__icon stat-tile__icon--green"><TrendingUp size={16} /></div>
+                    <div className="stat-tile__body">
+                        <span className="stat-tile__label">{isPrepaid ? 'Submissions Left' : 'Debited'}</span>
+                        <strong className="stat-tile__value">{isPrepaid ? (summary?.estimatedSubmissionsRemaining ?? 0) : formatCurrency(summary?.debitedAmount)}</strong>
+                    </div>
+                </div>
+            </div>
 
             <div className={`billing-layout ${isSuperAdmin ? 'billing-layout--admin' : ''}`}>
                 {isSuperAdmin && (
@@ -355,325 +588,48 @@ export default function Billing() {
                         <Card className="billing-empty">Loading billing details...</Card>
                     ) : (
                         <>
-                            <Card variant="gradient" className="plan-card">
-                                <div className="plan-header">
-                                    <div>
-                                        <div className="plan-badge">
-                                            <Badge variant="info">{isSuperAdmin ? 'Selected Company' : 'Active Billing Profile'}</Badge>
-                                        </div>
-                                        <h2 className="plan-name">{selectedTier?.name || profile?.billingTierCode || 'Billing not configured'}</h2>
-                                        <p className="plan-cycle">
+                            <Card className="plan-strip">
+                                <div className="plan-strip__left">
+                                    <Badge variant="info">{isSuperAdmin ? 'Selected Company' : 'Active Profile'}</Badge>
+                                    <div className="plan-strip__text">
+                                        <h2 className="plan-strip__name">{selectedTier?.name || profile?.billingTierCode || 'Billing not configured'}</h2>
+                                        <p className="plan-strip__sub">
                                             {isSuperAdmin ? (selectedCompany?.legalName || 'No company selected') : 'Authenticated company billing'}
+                                            <span className="plan-strip__dot">·</span>
+                                            {profile?.billingMode || profileForm.billingMode}
                                         </p>
                                     </div>
-                                    <div className="plan-cost">
-                                        <div className="cost-label">Unit Price</div>
-                                        <div className="cost-value">{formatCurrency(profile?.unitPrice || profileForm.unitPrice)}</div>
-                                    </div>
                                 </div>
-
-                                <div className="plan-meta-grid">
-                                    <div className="plan-meta-card">
-                                        <span className="meta-label">Billing Mode</span>
-                                        <strong>{profile?.billingMode || profileForm.billingMode}</strong>
-                                        <p className="meta-note">{isPrepaid ? 'Charges hit the wallet immediately.' : 'Charges accumulate for invoicing.'}</p>
-                                    </div>
-                                    <div className="plan-meta-card">
-                                        <span className="meta-label">{isPrepaid ? 'Current Balance' : 'Outstanding Amount'}</span>
-                                        <strong>{formatCurrency(isPrepaid ? summary?.currentBalance : summary?.outstandingAmount)}</strong>
-                                        <p className="meta-note">{isPrepaid ? 'Negative values mean credit is in use.' : 'Total unpaid exposure.'}</p>
-                                    </div>
-                                    <div className="plan-meta-card">
-                                        <span className="meta-label">{isPrepaid ? 'Available To Spend' : 'Ready To Invoice'}</span>
-                                        <strong>{formatCurrency(isPrepaid ? summary?.availableToSpend : summary?.readyToInvoiceAmount)}</strong>
-                                        <p className="meta-note">{isPrepaid ? 'Wallet plus remaining credit.' : 'Charges not yet invoiced.'}</p>
-                                    </div>
-                                    <div className="plan-meta-card">
-                                        <span className="meta-label">{isPrepaid ? 'Credit Limit' : 'Invoiced Amount'}</span>
-                                        <strong>{formatCurrency(isPrepaid ? (profile?.creditLimit || profileForm.creditLimit) : summary?.invoicedAmount)}</strong>
-                                        <p className="meta-note">{isPrepaid ? 'Maximum negative allowance.' : 'Charges already billed to invoices.'}</p>
-                                    </div>
-                                </div>
-
-                                <div className="plan-features">
-                                    <h4>Tier Features</h4>
-                                    <div className="features-grid">
-                                        {(selectedTier?.features || []).map((feature, index) => (
-                                            <div key={index} className="feature-item">
-                                                <span className="feature-icon">•</span>
-                                                <span className="feature-text">{feature}</span>
-                                            </div>
-                                        ))}
-                                        {!selectedTier?.features?.length && (
-                                            <div className="feature-empty">No tier features available.</div>
-                                        )}
-                                    </div>
+                                <div className="plan-strip__right">
+                                    <span className="plan-strip__price-label">Unit Price</span>
+                                    <strong className="plan-strip__price-value">{formatCurrency(profile?.unitPrice || profileForm.unitPrice)}</strong>
                                 </div>
                             </Card>
 
-                            <div className="summary-grid">
-                                <Card className={`summary-card ${isPrepaid ? 'summary-card--wallet' : 'summary-card--invoice'}`}>
-                                    <div className="summary-icon"><Wallet size={18} /></div>
-                                    <span className="summary-label">{isPrepaid ? 'Wallet Balance' : 'Outstanding Balance'}</span>
-                                    <strong>{formatCurrency(isPrepaid ? summary?.walletBalance : summary?.outstandingAmount)}</strong>
-                                </Card>
-                                <Card className={`summary-card ${isPrepaid ? 'summary-card--credit' : 'summary-card--flow'}`}>
-                                    <div className="summary-icon"><Receipt size={18} /></div>
-                                    <span className="summary-label">{isPrepaid ? 'Used Credit' : 'Debited'}</span>
-                                    <strong>{formatCurrency(isPrepaid ? summary?.usedCredit : summary?.debitedAmount)}</strong>
-                                </Card>
-                                <Card className={`summary-card ${isPrepaid ? 'summary-card--credit' : 'summary-card--flow'}`}>
-                                    <div className="summary-icon"><CreditCard size={18} /></div>
-                                    <span className="summary-label">{isPrepaid ? 'Remaining Credit' : 'Ready To Invoice'}</span>
-                                    <strong>{formatCurrency(isPrepaid ? summary?.remainingCredit : summary?.readyToInvoiceAmount)}</strong>
-                                </Card>
-                                <Card className={`summary-card ${isPrepaid ? 'summary-card--forecast' : 'summary-card--policy'}`}>
-                                    <div className="summary-icon"><CreditCard size={18} /></div>
-                                    <span className="summary-label">{isPrepaid ? 'Submissions Left' : 'Low Balance Threshold'}</span>
-                                    <strong>{isPrepaid ? (summary?.estimatedSubmissionsRemaining ?? 0) : formatCurrency(profile?.lowBalanceThreshold || profileForm.lowBalanceThreshold)}</strong>
-                                </Card>
-                            </div>
-
                             {isSuperAdmin && selectedCompany && (
-                                <div className="admin-grid">
-                                    <Card className="billing-form-card">
-                                        <div className="card__header">
-                                            <h3 className="card__title">Billing Profile</h3>
-                                        </div>
-                                        <div className="form-grid">
-                                            <label>
-                                                <span>Tier</span>
-                                                <select value={profileForm.billingTierCode} onChange={(e) => handleProfileChange('billingTierCode', e.target.value)} className="billing-input">
-                                                    {tiers.map((tier) => (
-                                                        <option key={tier.tierKey} value={tier.tierKey}>{tier.tierKey} - {tier.name}</option>
-                                                    ))}
-                                                </select>
-                                            </label>
-                                            <label>
-                                                <span>Billing Mode</span>
-                                                <select value={profileForm.billingMode} onChange={(e) => handleProfileChange('billingMode', e.target.value)} className="billing-input">
-                                                    <option value="POSTPAID">POSTPAID</option>
-                                                    <option value="PREPAID">PREPAID</option>
-                                                </select>
-                                            </label>
-                                            <label>
-                                                <span>Unit Price</span>
-                                                <input className="billing-input" value={profileForm.unitPrice} onChange={(e) => handleProfileChange('unitPrice', e.target.value)} />
-                                            </label>
-                                            <label>
-                                                <span>Currency</span>
-                                                <input className="billing-input" value={profileForm.currency} onChange={(e) => handleProfileChange('currency', e.target.value.toUpperCase())} />
-                                            </label>
-                                            <label>
-                                                <span>Billing Email</span>
-                                                <input className="billing-input" value={profileForm.billingEmail} onChange={(e) => handleProfileChange('billingEmail', e.target.value)} />
-                                            </label>
-                                            <label>
-                                                <span>Status</span>
-                                                <select value={profileForm.status} onChange={(e) => handleProfileChange('status', e.target.value)} className="billing-input">
-                                                    <option value="ACTIVE">ACTIVE</option>
-                                                    <option value="SUSPENDED">SUSPENDED</option>
-                                                    <option value="INACTIVE">INACTIVE</option>
-                                                </select>
-                                            </label>
-                                            <label>
-                                                <span>Low Balance Threshold</span>
-                                                <input className="billing-input" value={profileForm.lowBalanceThreshold} onChange={(e) => handleProfileChange('lowBalanceThreshold', e.target.value)} />
-                                            </label>
-                                            <label>
-                                                <span>Credit Limit</span>
-                                                <input className="billing-input" value={profileForm.creditLimit} onChange={(e) => handleProfileChange('creditLimit', e.target.value)} />
-                                            </label>
-                                            <label>
-                                                <span>Invoice Due Days</span>
-                                                <input className="billing-input" type="number" value={profileForm.invoiceDueDays} onChange={(e) => handleProfileChange('invoiceDueDays', e.target.value)} />
-                                            </label>
-                                            <label>
-                                                <span>Effective From</span>
-                                                <input className="billing-input" type="date" value={profileForm.effectiveFrom} onChange={(e) => handleProfileChange('effectiveFrom', e.target.value)} />
-                                            </label>
-                                            <label>
-                                                <span>Effective To</span>
-                                                <input className="billing-input" type="date" value={profileForm.effectiveTo} onChange={(e) => handleProfileChange('effectiveTo', e.target.value)} />
-                                            </label>
-                                        </div>
-
-                                        <div className="billing-switches">
-                                            {[
-                                                ['billOnSubmission', 'Bill On Submission'],
-                                                ['billOnCompleted', 'Bill On Completion'],
-                                                ['billOnRejected', 'Bill On Rejection'],
-                                                ['billOnFailedNonSystem', 'Bill On Non-System Failure'],
-                                                ['billOnFailedSystem', 'Bill On System Failure']
-                                            ].map(([field, label]) => (
-                                                <label key={field} className="switch-row">
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={!!profileForm[field]}
-                                                        onChange={(e) => handleProfileChange(field, e.target.checked)}
-                                                    />
-                                                    <span>{label}</span>
-                                                </label>
-                                            ))}
-                                        </div>
-
-                                        <div className="billing-actions">
-                                            <Button onClick={saveProfile} disabled={savingProfile}>
-                                                Save Profile
-                                            </Button>
-                                        </div>
-                                    </Card>
-
-                                    <div className="admin-side-stack">
-                                        <Card className="billing-form-card">
-                                            <div className="card__header">
-                                                <h3 className="card__title">Wallet Top-Up</h3>
-                                            </div>
-                                            <div className="form-grid form-grid--compact">
-                                                <label>
-                                                    <span>Amount</span>
-                                                    <input className="billing-input" value={topUpForm.amount} onChange={(e) => setTopUpForm((prev) => ({ ...prev, amount: e.target.value }))} />
-                                                </label>
-                                                <label>
-                                                    <span>Currency</span>
-                                                    <input className="billing-input" value={topUpForm.currency} onChange={(e) => setTopUpForm((prev) => ({ ...prev, currency: e.target.value.toUpperCase() }))} />
-                                                </label>
-                                                <label>
-                                                    <span>Reference</span>
-                                                    <input className="billing-input" value={topUpForm.reference} onChange={(e) => setTopUpForm((prev) => ({ ...prev, reference: e.target.value }))} />
-                                                </label>
-                                                <label>
-                                                    <span>Description</span>
-                                                    <input className="billing-input" value={topUpForm.description} onChange={(e) => setTopUpForm((prev) => ({ ...prev, description: e.target.value }))} />
-                                                </label>
-                                            </div>
-                                            <Button onClick={submitTopUp} disabled={toppingUp || !canTopUp}>
-                                                Top Up Wallet
-                                            </Button>
-                                            {!canTopUp && <p className="helper-text">Top-up is only available for PREPAID companies.</p>}
-                                        </Card>
-
-                                        <Card className="billing-form-card">
-                                            <div className="card__header">
-                                                <h3 className="card__title">Generate Invoice</h3>
-                                            </div>
-                                            <div className="form-grid form-grid--compact">
-                                                <label>
-                                                    <span>Period Start</span>
-                                                    <input className="billing-input" type="date" value={invoiceForm.periodStart} onChange={(e) => setInvoiceForm((prev) => ({ ...prev, periodStart: e.target.value }))} />
-                                                </label>
-                                                <label>
-                                                    <span>Period End</span>
-                                                    <input className="billing-input" type="date" value={invoiceForm.periodEnd} onChange={(e) => setInvoiceForm((prev) => ({ ...prev, periodEnd: e.target.value }))} />
-                                                </label>
-                                            </div>
-                                            <Button onClick={generateInvoice} disabled={generatingInvoice || profile?.billingMode !== 'POSTPAID'}>
-                                                Generate Invoice
-                                            </Button>
-                                            {profile?.billingMode !== 'POSTPAID' && <p className="helper-text">Invoice generation is available for POSTPAID companies.</p>}
-                                        </Card>
-                                    </div>
-                                </div>
+                                <Card className="admin-card">
+                                    <Tabs
+                                        tabs={[
+                                            { label: 'Billing Profile', icon: Settings2, content: profileTabContent },
+                                            { label: 'Wallet Top-Up', icon: Wallet, content: topUpTabContent },
+                                            { label: 'Generate Invoice', icon: FileText, content: invoiceGenTabContent }
+                                        ]}
+                                    />
+                                </Card>
                             )}
 
-                            <div className="billing-data-grid">
-                                <Card className="billing-table-card">
-                                    <div className="panel-header">
-                                        <div>
-                                            <span className="section-kicker">Ledger</span>
-                                            <h3>Invoices</h3>
-                                        </div>
-                                        <Badge variant="info">{invoices.length}</Badge>
-                                    </div>
-                                    {invoices.length === 0 ? (
-                                        <div className="billing-empty">No invoices available.</div>
-                                    ) : (
-                                        <div className="table-wrap">
-                                            <table className="billing-table">
-                                                <thead>
-                                                    <tr>
-                                                        <th>Invoice</th>
-                                                        <th>Period</th>
-                                                        <th>Total</th>
-                                                        <th>Status</th>
-                                                        <th>Recipient</th>
-                                                        <th>Action</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    {invoices.map((invoice) => (
-                                                        <tr key={invoice.id}>
-                                                            <td>{invoice.invoiceNumber}</td>
-                                                            <td>{formatDate(invoice.periodStart)} - {formatDate(invoice.periodEnd)}</td>
-                                                            <td>{formatCurrency(invoice.total)}</td>
-                                                            <td><Badge variant={invoice.status === 'PAID' ? 'success' : invoice.status === 'SENT' ? 'info' : 'warning'}>{invoice.status}</Badge></td>
-                                                            <td>{invoice.recipientEmail || 'Pending resolution'}</td>
-                                                            <td>
-                                                                {isSuperAdmin ? (
-                                                                    <Button
-                                                                        variant="ghost"
-                                                                        size="sm"
-                                                                        disabled={sendingInvoiceId === invoice.id}
-                                                                        onClick={() => sendInvoice(invoice.id, invoice.recipientEmail)}
-                                                                    >
-                                                                        <Send size={14} />
-                                                                        Send
-                                                                    </Button>
-                                                                ) : 'View only'}
-                                                            </td>
-                                                        </tr>
-                                                    ))}
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    )}
-                                </Card>
-
-                                <Card className="billing-table-card">
-                                    <div className="panel-header">
-                                        <div>
-                                            <span className="section-kicker">Cash Movement</span>
-                                            <h3>{isPrepaid ? 'Wallet Transactions' : 'Charge Activity'}</h3>
-                                        </div>
-                                        <Badge variant="info">{walletTransactions.length}</Badge>
-                                    </div>
-                                    {walletTransactions.length === 0 ? (
-                                        <div className="billing-empty">{isPrepaid ? 'No wallet transactions available.' : 'No debit transactions recorded.'}</div>
-                                    ) : (
-                                        <div className="table-wrap">
-                                            <table className="billing-table">
-                                                <thead>
-                                                    <tr>
-                                                        <th>Type</th>
-                                                        <th>Amount</th>
-                                                        <th>Reference</th>
-                                                        <th>Balance After</th>
-                                                        <th>Created</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    {walletTransactions.map((transaction) => (
-                                                        <tr key={transaction.id}>
-                                                            <td><Badge variant={transaction.type === 'TOPUP' ? 'success' : 'warning'}>{transaction.type}</Badge></td>
-                                                            <td>{formatCurrency(transaction.amount)}</td>
-                                                            <td>{transaction.reference || '-'}</td>
-                                                            <td>{formatCurrency(transaction.balanceAfter)}</td>
-                                                            <td>{formatDate(transaction.createdAt)}</td>
-                                                        </tr>
-                                                    ))}
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    )}
-                                </Card>
-                            </div>
+                            <Card className="ledger-card">
+                                <Tabs
+                                    tabs={[
+                                        { label: 'Invoices', icon: Receipt, badge: invoices.length, content: invoicesTabContent },
+                                        { label: isPrepaid ? 'Wallet Transactions' : 'Charge Activity', icon: ArrowLeftRight, badge: walletTransactions.length, content: transactionsTabContent }
+                                    ]}
+                                />
+                            </Card>
 
                             <div className="pricing-section">
                                 <div className="pricing-section__header">
-                                    <div>
-                                        <span className="section-kicker">Commercial Catalog</span>
-                                        <h2 className="section-title">Tier Catalog</h2>
-                                    </div>
+                                    <h3 className="section-title">Tier Catalog</h3>
                                 </div>
                                 <div className="pricing-grid">
                                     {tiers.map((tier) => (
@@ -682,20 +638,20 @@ export default function Billing() {
                                             className={`pricing-card ${(profile?.billingTierCode || profileForm.billingTierCode) === tier.tierKey ? 'pricing-card--current' : ''}`}
                                         >
                                             <div className="pricing-header">
-                                                <h3>{tier.name}</h3>
-                                                <div className="pricing-cost">
-                                                    <span className="price-value">${tier.priceRange?.[0] ?? '0.00'} - ${tier.priceRange?.[1] ?? '0.00'}</span>
-                                                    <span className="price-unit">per verification</span>
-                                                </div>
+                                                <h4>{tier.name}</h4>
+                                                <Badge variant={(profile?.billingTierCode || profileForm.billingTierCode) === tier.tierKey ? 'success' : 'default'}>
+                                                    {tier.tierKey}
+                                                </Badge>
+                                            </div>
+                                            <div className="pricing-cost">
+                                                <span className="price-value">${tier.priceRange?.[0] ?? '0.00'} - ${tier.priceRange?.[1] ?? '0.00'}</span>
+                                                <span className="price-unit">per verification</span>
                                             </div>
                                             <div className="pricing-features">
-                                                {(tier.features || []).slice(0, 6).map((feature, index) => (
+                                                {(tier.features || []).slice(0, 4).map((feature, index) => (
                                                     <div key={index} className="pricing-feature">{feature}</div>
                                                 ))}
                                             </div>
-                                            <Badge variant={(profile?.billingTierCode || profileForm.billingTierCode) === tier.tierKey ? 'success' : 'default'}>
-                                                {tier.tierKey}
-                                            </Badge>
                                         </Card>
                                     ))}
                                 </div>
