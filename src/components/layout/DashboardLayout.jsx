@@ -1,6 +1,8 @@
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import {
+    GitBranch,
+    Boxes,
     LayoutDashboard,
     ShieldCheck,
     Key,
@@ -67,6 +69,8 @@ export default function DashboardLayout() {
                 { path: '/dashboard/verifications', label: 'Verifications', icon: ShieldCheck },
                 { path: '/dashboard/documents', label: 'Documents', icon: FileText },
                 { path: '/dashboard/analytics', label: 'Analytics', icon: BarChart2 },
+                { path: '/dashboard/workflows', label: 'Workflows', icon: GitBranch },
+                ...(isSuperAdmin ? [{ path: '/dashboard/catalog', label: 'Service Catalog', icon: Boxes }] : []),
             ]
         },
         {
