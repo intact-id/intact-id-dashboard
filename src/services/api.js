@@ -1,6 +1,8 @@
 import axios from 'axios';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://auth.144-91-122-121.sslip.io';
+// Without a scheme the browser treats the value as a path on this site, so every call silently fails
+const withScheme = (url) => (url && !/^https?:\/\//i.test(url) ? `https://${url}` : url);
+const API_BASE_URL = withScheme(import.meta.env.VITE_API_BASE_URL) || 'https://api.intact-io.com';
 
 // Create axios instance
 const api = axios.create({
