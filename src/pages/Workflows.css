@@ -1,0 +1,47 @@
+.workflows-page { display: flex; flex-direction: column; gap: var(--spacing-lg); }
+.workflows-header { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--spacing-lg); }
+.workflows-header h1 { display: flex; align-items: center; gap: 0.5rem; margin: 0; font-size: 1.5rem; color: var(--color-text-primary); }
+.workflows-header p { margin: 0.35rem 0 0; color: var(--color-text-tertiary); max-width: 720px; }
+.workflows-page h2 { margin: 0 0 var(--spacing-md); font-size: 1.05rem; color: var(--color-text-primary); }
+.workflows-page .muted { color: var(--color-text-tertiary); }
+.workflows-page .small { font-size: 0.8rem; }
+.workflows-error { padding: 0.75rem 1rem; border-radius: var(--radius-md); background: rgba(239, 68, 68, 0.12); color: #FCA5A5; border: 1px solid rgba(239, 68, 68, 0.35); }
+
+.workflows-company { display: flex; align-items: flex-end; justify-content: space-between; gap: var(--spacing-md); }
+.workflows-company label { display: flex; flex-direction: column; gap: 0.35rem; color: var(--color-text-secondary); font-size: 0.85rem; min-width: 320px; }
+
+.workflows-page select, .workflows-page input, .workflows-page textarea {
+    background: var(--color-bg-tertiary); color: var(--color-text-primary); border: 1px solid var(--color-border-primary);
+    border-radius: var(--radius-md); padding: 0.5rem 0.65rem; font: inherit;
+}
+.workflows-page select option { background: #0B1220; }
+
+.workflows-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+.workflows-table th { text-align: left; color: var(--color-text-tertiary); font-weight: 500; padding: 0.5rem; border-bottom: 1px solid var(--color-border-secondary); }
+.workflows-table td { padding: 0.65rem 0.5rem; border-bottom: 1px solid var(--color-border-subtle); color: var(--color-text-secondary); vertical-align: top; }
+.workflows-table code, .workflows-page code { font-size: 0.8rem; color: #93C5FD; }
+.workflows-table .actions, .workflows-template .actions { display: flex; gap: 0.4rem; align-items: center; justify-content: flex-end; flex-wrap: wrap; }
+.workflows-page .link { background: none; border: none; color: var(--color-text-primary); font-weight: 600; cursor: pointer; padding: 0; }
+.workflows-page .link:hover { text-decoration: underline; }
+.workflows-page .icon { background: none; border: none; color: var(--color-text-tertiary); cursor: pointer; padding: 0.25rem; }
+.workflows-page .icon:hover { color: var(--color-text-primary); }
+
+.workflows-templates { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: var(--spacing-md); }
+.workflows-template { display: flex; flex-direction: column; justify-content: space-between; gap: 0.75rem; padding: var(--spacing-md);
+    border: 1px solid var(--color-border-secondary); border-radius: var(--radius-lg); background: var(--color-bg-tertiary); }
+.workflows-template strong { color: var(--color-text-primary); }
+.workflows-template p { margin: 0.35rem 0 0; font-size: 0.85rem; }
+
+.workflows-form { display: flex; flex-direction: column; gap: var(--spacing-md); }
+.workflows-form label, .workflows-form fieldset { display: flex; flex-direction: column; gap: 0.35rem; font-size: 0.85rem; color: var(--color-text-secondary); border: none; padding: 0; margin: 0; }
+.workflows-form small { color: var(--color-text-muted); font-weight: 400; }
+.workflows-form select, .workflows-form input, .workflows-form textarea {
+    background: var(--color-bg-tertiary); color: var(--color-text-primary); border: 1px solid var(--color-border-primary);
+    border-radius: var(--radius-md); padding: 0.5rem 0.65rem; font: inherit;
+}
+.workflows-form .inline { flex-direction: row; align-items: center; gap: 0.4rem; }
+.workflows-form__actions { display: flex; justify-content: flex-end; gap: 0.5rem; }
+.catalog-form { display: grid; grid-template-columns: 1fr 1fr; gap: var(--spacing-md); }
+.catalog-form .wide { grid-column: 1 / -1; }
+.catalog-filter { display: flex; justify-content: flex-end; margin-bottom: var(--spacing-md); }
+.wf-error { color: #FCA5A5; }

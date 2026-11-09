@@ -20,6 +20,9 @@ import Notifications from './pages/Notifications';
 import TeamMembers from './pages/TeamMembers';
 import Usage from './pages/Usage';
 import RequestLogs from './pages/RequestLogs';
+import Workflows from './pages/Workflows';
+import WorkflowBuilder from './pages/WorkflowBuilder';
+import ServiceCatalog from './pages/ServiceCatalog';
 
 // Protected Route Component
 function ProtectedRoute({ children }) {
@@ -94,6 +97,9 @@ function AppRoutes() {
         <Route path="logs" element={<RequestLogs />} />
         <Route path="api" element={<ApiManagement />} />
         <Route path="webhooks" element={<Webhooks />} />
+        <Route path="workflows" element={<Workflows />} />
+        <Route path="workflows/:id" element={<WorkflowBuilder />} />
+        <Route path="catalog" element={<ServiceCatalog />} />
         <Route path="billing" element={<Billing />} />
         <Route path="settings" element={<Settings />} />
       </Route>
