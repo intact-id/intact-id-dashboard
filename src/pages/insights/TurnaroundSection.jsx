@@ -19,14 +19,14 @@ const DAILY_SERIES = [
 ];
 
 // Super admins only: how long verifications take from submission to decision, and where the time goes.
-export default function TurnaroundSection({ environment, companyId, days }) {
+export default function TurnaroundSection({ companyId, days }) {
     const [tat, setTat] = useState(null);
     const [error, setError] = useState(false);
 
     useEffect(() => {
         setError(false);
-        statsService.turnaround({ environment, companyId, days }).then(setTat).catch(() => setError(true));
-    }, [environment, companyId, days]);
+        statsService.turnaround({ companyId, days }).then(setTat).catch(() => setError(true));
+    }, [companyId, days]);
 
     const stageTotal = tat ? STAGES.reduce((sum, s) => sum + (tat.stages[s.key] || 0), 0) : 0;
 

@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom';
 import { Search, X, RefreshCw, FileText, ChevronRight, ChevronLeft } from 'lucide-react';
 import Badge from '../components/ui/Badge';
 import { useAuth } from '../contexts/AuthContext';
-import { useEnvironment } from '../contexts/EnvironmentContext';
 import verificationService from '../services/verificationService';
 import companyService from '../services/companyService';
 import { errorMessage } from '../services/api';
@@ -31,7 +30,6 @@ const EMPTY_FILTERS = { search: '', status: 'all', type: 'all', companyId: 'all'
 export default function Verifications() {
     const { user } = useAuth();
     const isAdmin = hasAnyRole(user, ['ADMIN', 'SUPER_ADMIN']);
-    const { environment, setEnvironment } = useEnvironment();
 
     const [filters, setFilters] = useState(EMPTY_FILTERS);
     const [search, setSearch] = useState(''); // typed text; copied into filters after a pause
@@ -61,7 +59,6 @@ export default function Verifications() {
         setError('');
         verificationService
             .list({
-                environment,
                 status: filters.status === 'all' ? undefined : filters.status,
                 verificationType: filters.type === 'all' ? undefined : filters.type,
                 companyId: filters.companyId === 'all' ? undefined : filters.companyId,
@@ -73,7 +70,7 @@ export default function Verifications() {
             .then((data) => { if (!cancelled) setResult(data); })
             .catch((e) => { if (!cancelled) setError(errorMessage(e, 'Could not load verifications.')); });
         return () => { cancelled = true; };
-    }, [filters, page, reloadKey, environment]);
+    }, [filters, page, reloadKey]);
 
     const setFilter = (key, value) => {
         setFilters((f) => ({ ...f, [key]: value }));
@@ -97,20 +94,6 @@ export default function Verifications() {
                     <h1>Verifications</h1>
                     <p>Every identity check, split by the API keys that ran it.</p>
                 </div>
-            </div>
-
-            <div className="page-tabs" role="tablist" aria-label="Environment">
-                {[['PROD', 'Production'], ['DEV', 'Sandbox']].map(([value, label]) => (
-                    <button
-                        key={value}
-                        role="tab"
-                        aria-selected={environment === value}
-                        className={environment === value ? 'is-active' : ''}
-                        onClick={() => { setEnvironment(value); setPage(0); }}
-                    >
-                        {label}
-                    </button>
-                ))}
             </div>
 
             <div className="filter-bar">
@@ -173,7 +156,7 @@ export default function Verifications() {
                             const name = applicantName(v);
                             const status = statusOf(v.status);
                             const decision = decisionOf(v.overallDecision);
-                            const detailLink = `/dashboard/verifications/${v.verificationId}${v.environment === 'DEV' ? '?env=DEV' : ''}`;
+                            const detailLink = `/dashboard/verifications/${v.verificationId}`;
                             return (
                                 <tr key={v.verificationId}>
                                     <td>

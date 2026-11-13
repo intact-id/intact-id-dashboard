@@ -6,20 +6,17 @@ function unwrap(response) {
     return response.data.data;
 }
 
-// Production and sandbox verifications live behind different paths.
-const kycBase = (environment) => (environment === 'DEV' ? '/api/v1/kyc/dev' : '/api/v1/kyc');
-
 const verificationService = {
     // Spring page of verifications, newest first. Filters are optional:
     // { status, verificationType: 'individual'|'business', companyId, fromDate, toDate, search, page, size }
-    async list({ environment = 'PROD', ...filters } = {}) {
+    async list(filters = {}) {
         const params = Object.fromEntries(Object.entries(filters).filter(([, v]) => v !== undefined && v !== null && v !== ''));
-        return unwrap(await api.get(`${kycBase(environment)}/verifications`, { params }));
+        return unwrap(await api.get('/api/v1/kyc/verifications', { params }));
     },
 
     // Full verification: steps, documents, applicant data. Staff also get `review` and `webhookDeliveries`.
-    async get(verificationId, environment = 'PROD') {
-        return unwrap(await api.get(`${kycBase(environment)}/verify/${verificationId}`));
+    async get(verificationId) {
+        return unwrap(await api.get(`/api/v1/kyc/verify/${verificationId}`));
     },
 
     // Documents need the auth header, so they are fetched as blobs rather than linked directly.

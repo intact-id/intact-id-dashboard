@@ -10,10 +10,6 @@ import { errorMessage } from '../services/api';
 import { hasAnyRole, isSuperAdmin } from '../utils/roles';
 import { formatDate, humanize, initialsOf } from '../utils/format';
 
-const ENVIRONMENTS = [
-    { id: 'prod', label: 'Production' },
-    { id: 'dev', label: 'Development' },
-];
 const STATUS_BADGE = { ACTIVE: 'ok', SUSPENDED: 'warn', REVOKED: 'bad', EXPIRED: 'bad' };
 
 const formatCount = (value) => (value == null ? '—' : Number(value).toLocaleString());
@@ -41,8 +37,8 @@ export default function ApiManagement() {
     const [keys, setKeys] = useState(null); // null while loading
     const [usage, setUsage] = useState(null);
 
-    const [confirm, setConfirm] = useState(null); // { action: 'issue' | 'suspend' | 'activate', env }
-    const [issued, setIssued] = useState(null); // { env, apiKey, apiSecret } — shown once
+    const [confirm, setConfirm] = useState(null); // 'issue' | 'suspend' | 'activate' while the dialog is open
+    const [issued, setIssued] = useState(null); // { apiKey, apiSecret } — shown once
     const [limitsForm, setLimitsForm] = useState(null);
     const [saving, setSaving] = useState(false);
 
@@ -78,18 +74,18 @@ export default function ApiManagement() {
     }, [selected?.id, loadKeys]);
 
     const runConfirmedAction = async () => {
-        const { action, env } = confirm;
+        const action = confirm;
         setSaving(true);
         try {
             if (action === 'issue') {
-                const result = await apiKeyService.issueKey(selected.id, env.id);
-                setIssued({ env, apiKey: result.apiKey, apiSecret: result.apiSecret });
+                const result = await apiKeyService.issueKey(selected.id);
+                setIssued({ apiKey: result.apiKey, apiSecret: result.apiSecret });
             } else if (action === 'suspend') {
-                await apiKeyService.suspendKey(selected.id, env.id);
-                toast.success(`${env.label} key suspended`);
+                await apiKeyService.suspendKey(selected.id);
+                toast.success('Key suspended');
             } else {
-                await apiKeyService.activateKey(selected.id, env.id);
-                toast.success(`${env.label} key activated`);
+                await apiKeyService.activateKey(selected.id);
+                toast.success('Key activated');
             }
             setConfirm(null);
             await loadKeys(selected.id);
@@ -101,32 +97,25 @@ export default function ApiManagement() {
     };
 
     const openLimitsForm = () => {
-        setLimitsForm({
-            dev: { perHour: usage?.devRateLimitPerHour || '', perDay: usage?.devRateLimitPerDay || '', perMonth: usage?.devRateLimitPerMonth || '' },
-            prod: { perHour: usage?.prodRateLimitPerHour || '', perDay: usage?.prodRateLimitPerDay || '', perMonth: usage?.prodRateLimitPerMonth || '' },
-        });
+        setLimitsForm({ perHour: usage?.rateLimitPerHour || '', perDay: usage?.rateLimitPerDay || '', perMonth: usage?.rateLimitPerMonth || '' });
     };
 
-    const setLimit = (env, field, value) => {
-        setLimitsForm((form) => ({ ...form, [env]: { ...form[env], [field]: value } }));
-    };
+    const setLimit = (field, value) => setLimitsForm((form) => ({ ...form, [field]: value }));
 
     const saveLimits = async () => {
-        const values = ['dev', 'prod'].flatMap((env) => Object.values(limitsForm[env]));
+        const values = Object.values(limitsForm);
         if (values.some((v) => v !== '' && (!Number.isInteger(Number(v)) || Number(v) < 1))) {
             toast.error('Limits must be whole numbers of 1 or more. Leave a field empty for no limit.');
             return;
         }
         // auth-server: a negative value clears the limit (no limit); a number sets it.
         const toLimit = (value) => (value === '' ? -1 : Number(value));
-        const toNumbers = (env) => ({
-            perHour: toLimit(limitsForm[env].perHour),
-            perDay: toLimit(limitsForm[env].perDay),
-            perMonth: toLimit(limitsForm[env].perMonth),
-        });
+
         setSaving(true);
         try {
-            await apiKeyService.updateRateLimits(selected.id, { dev: toNumbers('dev'), prod: toNumbers('prod') });
+            await apiKeyService.updateRateLimits(selected.id, {
+                perHour: toLimit(limitsForm.perHour), perDay: toLimit(limitsForm.perDay), perMonth: toLimit(limitsForm.perMonth),
+            });
             toast.success('Rate limits saved');
             setLimitsForm(null);
             await loadKeys(selected.id);
@@ -149,14 +138,14 @@ export default function ApiManagement() {
     const query = search.trim().toLowerCase();
     const filtered = companies.filter((c) =>
         [c.legalName, c.tradingName].some((name) => name?.toLowerCase().includes(query)));
-    const keyFor = (env) => keys?.find((k) => k.environment?.toLowerCase() === env.id);
+    const key = keys?.[0]; // one key pair per company
 
     return (
         <div className="page">
             <div className="page-head">
                 <div>
                     <h1>API keys</h1>
-                    <p>Credentials issued per company, split by environment.</p>
+                    <p>One key pair per company. Keys work only on this server: test-server keys don't work in production.</p>
                 </div>
             </div>
 
@@ -203,37 +192,24 @@ export default function ApiManagement() {
                                     <div className="loading-state">Loading keys…</div>
                                 ) : (
                                     <div className="api-key-list">
-                                        {ENVIRONMENTS.map((env) => {
-                                            const key = keyFor(env);
-                                            const lastUsed = usage?.[`${env.id}LastUsedAt`];
-                                            return (
-                                                <div key={env.id} className="api-key-row">
-                                                    <div className="api-key-row-head">
-                                                        <div className="head-actions">
-                                                            <Badge kind={env.id === 'prod' ? 'ok' : 'neutral'} dot={false}>{env.label}</Badge>
-                                                            {key && <Badge kind={STATUS_BADGE[key.status] || 'neutral'}>{humanize(key.status)}</Badge>}
-                                                        </div>
-                                                        <div className="head-actions">
-                                                            <button className="btn btn--ghost btn--sm" onClick={() => setConfirm({ action: 'issue', env })}>
-                                                                {key ? 'Rotate' : 'Issue key'}
-                                                            </button>
-                                                            {key?.status === 'ACTIVE' && (
-                                                                <button className="btn btn--ghost btn--sm" onClick={() => setConfirm({ action: 'suspend', env })}>Suspend</button>
-                                                            )}
-                                                            {key?.status === 'SUSPENDED' && (
-                                                                <button className="btn btn--ghost btn--sm" onClick={() => setConfirm({ action: 'activate', env })}>Activate</button>
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                    <div className="api-key-value mono">{key ? '•••••••••••••••• (stored hashed — shown only when issued)' : 'No key issued'}</div>
-                                                    {key && (
-                                                        <div className="api-key-meta">
-                                                            Expires {formatDate(key.expiresAt)} · {lastUsed ? `Last used ${formatDate(lastUsed)}` : 'Never used'}
-                                                        </div>
-                                                    )}
+                                        <div className="api-key-row">
+                                            <div className="api-key-row-head">
+                                                <div className="head-actions">
+                                                    {key ? <Badge kind={STATUS_BADGE[key.status] || 'neutral'}>{humanize(key.status)}</Badge> : <Badge kind="neutral">No key</Badge>}
                                                 </div>
-                                            );
-                                        })}
+                                                <div className="head-actions">
+                                                    <button className="btn btn--ghost btn--sm" onClick={() => setConfirm('issue')}>{key ? 'Rotate' : 'Issue key'}</button>
+                                                    {key?.status === 'ACTIVE' && <button className="btn btn--ghost btn--sm" onClick={() => setConfirm('suspend')}>Suspend</button>}
+                                                    {key?.status === 'SUSPENDED' && <button className="btn btn--ghost btn--sm" onClick={() => setConfirm('activate')}>Activate</button>}
+                                                </div>
+                                            </div>
+                                            <div className="api-key-value mono">{key ? '•••••••••••••••• (stored hashed — shown only when issued)' : 'No key issued'}</div>
+                                            {key && (
+                                                <div className="api-key-meta">
+                                                    Expires {formatDate(key.expiresAt)} · {usage?.lastUsedAt ? `Last used ${formatDate(usage.lastUsedAt)}` : 'Never used'}
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
                                 )}
                             </div>
@@ -248,19 +224,16 @@ export default function ApiManagement() {
                                 <div className="table-scroll">
                                     <table className="data-table">
                                         <thead>
-                                            <tr><th>Environment</th><th>Per hour</th><th>Per day</th><th>Per month</th><th>Requests (all time)</th><th>Failed</th></tr>
+                                            <tr><th>Per hour</th><th>Per day</th><th>Per month</th><th>Requests (all time)</th><th>Failed</th></tr>
                                         </thead>
                                         <tbody>
-                                            {ENVIRONMENTS.map((env) => (
-                                                <tr key={env.id}>
-                                                    <td>{env.label}</td>
-                                                    <td className="mono">{usage ? formatLimit(usage[`${env.id}RateLimitPerHour`]) : '—'}</td>
-                                                    <td className="mono">{usage ? formatLimit(usage[`${env.id}RateLimitPerDay`]) : '—'}</td>
-                                                    <td className="mono">{usage ? formatLimit(usage[`${env.id}RateLimitPerMonth`]) : '—'}</td>
-                                                    <td className="mono">{formatCount(usage?.[`${env.id}TotalRequests`])}</td>
-                                                    <td className="mono">{formatCount(usage?.[`${env.id}TotalFailedRequests`])}</td>
-                                                </tr>
-                                            ))}
+                                            <tr>
+                                                <td className="mono">{usage ? formatLimit(usage.rateLimitPerHour) : '—'}</td>
+                                                <td className="mono">{usage ? formatLimit(usage.rateLimitPerDay) : '—'}</td>
+                                                <td className="mono">{usage ? formatLimit(usage.rateLimitPerMonth) : '—'}</td>
+                                                <td className="mono">{formatCount(usage?.totalRequests)}</td>
+                                                <td className="mono">{formatCount(usage?.totalFailedRequests)}</td>
+                                            </tr>
                                         </tbody>
                                     </table>
                                 </div>
@@ -274,26 +247,26 @@ export default function ApiManagement() {
                 isOpen={!!confirm}
                 onClose={() => setConfirm(null)}
                 title={confirm && {
-                    issue: keyFor(confirm.env) ? `Rotate the ${confirm.env.label.toLowerCase()} key?` : `Issue a ${confirm.env.label.toLowerCase()} key?`,
-                    suspend: `Suspend the ${confirm.env.label.toLowerCase()} key?`,
-                    activate: `Activate the ${confirm.env.label.toLowerCase()} key?`,
-                }[confirm.action]}
+                    issue: key ? 'Rotate the key?' : 'Issue a key?',
+                    suspend: 'Suspend the key?',
+                    activate: 'Activate the key?',
+                }[confirm]}
                 caption={confirm && {
-                    issue: keyFor(confirm.env)
+                    issue: key
                         ? `The current key stops working immediately. ${selected?.legalName} must switch to the new key and secret.`
                         : 'The key and secret are shown once. Copy them before closing.',
                     suspend: `Calls with this key are rejected until you activate it again.`,
                     activate: 'Calls with this key are accepted again.',
-                }[confirm.action]}
+                }[confirm]}
                 footer={(
                     <>
                         <button className="btn btn--secondary" onClick={() => setConfirm(null)} disabled={saving}>Cancel</button>
                         <button
-                            className={confirm?.action === 'suspend' || (confirm?.action === 'issue' && keyFor(confirm.env)) ? 'btn btn--danger-outline' : 'btn btn--primary'}
+                            className={confirm === 'suspend' || (confirm === 'issue' && key) ? 'btn btn--danger-outline' : 'btn btn--primary'}
                             onClick={runConfirmedAction}
                             disabled={saving}
                         >
-                            {saving ? 'Working…' : confirm && { issue: keyFor(confirm.env) ? 'Rotate key' : 'Issue key', suspend: 'Suspend key', activate: 'Activate key' }[confirm.action]}
+                            {saving ? 'Working…' : confirm && { issue: key ? 'Rotate key' : 'Issue key', suspend: 'Suspend key', activate: 'Activate key' }[confirm]}
                         </button>
                     </>
                 )}
@@ -302,7 +275,7 @@ export default function ApiManagement() {
             <Modal
                 isOpen={!!issued}
                 onClose={() => setIssued(null)}
-                title={`New ${issued?.env.label.toLowerCase()} credentials`}
+                title="New credentials"
                 caption="Copy both values now. They are stored hashed and cannot be shown again."
                 footer={<button className="btn btn--primary" onClick={() => setIssued(null)}>I have copied them</button>}
             >
@@ -332,26 +305,17 @@ export default function ApiManagement() {
                     </>
                 )}
             >
-                {limitsForm && ENVIRONMENTS.map((env) => (
-                    <div key={env.id} className="field">
-                        <label>{env.label}</label>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
-                            {[['perHour', 'Per hour'], ['perDay', 'Per day'], ['perMonth', 'Per month']].map(([field, label]) => (
-                                <input
-                                    key={field}
-                                    className="input"
-                                    type="number"
-                                    min="1"
-                                    step="1"
-                                    aria-label={`${env.label} ${label}`}
-                                    placeholder={`${label}: no limit`}
-                                    value={limitsForm[env.id][field]}
-                                    onChange={(e) => setLimit(env.id, field, e.target.value)}
-                                />
-                            ))}
-                        </div>
+                {limitsForm && (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+                        {[['perHour', 'Per hour'], ['perDay', 'Per day'], ['perMonth', 'Per month']].map(([field, label]) => (
+                            <div key={field} className="field">
+                                <label htmlFor={`limit-${field}`}>{label}</label>
+                                <input id={`limit-${field}`} className="input" type="number" min="1" step="1" placeholder="No limit"
+                                       value={limitsForm[field]} onChange={(e) => setLimit(field, e.target.value)} />
+                            </div>
+                        ))}
                     </div>
-                ))}
+                )}
             </Modal>
         </div>
     );

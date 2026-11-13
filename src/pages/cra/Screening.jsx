@@ -4,7 +4,6 @@ import { Search, ChevronDown, ChevronRight, ChevronLeft, ShieldAlert, ShieldChec
 import Badge from '../../components/ui/Badge';
 import StatCard from '../../components/ui/StatCard';
 import { useAuth } from '../../contexts/AuthContext';
-import { useEnvironment } from '../../contexts/EnvironmentContext';
 import { useToast } from '../../contexts/ToastContext';
 import screeningService from '../../services/screeningService';
 import companyService from '../../services/companyService';
@@ -104,7 +103,6 @@ function ScreenNow() {
 
 export default function Screening() {
     const { user } = useAuth();
-    const { environment } = useEnvironment();
     const superAdmin = isSuperAdmin(user);
     const staff = hasAnyRole(user, ['ADMIN', 'SUPER_ADMIN']);
 
@@ -132,19 +130,19 @@ export default function Screening() {
         setError('');
         setResult(null);
         try {
-            setResult(await screeningService.results({ verdict, search: query, environment, companyId, page, size: PAGE_SIZE }));
+            setResult(await screeningService.results({ verdict, search: query, companyId, page, size: PAGE_SIZE }));
         } catch (e) {
             setError(e?.response?.status === 404
                 ? 'Screening results need the latest auth-server. They will appear once the server is updated.'
                 : errorMessage(e, 'Could not load screening results.'));
         }
-    }, [verdict, query, environment, companyId, page]);
+    }, [verdict, query, companyId, page]);
 
     useEffect(() => { load(); }, [load]);
 
     useEffect(() => {
-        screeningService.summary({ environment, companyId }).then(setSummary).catch(() => setSummary(null));
-    }, [environment, companyId]);
+        screeningService.summary({ companyId }).then(setSummary).catch(() => setSummary(null));
+    }, [companyId]);
 
     const rows = result?.content ?? [];
     const totalPages = result?.totalPages ?? 0;
@@ -155,7 +153,7 @@ export default function Screening() {
             <div className="page-head">
                 <div>
                     <h1>Screening</h1>
-                    <p>Sanctions, PEP and adverse-media checks from {environment === 'DEV' ? 'sandbox' : 'production'} verifications.</p>
+                    <p>Sanctions, PEP and adverse-media checks from verifications.</p>
                 </div>
                 {superAdmin && companies.length > 0 && (
                     <div className="head-actions">
@@ -203,7 +201,7 @@ export default function Screening() {
                                                             <td>{expanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}</td>
                                                             <td>
                                                                 <div className="name-primary">{r.subjectName || 'Unnamed applicant'}</div>
-                                                                <Link className="name-secondary mono" to={`/dashboard/verifications/${r.verificationId}${r.environment === 'DEV' ? '?env=DEV' : ''}`} onClick={(e) => e.stopPropagation()}>
+                                                                <Link className="name-secondary mono" to={`/dashboard/verifications/${r.verificationId}`} onClick={(e) => e.stopPropagation()}>
                                                                     {r.verificationId}
                                                                 </Link>
                                                             </td>

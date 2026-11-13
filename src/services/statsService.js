@@ -10,13 +10,13 @@ const clean = (params) => Object.fromEntries(Object.entries(params).filter(([, v
 
 const statsService = {
     // { from, to, current, previous, daily, byType, byCountry, checks } — see auth-server VerificationStatsDto
-    async verifications({ environment, companyId, days = 30 } = {}) {
-        return unwrap(await api.get('/api/v1/stats/verifications', { params: clean({ environment, companyId, days }) }));
+    async verifications({ companyId, days = 30 } = {}) {
+        return unwrap(await api.get('/api/v1/stats/verifications', { params: clean({ companyId, days }) }));
     },
 
     // Super admins. Seconds: averageSeconds, medianSeconds, p90Seconds, stages{queued, checks, waitingForReviewer, underReview}
-    async turnaround({ environment, companyId, days = 30 } = {}) {
-        return unwrap(await api.get('/api/v1/stats/turnaround', { params: clean({ environment, companyId, days }) }));
+    async turnaround({ companyId, days = 30 } = {}) {
+        return unwrap(await api.get('/api/v1/stats/turnaround', { params: clean({ companyId, days }) }));
     },
 
     // Super admins. One verification's stages: { totalMs, running, stages: [{ key, label, startedAt, endedAt, durationMs, running, note, checks }] }

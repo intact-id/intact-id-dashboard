@@ -678,7 +678,7 @@ table.data-table tbody tr:hover { background: var(--bg-soft); }
 .link-btn { display: inline-flex; align-items: center; gap: 4px; margin-top: 4px; }
 .link-btn:disabled { opacity: 0.5; cursor: default; }
 
-/* Underlined page tabs (e.g. Production / Sandbox on Verifications) */
+/* Underlined page tabs (e.g. Inbox / Sent on Notifications) */
 .page-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--rule); }
 .page-tabs button {
   border: none; background: none; cursor: pointer; font: inherit; font-size: 14px; font-weight: 600;

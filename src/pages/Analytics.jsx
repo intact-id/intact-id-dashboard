@@ -9,7 +9,6 @@ import CheckOutcomes from './insights/CheckOutcomes';
 import TurnaroundSection from './insights/TurnaroundSection';
 import ServiceHealthSection from './insights/ServiceHealthSection';
 import { useAuth } from '../contexts/AuthContext';
-import { useEnvironment } from '../contexts/EnvironmentContext';
 import statsService from '../services/statsService';
 import { errorMessage } from '../services/api';
 import { isSuperAdmin } from '../utils/roles';
@@ -21,7 +20,6 @@ const TYPE_COLORS = ['var(--brand-green)', 'var(--brand-bright)', 'var(--amber-i
 
 export default function Analytics() {
     const { user } = useAuth();
-    const { environment } = useEnvironment();
     const superAdmin = isSuperAdmin(user);
     const [days, setDays] = useState(30);
     const [companyId, setCompanyId] = useState('');
@@ -30,10 +28,10 @@ export default function Analytics() {
 
     useEffect(() => {
         setError('');
-        statsService.verifications({ environment, companyId, days })
+        statsService.verifications({ companyId, days })
             .then(setStats)
             .catch((e) => setError(errorMessage(e, 'Could not load analytics.')));
-    }, [environment, companyId, days]);
+    }, [companyId, days]);
 
     // Opened from the overview's system status link
     useEffect(() => {
@@ -47,7 +45,7 @@ export default function Analytics() {
             <div className="page-head">
                 <div>
                     <h1>Analytics</h1>
-                    <p>How {environment === 'DEV' ? 'sandbox' : 'production'} verifications are trending over the last {days} days.</p>
+                    <p>How verifications are trending over the last {days} days.</p>
                 </div>
                 <div className="head-actions">
                     {superAdmin && <CompanySelect value={companyId} onChange={setCompanyId} />}
@@ -124,7 +122,7 @@ export default function Analytics() {
 
                     <CheckOutcomes checks={stats.checks} />
 
-                    {superAdmin && <TurnaroundSection environment={environment} companyId={companyId} days={days} />}
+                    {superAdmin && <TurnaroundSection companyId={companyId} days={days} />}
                     {superAdmin && <ServiceHealthSection />}
                 </>
             )}

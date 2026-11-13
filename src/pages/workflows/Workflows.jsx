@@ -34,10 +34,10 @@ function WorkflowCard({ workflow, href, onArchive }) {
             <div className="wf-card-meta">
                 <Badge kind="neutral" dot={false}>{SUBJECT_TYPES[workflow.subjectType]?.label || 'Any applicant'}</Badge>
                 {workflow.template ? <Badge kind="info" dot={false}>Template</Badge>
-                    : workflow.liveVersion ? <Badge kind="ok">Live v{workflow.liveVersion}</Badge> : <Badge kind="warn">Not live</Badge>}
+                    : workflow.liveVersion ? <Badge kind="ok">Live v{workflow.liveVersion}</Badge> : <Badge kind="warn">Not published</Badge>}
                 {workflow.defaultWorkflow && <Badge kind="info" dot={false}>Default</Badge>}
                 {workflow.latestVersion > (workflow.liveVersion || 0) && !workflow.template && (
-                    <Badge kind="neutral" dot={false}>v{workflow.latestVersion} published</Badge>
+                    <Badge kind="neutral" dot={false}>v{workflow.latestVersion} not in use</Badge>
                 )}
             </div>
             <div className="wf-card-foot">
@@ -270,7 +270,7 @@ export default function Workflows() {
                 onClose={() => setCreating(null)}
                 size="lg"
                 title={creating?.template ? 'New template' : 'New workflow'}
-                caption="You can change the steps any time; nothing goes live until you publish and switch it on."
+                caption="You can change the steps any time; nothing goes live until you publish."
                 footer={(
                     <>
                         <button className="btn btn--secondary" onClick={() => setCreating(null)} disabled={busy}>Cancel</button>
