@@ -9,10 +9,11 @@ import { errorMessage } from '../services/api';
 import { hasAnyRole, isSuperAdmin } from '../utils/roles';
 import { formatDate, formatDateTime, humanize, initialsOf } from '../utils/format';
 import {
-    STEP_STATUS, TYPE_LABEL, applicantName, decisionOf, maskId, riskOf, statusOf, stepLabel,
+    STEP_STATUS, TYPE_LABEL, applicantName, isBusiness, decisionOf, maskId, riskOf, statusOf, stepLabel,
 } from '../utils/verification';
 import ReviewDecisionModal from './verifications/ReviewDecisionModal';
 import TurnaroundPanel from './verifications/TurnaroundPanel';
+import { BusinessDetails, PartiesCard } from './verifications/BusinessPanels';
 
 const percent = (value) => (typeof value === 'number' ? `${Math.round(value <= 1 ? value * 100 : value)}%` : null);
 
@@ -185,6 +186,8 @@ export default function VerificationDetail() {
 
             <div className="detail-body">
                 <div className="detail-main">
+                    {isBusiness(v) && <PartiesCard verification={v} onChanged={load} />}
+
                     <div className="card">
                         <div className="card-head">
                             <div>
@@ -270,6 +273,7 @@ export default function VerificationDetail() {
                         </div>
                     )}
 
+                    {isBusiness(v) ? <BusinessDetails verification={v} /> : (
                     <div className="card">
                         <div className="card-head"><h3>Applicant</h3></div>
                         <div className="subject-head">
@@ -288,6 +292,7 @@ export default function VerificationDetail() {
                             <div className="kv-row"><span>ID number</span><strong className="mono">{maskId(data.idNumber)}</strong></div>
                         </div>
                     </div>
+                    )}
 
                     <div className="card">
                         <div className="card-head"><h3>Risk</h3></div>

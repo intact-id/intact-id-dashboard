@@ -8,6 +8,7 @@ import companyService from '../services/companyService';
 import { errorMessage } from '../services/api';
 import { hasAnyRole } from '../utils/roles';
 import { formatDate, humanize, initialsOf } from '../utils/format';
+import OwnerCheckSettings from '../components/kyb/OwnerCheckSettings';
 
 const STATUS_BADGE = { ACTIVE: 'ok', APPROVED: 'ok', PENDING: 'warn', PENDING_APPROVAL: 'warn', SUSPENDED: 'bad', INACTIVE: 'bad' };
 const PAGE_SIZE = 100;
@@ -218,6 +219,8 @@ export default function Companies() {
                                     </div>
                                 </div>
                             </div>
+
+                            {isAdmin && <OwnerCheckSettings key={selected.id} companyId={selected.id} />}
                         </div>
                     )}
                 </div>
