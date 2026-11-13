@@ -7,7 +7,7 @@ import './Login.css';
 const HIGHLIGHTS = [
     'Full audit trail on every review',
     'Maker–checker approvals built in',
-    'Scoped keys for sandbox and production',
+    'API keys you can rotate any time',
 ];
 
 export default function Login() {

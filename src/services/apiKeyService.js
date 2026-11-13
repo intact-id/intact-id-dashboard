@@ -6,35 +6,35 @@ function unwrap(response) {
     return response.data.data;
 }
 
-// Each company has one credential pair per environment ('dev' | 'prod'). All of these are
-// admin-only on auth-server; `companyId` is honoured for super admins and ignored for everyone
-// else (the server substitutes the caller's own company).
+// Each company has one key pair, which works only on this server (the test server and production have
+// separate databases). All of these are admin-only on auth-server; `companyId` is honoured for super
+// admins and ignored for everyone else (the server substitutes the caller's own company).
 const apiKeyService = {
-    // [{ environment: 'PROD' | 'DEV', status, expiresAt, apiKey: '****', apiSecret: '****' }]
+    // [{ status, expiresAt, apiKey: '****', apiSecret: '****' }] — empty when no key was issued yet
     async listKeys(companyId) {
         return unwrap(await api.get('/api/companies/api-keys', { params: { companyId } }));
     },
 
-    // Request totals, last-used times and rate limits for both environments.
+    // { totalRequests, totalSuccessfulRequests, totalFailedRequests, lastUsedAt, rateLimitPerHour/Day/Month }
     async getUsage(companyId) {
         return unwrap(await api.get('/api/companies/api-keys/usage', { params: { companyId } }));
     },
 
-    // Issues a new key + secret for one environment, replacing any existing pair immediately.
+    // Issues a new key + secret, replacing the existing pair immediately.
     // The raw values are only ever returned here — they are stored hashed.
-    async issueKey(companyId, environment) {
-        return unwrap(await api.post(`/api/companies/api-keys/generate/${environment}`, null, { params: { companyId } }));
+    async issueKey(companyId) {
+        return unwrap(await api.post('/api/companies/api-keys/generate', null, { params: { companyId } }));
     },
 
-    async suspendKey(companyId, environment) {
-        return unwrap(await api.post(`/api/companies/${companyId}/credentials/suspend`, null, { params: { environment } }));
+    async suspendKey(companyId) {
+        return unwrap(await api.post(`/api/companies/${companyId}/credentials/suspend`));
     },
 
-    async activateKey(companyId, environment) {
-        return unwrap(await api.post(`/api/companies/${companyId}/credentials/activate`, null, { params: { environment } }));
+    async activateKey(companyId) {
+        return unwrap(await api.post(`/api/companies/${companyId}/credentials/activate`));
     },
 
-    // Super admin only. limits = { dev: { perHour, perDay, perMonth }, prod: { … } }
+    // Super admin only. limits = { perHour, perDay, perMonth }; a negative value removes that limit.
     async updateRateLimits(companyId, limits) {
         return unwrap(await api.put(`/api/companies/${companyId}/rate-limits`, limits));
     },

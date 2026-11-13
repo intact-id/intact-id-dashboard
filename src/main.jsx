@@ -5,7 +5,6 @@ import './styles/tokens.css';
 import './styles/base.css';
 import { AuthProvider } from './contexts/AuthContext';
 import { ToastProvider } from './contexts/ToastContext';
-import { EnvironmentProvider } from './contexts/EnvironmentContext';
 import ToastContainer from './components/ui/Toast';
 import App from './App.jsx';
 
@@ -14,10 +13,8 @@ createRoot(document.getElementById('root')).render(
     <BrowserRouter>
       <AuthProvider>
         <ToastProvider>
-          <EnvironmentProvider>
-            <App />
-            <ToastContainer />
-          </EnvironmentProvider>
+          <App />
+          <ToastContainer />
         </ToastProvider>
       </AuthProvider>
     </BrowserRouter>

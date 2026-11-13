@@ -116,7 +116,7 @@ export default function KycReviews() {
                                 return (
                                     <tr key={row.verificationId}>
                                         <td>
-                                            <Link to={`/dashboard/verifications/${row.verificationId}${row.environment === 'DEV' ? '?env=DEV' : ''}`} className="name-cell">
+                                            <Link to={`/dashboard/verifications/${row.verificationId}`} className="name-cell">
                                                 <span className="avatar avatar--light">{initialsOf(name)}</span>
                                                 <div>
                                                     <div className="name-primary">{name}</div>

@@ -9,7 +9,6 @@ import StackedBarChart, { ChartLegend } from '../components/ui/StackedBarChart';
 import SystemStatusCard from './insights/SystemStatusCard';
 import CheckOutcomes from './insights/CheckOutcomes';
 import { useAuth } from '../contexts/AuthContext';
-import { useEnvironment } from '../contexts/EnvironmentContext';
 import statsService from '../services/statsService';
 import verificationService from '../services/verificationService';
 import { errorMessage } from '../services/api';
@@ -35,7 +34,6 @@ function greeting() {
 
 export default function Overview() {
     const { user } = useAuth();
-    const { environment } = useEnvironment();
     const superAdmin = isSuperAdmin(user);
     const [days, setDays] = useState(30);
     const [companyId, setCompanyId] = useState('');
@@ -46,20 +44,19 @@ export default function Overview() {
 
     useEffect(() => {
         setError('');
-        statsService.verifications({ environment, companyId, days })
+        statsService.verifications({ companyId, days })
             .then(setStats)
             .catch((e) => setError(errorMessage(e, 'Could not load the overview.')));
-        if (superAdmin) statsService.turnaround({ environment, companyId, days }).then(setTurnaround).catch(() => setTurnaround(null));
-    }, [environment, companyId, days, superAdmin]);
+        if (superAdmin) statsService.turnaround({ companyId, days }).then(setTurnaround).catch(() => setTurnaround(null));
+    }, [companyId, days, superAdmin]);
 
     useEffect(() => {
-        verificationService.list({ environment, companyId, page: 0, size: 6 })
+        verificationService.list({ companyId, page: 0, size: 6 })
             .then((page) => setRecent(page.content || []))
             .catch(() => setRecent([]));
-    }, [environment, companyId]);
+    }, [companyId]);
 
     const firstName = user?.firstName || user?.username || '';
-    const where = environment === 'DEV' ? 'Sandbox' : 'Production';
     const current = stats?.current;
 
     return (
@@ -67,7 +64,7 @@ export default function Overview() {
             <div className="page-head">
                 <div>
                     <h1>{greeting()}{firstName ? `, ${firstName}` : ''}</h1>
-                    <p>{where} activity over the last {days} days.</p>
+                    <p>Activity over the last {days} days.</p>
                 </div>
                 <div className="head-actions">
                     {superAdmin && <CompanySelect value={companyId} onChange={setCompanyId} />}
@@ -152,7 +149,7 @@ export default function Overview() {
                                     ) : recent.map((v) => {
                                         const name = applicantName(v);
                                         const shown = v.overallDecision ? decisionOf(v.overallDecision) : statusOf(v.status);
-                                        const link = `/dashboard/verifications/${v.verificationId}${v.environment === 'DEV' ? '?env=DEV' : ''}`;
+                                        const link = `/dashboard/verifications/${v.verificationId}`;
                                         return (
                                             <tr key={v.verificationId}>
                                                 <td>
