@@ -1,252 +1,220 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { ShieldCheck, User, Lock, ArrowRight, CircleCheck, KeyRound } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import Button from '../components/ui/Button';
-import logoIcon from '../assets/intact-logo.svg';
-import { User, Lock, AlertCircle } from 'lucide-react';
-import authService from '../services/authService';
 import './Login.css';
 
+const HIGHLIGHTS = [
+    'Full audit trail on every review',
+    'Maker–checker approvals built in',
+    'Scoped keys for sandbox and production',
+];
+
 export default function Login() {
+    const { login, verifyTwoFactor } = useAuth();
+    const navigate = useNavigate();
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
-    const [error, setError] = useState('');
-    const [loading, setLoading] = useState(false);
-    const [step, setStep] = useState('credentials'); // 'credentials' | 'verify'
-    const [verificationCode, setVerificationCode] = useState('');
-    const [backupCode, setBackupCode] = useState('');
-    const [useBackupCode, setUseBackupCode] = useState(false);
     const [rememberDevice, setRememberDevice] = useState(false);
+    const [error, setError] = useState('');
+    const [busy, setBusy] = useState(false);
+
+    // Set when the password step passed but auth-server wants a second factor.
     const [mfaToken, setMfaToken] = useState(null);
-    const { login, completeTwoFactorLogin } = useAuth();
-    const navigate = useNavigate();
+    const [code, setCode] = useState('');
+    const [useBackupCode, setUseBackupCode] = useState(false);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        setError('');
-        setLoading(true);
-
-        try {
-            const result = await login(username, password);
-            if (result.success) {
-                if (result.data?.mfaRequired) {
-                    setMfaToken(result.data.mfaToken);
-                    setStep('verify');
-                } else {
-                    navigate('/dashboard');
-                }
-            } else {
-                setError(result.error || 'Login failed');
-            }
-        } catch {
-            setError('An unexpected error occurred');
-        } finally {
-            setLoading(false);
+        if (!username.trim() || !password) {
+            setError('Enter your username and password.');
+            return;
         }
+        setError('');
+        setBusy(true);
+        const res = await login(username.trim(), password);
+        setBusy(false);
+        if (!res.success) setError(res.error);
+        else if (res.mfaRequired) setMfaToken(res.mfaToken);
+        else navigate('/dashboard');
     };
 
     const handleVerify = async (e) => {
         e.preventDefault();
-        setError('');
-
-        if (useBackupCode) {
-            if (!backupCode.trim()) {
-                setError('Enter one of your backup codes');
-                return;
-            }
-        } else if (!/^\d{6}$/.test(verificationCode)) {
-            setError('Enter the 6-digit code from your authenticator app');
+        if (!code.trim()) {
+            setError(useBackupCode ? 'Enter one of your backup codes.' : 'Enter the 6-digit code from your authenticator app.');
             return;
         }
-
-        setLoading(true);
-        try {
-            const result = useBackupCode
-                ? await authService.verifyBackupCode(mfaToken, backupCode.trim(), rememberDevice)
-                : await authService.verifyMfaCode(mfaToken, Number(verificationCode), rememberDevice);
-
-            if (result.success) {
-                completeTwoFactorLogin(result.data);
-                navigate('/dashboard');
-            } else {
-                setError(result.error || 'Incorrect code. Please try again.');
-            }
-        } catch {
-            setError('An unexpected error occurred');
-        } finally {
-            setLoading(false);
-        }
+        setError('');
+        setBusy(true);
+        const res = await verifyTwoFactor({
+            mfaToken,
+            rememberDevice,
+            ...(useBackupCode ? { backupCode: code.trim() } : { verificationCode: code.trim() }),
+        });
+        setBusy(false);
+        if (res.success) navigate('/dashboard');
+        else setError(res.error);
     };
 
-    const handleBackToLogin = () => {
-        // No tokens were ever issued during a pending 2FA challenge, so there's nothing
-        // to log out of on the backend — just reset the local step state.
-        setVerificationCode('');
-        setBackupCode('');
-        setUseBackupCode(false);
-        setRememberDevice(false);
+    const backToPassword = () => {
         setMfaToken(null);
+        setCode('');
+        setUseBackupCode(false);
         setError('');
-        setStep('credentials');
     };
 
     return (
-        <div className="login-page">
-            <div className="login-container">
-                <div className="login-card">
-                    <div className="login-header">
-                        <div className="login-logo-container">
-                            <img src={logoIcon} alt="Intact ID" className="login-logo-img" />
-                            <h1 className="login-logo-text">
-                                <span className="logo-text">Intact</span>
-                                <span className="logo-accent">ID</span>
-                            </h1>
+        <div className="login-screen">
+            <div className="login-brand">
+                <div className="brand-row">
+                    <ShieldCheck size={22} />
+                    <span>Intact ID</span>
+                </div>
+
+                <div className="login-message">
+                    <div className="eyebrow-row">
+                        <span className="eyebrow-rule" />
+                        <span className="eyebrow eyebrow--on-ink">SECURE ACCESS</span>
+                    </div>
+                    <h1>The verification console for regulated teams.</h1>
+                    <p>
+                        Review identity checks, trace every decision back to its evidence, and keep your operators
+                        inside one audited workflow.
+                    </p>
+                    <ul className="login-highlights">
+                        {HIGHLIGHTS.map((h) => (
+                            <li key={h}>
+                                <CircleCheck size={17} />
+                                <span>{h}</span>
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+
+                <div className="login-footer">
+                    <span>© 2026 Intact ID</span>
+                    <span>·</span>
+                    <span>support@intactid.com</span>
+                </div>
+            </div>
+
+            <div className="login-form-panel">
+                {mfaToken ? (
+                    <form className="login-card" onSubmit={handleVerify}>
+                        <div className="login-card-head">
+                            <h1>Two-factor check</h1>
+                            <p>
+                                {useBackupCode
+                                    ? 'Enter one of the backup codes you saved when you set up two-factor authentication.'
+                                    : 'Enter the 6-digit code from your authenticator app.'}
+                            </p>
                         </div>
-                        <p className="login-subtitle">Identity Verification Platform</p>
+
+                        <div className="login-fields">
+                            <div className="field">
+                                <label htmlFor="mfa-code">{useBackupCode ? 'Backup code' : 'Authentication code'}</label>
+                                <div className="input-with-icon">
+                                    <KeyRound size={16} />
+                                    <input
+                                        id="mfa-code"
+                                        type="text"
+                                        inputMode={useBackupCode ? 'text' : 'numeric'}
+                                        autoComplete="one-time-code"
+                                        placeholder={useBackupCode ? 'XXXX-XXXX' : '123456'}
+                                        maxLength={useBackupCode ? 32 : 6}
+                                        value={code}
+                                        onChange={(e) => setCode(e.target.value)}
+                                        autoFocus
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        {error && <div className="login-error">{error}</div>}
+
+                        <div className="login-meta-row">
+                            <label className="checkbox-row">
+                                <input type="checkbox" checked={rememberDevice} onChange={(e) => setRememberDevice(e.target.checked)} />
+                                <span>Trust this device</span>
+                            </label>
+                            <a href="#backup" onClick={(e) => { e.preventDefault(); setUseBackupCode((v) => !v); setCode(''); setError(''); }}>
+                                {useBackupCode ? 'Use authenticator code' : 'Use a backup code'}
+                            </a>
+                        </div>
+
+                        <button className="btn btn--primary login-submit" type="submit" disabled={busy}>
+                            {busy ? 'Verifying…' : 'Verify and sign in'}
+                            {!busy && <ArrowRight size={17} />}
+                        </button>
+
+                        <div className="login-note">
+                            <div className="divider" />
+                            <p>
+                                <a href="#back" onClick={(e) => { e.preventDefault(); backToPassword(); }}>Back to sign in</a>
+                            </p>
+                        </div>
+                    </form>
+                ) : (
+                <form className="login-card" onSubmit={handleSubmit}>
+                    <div className="login-card-head">
+                        <h1>Sign in</h1>
+                        <p>Use the work account issued by your administrator.</p>
                     </div>
 
-                    {step === 'credentials' ? (
-                        <>
-                            <form onSubmit={handleSubmit} className="login-form">
-                                <div className="form-group">
-                                    <div className="input-wrapper">
-                                        <User size={18} className="input-icon" />
-                                        <input
-                                            type="text"
-                                            name="username"
-                                            value={username}
-                                            onChange={(e) => setUsername(e.target.value)}
-                                            placeholder="Username"
-                                            className="form-input"
-                                            required
-                                            autoComplete="username"
-                                        />
-                                    </div>
-                                </div>
-
-                                <div className="form-group">
-                                    <div className="input-wrapper">
-                                        <Lock size={18} className="input-icon" />
-                                        <input
-                                            type="password"
-                                            name="password"
-                                            value={password}
-                                            onChange={(e) => setPassword(e.target.value)}
-                                            placeholder="Password"
-                                            className="form-input"
-                                            required
-                                            autoComplete="current-password"
-                                        />
-                                    </div>
-                                </div>
-
-                                {error && (
-                                    <div className="login-error">
-                                        <AlertCircle size={18} />
-                                        <span>{error}</span>
-                                    </div>
-                                )}
-
-                                <button
-                                    type="submit"
-                                    className="login-button"
-                                    disabled={loading}
-                                >
-                                    {loading ? 'Sign in...' : 'Sign in'}
-                                </button>
-                            </form>
-
-                            <div className="login-footer">
-                                <div className="demo-credentials">
-                                    <strong>Demo Access</strong>
-                                    <div>admin / Admin@123</div>
-                                </div>
-                            </div>
-                        </>
-                    ) : (
-                        <form onSubmit={handleVerify} className="login-form">
-                            <p className="login-verify-hint">
-                                {useBackupCode
-                                    ? 'Enter one of your unused backup codes'
-                                    : 'Enter the 6-digit code from your authenticator app'}
-                            </p>
-
-                            <div className="form-group">
-                                {useBackupCode ? (
-                                    <input
-                                        type="text"
-                                        name="backupCode"
-                                        value={backupCode}
-                                        onChange={(e) => setBackupCode(e.target.value.toUpperCase().slice(0, 9))}
-                                        placeholder="XXXX-XXXX"
-                                        className="form-input login-code-input"
-                                        autoComplete="one-time-code"
-                                        autoFocus
-                                    />
-                                ) : (
-                                    <input
-                                        type="text"
-                                        inputMode="numeric"
-                                        name="verificationCode"
-                                        value={verificationCode}
-                                        onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                                        placeholder="000000"
-                                        className="form-input login-code-input"
-                                        autoComplete="one-time-code"
-                                        autoFocus
-                                    />
-                                )}
-                            </div>
-
-                            <label className="login-remember-device">
+                    <div className="login-fields">
+                        <div className="field">
+                            <label htmlFor="username">Username</label>
+                            <div className="input-with-icon">
+                                <User size={16} />
                                 <input
-                                    type="checkbox"
-                                    checked={rememberDevice}
-                                    onChange={(e) => setRememberDevice(e.target.checked)}
+                                    id="username"
+                                    type="text"
+                                    placeholder="frank.mwangi"
+                                    value={username}
+                                    onChange={(e) => setUsername(e.target.value)}
+                                    autoComplete="username"
                                 />
-                                <span>Remember this device for 30 days</span>
-                            </label>
+                            </div>
+                        </div>
 
-                            {error && (
-                                <div className="login-error">
-                                    <AlertCircle size={18} />
-                                    <span>{error}</span>
-                                </div>
-                            )}
+                        <div className="field">
+                            <label htmlFor="password">Password</label>
+                            <div className="input-with-icon">
+                                <Lock size={16} />
+                                <input
+                                    id="password"
+                                    type="password"
+                                    placeholder="••••••••••••"
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    autoComplete="current-password"
+                                />
+                            </div>
+                        </div>
+                    </div>
 
-                            <button
-                                type="submit"
-                                className="login-button"
-                                disabled={loading}
-                            >
-                                {loading ? 'Verifying...' : 'Verify & Continue'}
-                            </button>
+                    {error && <div className="login-error">{error}</div>}
 
-                            <button
-                                type="button"
-                                className="login-back-link"
-                                onClick={() => {
-                                    setUseBackupCode(!useBackupCode);
-                                    setVerificationCode('');
-                                    setBackupCode('');
-                                    setError('');
-                                }}
-                                disabled={loading}
-                            >
-                                {useBackupCode ? 'Use authenticator app instead' : 'Use a backup code instead'}
-                            </button>
+                    <div className="login-meta-row">
+                        <label className="checkbox-row">
+                            <input type="checkbox" checked={rememberDevice} onChange={(e) => setRememberDevice(e.target.checked)} />
+                            <span>Remember this device</span>
+                        </label>
+                        <a href="#forgot">Forgot password?</a>
+                    </div>
 
-                            <button
-                                type="button"
-                                className="login-back-link"
-                                onClick={handleBackToLogin}
-                                disabled={loading}
-                            >
-                                Back to login
-                            </button>
-                        </form>
-                    )}
-                </div>
+                    <button className="btn btn--primary login-submit" type="submit" disabled={busy}>
+                        {busy ? 'Signing in…' : 'Sign in'}
+                        {!busy && <ArrowRight size={17} />}
+                    </button>
+
+                    <div className="login-note">
+                        <div className="divider" />
+                        <p>Two-factor confirmation is requested after this step.</p>
+                    </div>
+                </form>
+                )}
             </div>
         </div>
     );

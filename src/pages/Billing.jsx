@@ -1,619 +1,323 @@
-import { useEffect, useMemo, useState } from 'react';
-import { RefreshCcw, Send, ChevronDown } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Wallet, Receipt, Plus, Pencil, Building2, Lock } from 'lucide-react';
 import Badge from '../components/ui/Badge';
-import Button from '../components/ui/Button';
-import Tabs from '../components/ui/Tabs';
+import Modal from '../components/ui/Modal';
+import CompanySelect from '../components/ui/CompanySelect';
+import StackedBarChart from '../components/ui/StackedBarChart';
 import { useAuth } from '../contexts/AuthContext';
-import { hasAnyRole } from '../utils/roles';
+import { useToast } from '../contexts/ToastContext';
 import billingService from '../services/billingService';
-import companyService from '../services/companyService';
-import './Billing.css';
+import { errorMessage } from '../services/api';
+import { isSuperAdmin } from '../utils/roles';
+import { formatDate, formatDateTime, humanize } from '../utils/format';
+import { formatCount, formatMoney, shortDate } from '../utils/insights';
+import './insights/insights.css';
+import './billing.css';
+
+const INVOICE_STATUS = { ISSUED: { label: 'Due', badge: 'warn' }, PAID: { label: 'Paid', badge: 'ok' }, VOID: { label: 'Void', badge: 'neutral' } };
+const MODEL_LABEL = { PER_CALL: 'Pay per verification', FLAT_PERIODIC: 'Flat fee', HYBRID: 'Flat fee + per verification' };
+const SPEND_DAYS = 30;
+const SPEND_SERIES = [{ key: 'spent', label: 'Spent', color: 'var(--brand-green)' }];
+
+// Wallet debits per day over the last SPEND_DAYS days.
+function dailySpend(transactions) {
+    const days = [];
+    const today = new Date();
+    for (let i = SPEND_DAYS - 1; i >= 0; i--) {
+        const d = new Date(today);
+        d.setDate(today.getDate() - i);
+        days.push({ date: d.toISOString().slice(0, 10), spent: 0 });
+    }
+    const byDate = new Map(days.map((d) => [d.date, d]));
+    transactions.filter((t) => t.type === 'DEBIT').forEach((t) => {
+        const day = byDate.get(String(t.createdAt).slice(0, 10));
+        if (day) day.spent += Number(t.amount);
+    });
+    return days;
+}
+
+function SetUpBilling({ companyId, onDone }) {
+    const { toast } = useToast();
+    const [form, setForm] = useState({ billingModel: 'PER_CALL', paymentType: 'PREPAID', currency: 'KES', pricePerCall: '', freeQuota: '' });
+    const [busy, setBusy] = useState(false);
+    const set = (key) => (e) => setForm({ ...form, [key]: e.target.value });
+
+    const save = async () => {
+        setBusy(true);
+        try {
+            await billingService.setUp(companyId, {
+                ...form,
+                currency: form.currency.trim().toUpperCase(),
+                pricePerCall: form.pricePerCall === '' ? undefined : Number(form.pricePerCall),
+                freeQuota: form.freeQuota === '' ? undefined : Number(form.freeQuota),
+            });
+            toast.success('Billing set up');
+            onDone();
+        } catch (e) {
+            toast.error(errorMessage(e, 'Could not set up billing.'));
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    return (
+        <div className="card bill-setup">
+            <div className="card-head"><div><h3>Set up billing</h3><div className="card-caption">Choose how this company pays. You can change the terms later.</div></div></div>
+            <div className="form-grid">
+                <div className="field"><label>Billing model</label>
+                    <select value={form.billingModel} onChange={set('billingModel')}>
+                        {Object.entries(MODEL_LABEL).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                    </select>
+                </div>
+                <div className="field"><label>Payment</label>
+                    <select value={form.paymentType} onChange={set('paymentType')}>
+                        <option value="PREPAID">Prepaid wallet</option>
+                        <option value="POSTPAID">Postpaid, invoiced</option>
+                    </select>
+                </div>
+                <div className="field"><label>Currency</label><input type="text" maxLength={3} value={form.currency} onChange={set('currency')} /></div>
+                <div className="field"><label>Price per verification</label><input type="number" min="0" step="0.01" value={form.pricePerCall} onChange={set('pricePerCall')} placeholder="Optional" /></div>
+                <div className="field"><label>Free verifications</label><input type="number" min="0" step="1" value={form.freeQuota} onChange={set('freeQuota')} placeholder="0" /></div>
+            </div>
+            <div className="bill-setup-foot">
+                <button className="btn btn--primary" disabled={busy || !/^[A-Za-z]{3}$/.test(form.currency.trim())} onClick={save}>{busy ? 'Setting up…' : 'Set up billing'}</button>
+            </div>
+        </div>
+    );
+}
 
 export default function Billing() {
     const { user } = useAuth();
-    const isSuperAdmin = useMemo(() => hasAnyRole(user, ['SUPER_ADMIN']), [user]);
-    const isCompanyUser = useMemo(() => hasAnyRole(user, ['COMPANY']), [user]);
-
-    const [tiers, setTiers] = useState([]);
-    const [companies, setCompanies] = useState([]);
-    const [selectedCompany, setSelectedCompany] = useState(null);
-    const [profile, setProfile] = useState(null);
-    const [summary, setSummary] = useState(null);
-    const [invoices, setInvoices] = useState([]);
-    const [walletTransactions, setWalletTransactions] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [detailLoading, setDetailLoading] = useState(false);
+    const { toast } = useToast();
+    const superAdmin = isSuperAdmin(user);
+    const [companyId, setCompanyId] = useState('');
+    const [data, setData] = useState(null); // { account, prices, invoices, history } or { notSetUp: true }
     const [error, setError] = useState('');
-    const [success, setSuccess] = useState('');
-    const [savingProfile, setSavingProfile] = useState(false);
-    const [toppingUp, setToppingUp] = useState(false);
-    const [generatingInvoice, setGeneratingInvoice] = useState(false);
-    const [sendingInvoiceId, setSendingInvoiceId] = useState(null);
+    const [modal, setModal] = useState(null); // 'topup' | 'price'
+    const [form, setForm] = useState({});
+    const [busy, setBusy] = useState(false);
 
-    const [profileForm, setProfileForm] = useState({
-        billingTierCode: 'TIER_1',
-        billingMode: 'POSTPAID',
-        unitPrice: '0.0000',
-        currency: 'USD',
-        billingEmail: '',
-        billOnSubmission: false,
-        billOnCompleted: true,
-        billOnRejected: true,
-        billOnFailedNonSystem: true,
-        billOnFailedSystem: false,
-        lowBalanceThreshold: '0.0000',
-        creditLimit: '0.0000',
-        invoiceDueDays: 30,
-        status: 'ACTIVE',
-        effectiveFrom: '',
-        effectiveTo: ''
-    });
+    const company = superAdmin ? companyId : undefined;
+    const ready = !superAdmin || companyId;
 
-    const [topUpForm, setTopUpForm] = useState({
-        amount: '',
-        currency: 'USD',
-        reference: '',
-        description: ''
-    });
-
-    const [invoiceForm, setInvoiceForm] = useState({
-        periodStart: '',
-        periodEnd: ''
-    });
-
-    useEffect(() => {
-        bootstrap();
-    }, [isSuperAdmin, isCompanyUser]);
-
-    const bootstrap = async () => {
-        setLoading(true);
+    const load = useCallback(async () => {
+        if (!ready) return;
         setError('');
+        setData(null);
         try {
-            const tierResponse = await billingService.getTierCatalog().catch(() => ({ success: false, data: { tiers: [] } }));
-            setTiers(tierResponse?.data?.tiers || []);
-
-            if (isSuperAdmin) {
-                const companyResponse = await companyService.getAllCompanies({}, { page: 0, size: 200 });
-                const list = companyResponse?.data?.content || [];
-                setCompanies(list);
-                if (list.length > 0) {
-                    await loadCompanyBilling(list[0]);
-                }
-            } else if (isCompanyUser) {
-                await loadMyBilling();
-            }
-        } catch (err) {
-            setError(err.response?.data?.responseMessage || err.response?.data?.errorMessage || err.message || 'Failed to load billing data');
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const loadMyBilling = async () => {
-        setDetailLoading(true);
-        setError('');
-        try {
-            const [profileResponse, summaryResponse, invoiceResponse, walletResponse] = await Promise.all([
-                billingService.getMyBillingProfile(),
-                billingService.getMyBillingSummary(),
-                billingService.getMyInvoices(),
-                billingService.getMyWalletTransactions()
+            const account = await billingService.account(company);
+            const [prices, invoices, history] = await Promise.all([
+                billingService.prices(company).catch(() => []),
+                account.billingProfile ? billingService.invoices(company).catch(() => []) : [],
+                account.wallet ? billingService.walletHistory(company).catch(() => []) : [],
             ]);
-
-            setProfile(profileResponse?.data || null);
-            setSummary(summaryResponse?.data || null);
-            setInvoices(invoiceResponse?.data || []);
-            setWalletTransactions(walletResponse?.data || []);
-        } catch (err) {
-            setError(err.response?.data?.responseMessage || err.response?.data?.errorMessage || err.message || 'Failed to load company billing details');
-        } finally {
-            setDetailLoading(false);
+            setData({ account, prices: prices || [], invoices: invoices || [], history: history || [] });
+        } catch (e) {
+            if (e.response?.status === 404) setData({ notSetUp: true });
+            else setError(errorMessage(e, 'Could not load billing.'));
         }
-    };
+    }, [company, ready]);
 
-    const loadCompanyBilling = async (company) => {
-        setSelectedCompany(company);
-        setDetailLoading(true);
-        setError('');
-        setSuccess('');
+    useEffect(() => { load(); }, [load]);
+
+    const history = useMemo(() => [...(data?.history || [])].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)), [data]);
+    const spend = useMemo(() => dailySpend(history), [history]);
+
+    const run = async (action, success) => {
+        setBusy(true);
         try {
-            const [profileResponse, summaryResponse, invoiceResponse, walletResponse] = await Promise.all([
-                billingService.getCompanyBillingProfile(company.id),
-                billingService.getCompanyBillingSummary(company.id),
-                billingService.getCompanyInvoices(company.id),
-                billingService.getCompanyWalletTransactions(company.id)
-            ]);
-
-            const nextProfile = profileResponse?.data || null;
-            setProfile(nextProfile);
-            setSummary(summaryResponse?.data || null);
-            setInvoices(invoiceResponse?.data || []);
-            setWalletTransactions(walletResponse?.data || []);
-
-            if (nextProfile) {
-                setProfileForm({
-                    billingTierCode: nextProfile.billingTierCode || 'TIER_1',
-                    billingMode: nextProfile.billingMode || 'POSTPAID',
-                    unitPrice: `${nextProfile.unitPrice ?? '0.0000'}`,
-                    currency: nextProfile.currency || 'USD',
-                    billingEmail: nextProfile.billingEmail || '',
-                    billOnSubmission: !!nextProfile.billOnSubmission,
-                    billOnCompleted: !!nextProfile.billOnCompleted,
-                    billOnRejected: !!nextProfile.billOnRejected,
-                    billOnFailedNonSystem: !!nextProfile.billOnFailedNonSystem,
-                    billOnFailedSystem: !!nextProfile.billOnFailedSystem,
-                    lowBalanceThreshold: `${nextProfile.lowBalanceThreshold ?? '0.0000'}`,
-                    creditLimit: `${nextProfile.creditLimit ?? '0.0000'}`,
-                    invoiceDueDays: nextProfile.invoiceDueDays ?? 30,
-                    status: nextProfile.status || 'ACTIVE',
-                    effectiveFrom: nextProfile.effectiveFrom || '',
-                    effectiveTo: nextProfile.effectiveTo || ''
-                });
-                setTopUpForm((prev) => ({ ...prev, currency: nextProfile.currency || 'USD' }));
-            }
-        } catch (err) {
-            setProfile(null);
-            setSummary(null);
-            setInvoices([]);
-            setWalletTransactions([]);
-            const message = err.response?.status === 404
-                ? 'No billing profile found for this company yet. Configure one below.'
-                : (err.response?.data?.responseMessage || err.response?.data?.errorMessage || err.message || 'Failed to load billing details');
-            setError(message);
+            await action();
+            toast.success(success);
+            setModal(null);
+            await load();
+        } catch (e) {
+            toast.error(errorMessage(e, 'That did not work.'));
         } finally {
-            setDetailLoading(false);
+            setBusy(false);
         }
     };
 
-    const formatCurrency = (amount) => {
-        return new Intl.NumberFormat('en-US', {
-            style: 'currency',
-            currency: 'USD'
-        }).format(Number(amount || 0));
-    };
-
-    const formatDate = (dateString) => {
-        if (!dateString) return 'N/A';
-        const date = new Date(dateString);
-        return date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
-    };
-
-    const selectedTier = tiers.find((tier) => tier.tierKey === (profile?.billingTierCode || profileForm.billingTierCode));
-    const canTopUp = (profile?.billingMode || profileForm.billingMode) === 'PREPAID';
-    const isPrepaid = summary?.billingMode === 'PREPAID' || (profile?.billingMode || profileForm.billingMode) === 'PREPAID';
-
-    const handleProfileChange = (field, value) => {
-        setProfileForm((prev) => ({ ...prev, [field]: value }));
-    };
-
-    const saveProfile = async () => {
-        if (!selectedCompany) return;
-        setSavingProfile(true);
-        setError('');
-        setSuccess('');
-        try {
-            await billingService.updateCompanyBillingProfile(selectedCompany.id, {
-                ...profileForm,
-                unitPrice: Number(profileForm.unitPrice),
-                lowBalanceThreshold: Number(profileForm.lowBalanceThreshold),
-                creditLimit: Number(profileForm.creditLimit),
-                invoiceDueDays: Number(profileForm.invoiceDueDays)
-            });
-            setSuccess('Billing profile saved successfully.');
-            await loadCompanyBilling(selectedCompany);
-        } catch (err) {
-            setError(err.response?.data?.responseMessage || err.response?.data?.errorMessage || err.message || 'Failed to save billing profile');
-        } finally {
-            setSavingProfile(false);
-        }
-    };
-
-    const submitTopUp = async () => {
-        if (!selectedCompany) return;
-        setToppingUp(true);
-        setError('');
-        setSuccess('');
-        try {
-            await billingService.topUpWallet(selectedCompany.id, {
-                ...topUpForm,
-                amount: Number(topUpForm.amount)
-            });
-            setSuccess('Wallet topped up successfully.');
-            setTopUpForm((prev) => ({ ...prev, amount: '', reference: '', description: '' }));
-            await loadCompanyBilling(selectedCompany);
-        } catch (err) {
-            setError(err.response?.data?.responseMessage || err.response?.data?.errorMessage || err.message || 'Failed to top up wallet');
-        } finally {
-            setToppingUp(false);
-        }
-    };
-
-    const generateInvoice = async () => {
-        if (!selectedCompany) return;
-        setGeneratingInvoice(true);
-        setError('');
-        setSuccess('');
-        try {
-            await billingService.generateInvoice(selectedCompany.id, invoiceForm);
-            setSuccess('Invoice generated successfully.');
-            await loadCompanyBilling(selectedCompany);
-        } catch (err) {
-            setError(err.response?.data?.responseMessage || err.response?.data?.errorMessage || err.message || 'Failed to generate invoice');
-        } finally {
-            setGeneratingInvoice(false);
-        }
-    };
-
-    const sendInvoice = async (invoiceId, recipientEmail) => {
-        setSendingInvoiceId(invoiceId);
-        setError('');
-        setSuccess('');
-        try {
-            await billingService.sendInvoice(invoiceId, recipientEmail || undefined);
-            setSuccess('Invoice email sent successfully.');
-            if (selectedCompany) {
-                await loadCompanyBilling(selectedCompany);
-            } else {
-                await loadMyBilling();
-            }
-        } catch (err) {
-            setError(err.response?.data?.responseMessage || err.response?.data?.errorMessage || err.message || 'Failed to send invoice');
-        } finally {
-            setSendingInvoiceId(null);
-        }
-    };
-
-    if (loading) {
-        return <div className="page-loading"><div className="spinner"></div></div>;
-    }
-
-    if (!isSuperAdmin && !isCompanyUser) {
-        return (
-            <div className="billing billing--static">
-                <div className="page-header">
-                    <div>
-                        <h1>Billing & Usage</h1>
-                    </div>
-                </div>
-                <div className="billing-panel billing-empty">This page is available to `SUPER_ADMIN` and `COMPANY` users only.</div>
-            </div>
-        );
-    }
-
-    const invoicesTabContent = (
-        invoices.length === 0 ? (
-            <div className="billing-empty">No invoices available.</div>
-        ) : (
-            <div className="scroll-container">
-                <table className="billing-table">
-                    <thead>
-                        <tr>
-                            <th>Invoice</th>
-                            <th>Period</th>
-                            <th>Total</th>
-                            <th>Status</th>
-                            <th>Recipient</th>
-                            <th></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {invoices.map((invoice) => (
-                            <tr key={invoice.id}>
-                                <td className="mono">{invoice.invoiceNumber}</td>
-                                <td>{formatDate(invoice.periodStart)} – {formatDate(invoice.periodEnd)}</td>
-                                <td>{formatCurrency(invoice.total)}</td>
-                                <td><Badge variant={invoice.status === 'PAID' ? 'success' : invoice.status === 'SENT' ? 'info' : 'warning'}>{invoice.status}</Badge></td>
-                                <td className="text-tertiary">{invoice.recipientEmail || 'Pending resolution'}</td>
-                                <td className="cell-action">
-                                    {isSuperAdmin && (
-                                        <button
-                                            className="icon-btn"
-                                            disabled={sendingInvoiceId === invoice.id}
-                                            onClick={() => sendInvoice(invoice.id, invoice.recipientEmail)}
-                                            title="Send invoice"
-                                        >
-                                            <Send size={14} />
-                                        </button>
-                                    )}
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-            </div>
-        )
-    );
-
-    const transactionsTabContent = (
-        walletTransactions.length === 0 ? (
-            <div className="billing-empty">{isPrepaid ? 'No wallet transactions available.' : 'No debit transactions recorded.'}</div>
-        ) : (
-            <div className="scroll-container">
-                <table className="billing-table">
-                    <thead>
-                        <tr>
-                            <th>Type</th>
-                            <th>Amount</th>
-                            <th>Reference</th>
-                            <th>Balance After</th>
-                            <th>Created</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {walletTransactions.map((transaction) => (
-                            <tr key={transaction.id}>
-                                <td><Badge variant={transaction.type === 'TOPUP' ? 'success' : 'warning'}>{transaction.type}</Badge></td>
-                                <td>{formatCurrency(transaction.amount)}</td>
-                                <td className="text-tertiary">{transaction.reference || '-'}</td>
-                                <td>{formatCurrency(transaction.balanceAfter)}</td>
-                                <td className="text-tertiary">{formatDate(transaction.createdAt)}</td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-            </div>
-        )
-    );
-
-    const profileTabContent = (
-        <div className="tab-scroll">
-            <div className="field-grid">
-                <label className="field">
-                    <span>Tier</span>
-                    <select value={profileForm.billingTierCode} onChange={(e) => handleProfileChange('billingTierCode', e.target.value)} className="field-input">
-                        {tiers.map((tier) => (
-                            <option key={tier.tierKey} value={tier.tierKey}>{tier.tierKey} — {tier.name}</option>
-                        ))}
-                    </select>
-                </label>
-                <label className="field">
-                    <span>Billing Mode</span>
-                    <select value={profileForm.billingMode} onChange={(e) => handleProfileChange('billingMode', e.target.value)} className="field-input">
-                        <option value="POSTPAID">POSTPAID</option>
-                        <option value="PREPAID">PREPAID</option>
-                    </select>
-                </label>
-                <label className="field">
-                    <span>Unit Price</span>
-                    <input className="field-input" value={profileForm.unitPrice} onChange={(e) => handleProfileChange('unitPrice', e.target.value)} />
-                </label>
-                <label className="field">
-                    <span>Currency</span>
-                    <input className="field-input" value={profileForm.currency} onChange={(e) => handleProfileChange('currency', e.target.value.toUpperCase())} />
-                </label>
-                <label className="field">
-                    <span>Billing Email</span>
-                    <input className="field-input" value={profileForm.billingEmail} onChange={(e) => handleProfileChange('billingEmail', e.target.value)} />
-                </label>
-                <label className="field">
-                    <span>Status</span>
-                    <select value={profileForm.status} onChange={(e) => handleProfileChange('status', e.target.value)} className="field-input">
-                        <option value="ACTIVE">ACTIVE</option>
-                        <option value="SUSPENDED">SUSPENDED</option>
-                        <option value="INACTIVE">INACTIVE</option>
-                    </select>
-                </label>
-                <label className="field">
-                    <span>Low Balance Threshold</span>
-                    <input className="field-input" value={profileForm.lowBalanceThreshold} onChange={(e) => handleProfileChange('lowBalanceThreshold', e.target.value)} />
-                </label>
-                <label className="field">
-                    <span>Credit Limit</span>
-                    <input className="field-input" value={profileForm.creditLimit} onChange={(e) => handleProfileChange('creditLimit', e.target.value)} />
-                </label>
-                <label className="field">
-                    <span>Invoice Due Days</span>
-                    <input className="field-input" type="number" value={profileForm.invoiceDueDays} onChange={(e) => handleProfileChange('invoiceDueDays', e.target.value)} />
-                </label>
-                <label className="field">
-                    <span>Effective From</span>
-                    <input className="field-input" type="date" value={profileForm.effectiveFrom} onChange={(e) => handleProfileChange('effectiveFrom', e.target.value)} />
-                </label>
-                <label className="field">
-                    <span>Effective To</span>
-                    <input className="field-input" type="date" value={profileForm.effectiveTo} onChange={(e) => handleProfileChange('effectiveTo', e.target.value)} />
-                </label>
-            </div>
-
-            <div className="field-toggles">
-                {[
-                    ['billOnSubmission', 'Bill on submission'],
-                    ['billOnCompleted', 'Bill on completion'],
-                    ['billOnRejected', 'Bill on rejection'],
-                    ['billOnFailedNonSystem', 'Bill on non-system failure'],
-                    ['billOnFailedSystem', 'Bill on system failure']
-                ].map(([field, label]) => (
-                    <label key={field} className="toggle-row">
-                        <input
-                            type="checkbox"
-                            checked={!!profileForm[field]}
-                            onChange={(e) => handleProfileChange(field, e.target.checked)}
-                        />
-                        <span>{label}</span>
-                    </label>
-                ))}
-            </div>
-
-            <div className="tab-actions">
-                <Button onClick={saveProfile} disabled={savingProfile}>Save Profile</Button>
-            </div>
-        </div>
-    );
-
-    const walletTabContent = (
-        <div className="tab-scroll">
-            <div className="wallet-actions-grid">
-                <div className="wallet-action">
-                    <h4>Top Up Wallet</h4>
-                    <p className="text-tertiary">Credit the company wallet immediately. Available for PREPAID companies only.</p>
-                    <div className="field-grid field-grid--single">
-                        <label className="field">
-                            <span>Amount</span>
-                            <input className="field-input" value={topUpForm.amount} onChange={(e) => setTopUpForm((prev) => ({ ...prev, amount: e.target.value }))} />
-                        </label>
-                        <label className="field">
-                            <span>Currency</span>
-                            <input className="field-input" value={topUpForm.currency} onChange={(e) => setTopUpForm((prev) => ({ ...prev, currency: e.target.value.toUpperCase() }))} />
-                        </label>
-                        <label className="field">
-                            <span>Reference</span>
-                            <input className="field-input" value={topUpForm.reference} onChange={(e) => setTopUpForm((prev) => ({ ...prev, reference: e.target.value }))} />
-                        </label>
-                        <label className="field">
-                            <span>Description</span>
-                            <input className="field-input" value={topUpForm.description} onChange={(e) => setTopUpForm((prev) => ({ ...prev, description: e.target.value }))} />
-                        </label>
-                    </div>
-                    <div className="tab-actions">
-                        <Button onClick={submitTopUp} disabled={toppingUp || !canTopUp}>Top Up Wallet</Button>
-                    </div>
-                    {!canTopUp && <p className="helper-text">Only available for PREPAID companies.</p>}
-                </div>
-
-                <div className="wallet-action">
-                    <h4>Generate Invoice</h4>
-                    <p className="text-tertiary">Roll up charges for a period into a new invoice. Available for POSTPAID companies only.</p>
-                    <div className="field-grid field-grid--single">
-                        <label className="field">
-                            <span>Period Start</span>
-                            <input className="field-input" type="date" value={invoiceForm.periodStart} onChange={(e) => setInvoiceForm((prev) => ({ ...prev, periodStart: e.target.value }))} />
-                        </label>
-                        <label className="field">
-                            <span>Period End</span>
-                            <input className="field-input" type="date" value={invoiceForm.periodEnd} onChange={(e) => setInvoiceForm((prev) => ({ ...prev, periodEnd: e.target.value }))} />
-                        </label>
-                    </div>
-                    <div className="tab-actions">
-                        <Button onClick={generateInvoice} disabled={generatingInvoice || profile?.billingMode !== 'POSTPAID'}>Generate Invoice</Button>
-                    </div>
-                    {profile?.billingMode !== 'POSTPAID' && <p className="helper-text">Only available for POSTPAID companies.</p>}
-                </div>
-            </div>
-        </div>
-    );
-
-    const plansTabContent = (
-        <div className="scroll-container">
-            <table className="billing-table plans-table">
-                <thead>
-                    <tr>
-                        <th>Tier</th>
-                        <th>Price / Verification</th>
-                        <th>Highlights</th>
-                        <th></th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {tiers.map((tier) => {
-                        const isCurrent = (profile?.billingTierCode || profileForm.billingTierCode) === tier.tierKey;
-                        return (
-                            <tr key={tier.tierKey} className={isCurrent ? 'row-current' : ''}>
-                                <td>
-                                    <span className="text-primary">{tier.name}</span>
-                                    <span className="tier-key mono">{tier.tierKey}</span>
-                                </td>
-                                <td>${tier.priceRange?.[0] ?? '0.00'} – ${tier.priceRange?.[1] ?? '0.00'}</td>
-                                <td className="text-tertiary">{(tier.features || []).slice(0, 3).join(' · ') || '—'}</td>
-                                <td className="cell-action">{isCurrent && <Badge variant="success">Current</Badge>}</td>
-                            </tr>
-                        );
-                    })}
-                    {tiers.length === 0 && (
-                        <tr><td colSpan={4} className="billing-empty">No tiers available.</td></tr>
-                    )}
-                </tbody>
-            </table>
-        </div>
-    );
-
-    const tabs = [];
-    if (isSuperAdmin && selectedCompany) {
-        tabs.push({ label: 'Billing Profile', content: profileTabContent });
-        tabs.push({ label: 'Wallet & Invoicing', content: walletTabContent });
-    }
-    tabs.push({ label: 'Invoices', badge: invoices.length || undefined, content: invoicesTabContent });
-    tabs.push({ label: isPrepaid ? 'Wallet Transactions' : 'Charge Activity', badge: walletTransactions.length || undefined, content: transactionsTabContent });
-    tabs.push({ label: 'Plans', content: plansTabContent });
+    const account = data?.account;
+    const profile = account?.billingProfile;
+    const currency = profile?.currency || account?.wallet?.currency;
+    const pricing = account?.perCallPricing;
+    const prepaid = profile?.paymentType === 'PREPAID';
+    const outstanding = (data?.invoices || []).filter((i) => i.status === 'ISSUED').reduce((sum, i) => sum + Number(i.amount), 0);
+    const spent = spend.reduce((sum, d) => sum + d.spent, 0);
+    const callsLeft = prepaid && pricing?.pricePerCall > 0 ? Math.floor(Number(account.wallet?.balance || 0) / Number(pricing.pricePerCall)) : null;
 
     return (
-        <div className="billing">
-            <div className="page-header">
+        <div className="page">
+            <div className="page-head">
                 <div>
-                    <h1>Billing & Usage</h1>
-                    <p className="page-subtitle">
-                        {isSuperAdmin ? 'Manage company billing profiles, credit, wallet funding, and invoices.' : 'Track your live balance, credit position, and billing history.'}
-                    </p>
+                    <h1>Billing</h1>
+                    <p>{superAdmin ? 'A company’s balance, prices, invoices and wallet activity.' : 'Your balance, prices, invoices and wallet activity.'}</p>
                 </div>
-                <div className="page-header-actions">
-                    {isSuperAdmin && (
-                        <div className="company-select">
-                            <select
-                                value={selectedCompany?.id || ''}
-                                onChange={(e) => {
-                                    const next = companies.find((c) => String(c.id) === e.target.value);
-                                    if (next) loadCompanyBilling(next);
-                                }}
-                            >
-                                {companies.map((company) => (
-                                    <option key={company.id} value={company.id}>{company.legalName}</option>
-                                ))}
-                            </select>
-                            <ChevronDown size={14} className="company-select__chevron" />
-                        </div>
-                    )}
-                    <Button variant="secondary" onClick={bootstrap}>
-                        <RefreshCcw size={14} />
-                        Refresh
-                    </Button>
-                </div>
+                {superAdmin && (
+                    <div className="head-actions">
+                        <CompanySelect value={companyId} onChange={setCompanyId} allLabel="" placeholder="Choose a company" />
+                    </div>
+                )}
             </div>
 
-            {error && <div className="error-banner">{error}</div>}
-            {success && <div className="success-banner">{success}</div>}
-
-            {detailLoading ? (
-                <div className="billing-panel billing-empty">Loading billing details…</div>
+            {!ready ? (
+                <div className="card bill-empty"><Building2 size={22} /><strong>Choose a company</strong><span>Billing is kept per company. Pick one above to see and manage its account.</span></div>
+            ) : error ? <div className="card"><div className="empty-state">{error}</div></div> : !data ? (
+                <div className="card"><div className="loading-state">Loading billing…</div></div>
+            ) : data.notSetUp ? (
+                superAdmin ? <SetUpBilling companyId={companyId} onDone={load} /> : (
+                    <div className="card bill-empty"><Receipt size={22} /><strong>Billing isn’t set up yet</strong><span>Intact ID sets up your billing terms. Contact your account manager to get started.</span></div>
+                )
             ) : (
                 <>
-                    <div className="billing-context">
-                        <div className="billing-context__plan">
-                            <span className="billing-context__name">{selectedTier?.name || profile?.billingTierCode || 'Not configured'}</span>
-                            <Badge variant="info">{profile?.billingMode || profileForm.billingMode}</Badge>
-                            {isSuperAdmin && selectedCompany && (
-                                <span className="billing-context__company">{selectedCompany.legalName}</span>
+                    <div className="bill-hero">
+                        <div className="bill-balance">
+                            <div className="bill-balance-head">
+                                <span>{prepaid ? 'Wallet balance' : 'Outstanding'}</span>
+                                <Wallet size={17} />
+                            </div>
+                            <div className="bill-balance-value">{formatMoney(prepaid ? account.wallet?.balance : outstanding, currency)}</div>
+                            <div className="bill-balance-foot">
+                                {prepaid
+                                    ? callsLeft !== null ? `About ${formatCount(callsLeft)} verifications at the standard price` : 'Verifications are paid from this balance'
+                                    : `${(data.invoices || []).filter((i) => i.status === 'ISSUED').length} unpaid invoice(s)`}
+                            </div>
+                            {superAdmin && prepaid && (
+                                <button className="btn bill-balance-btn" onClick={() => { setForm({ amount: '', externalRef: '', description: '', retryRef: `topup-${crypto.randomUUID()}` }); setModal('topup'); }}>
+                                    <Plus size={15} /> Top up wallet
+                                </button>
                             )}
                         </div>
-                        <div className="billing-context__stats">
-                            <div className="stat">
-                                <span className="stat__label">Unit Price</span>
-                                <strong className="stat__value">{formatCurrency(profile?.unitPrice || profileForm.unitPrice)}</strong>
+
+                        <div className="card bill-spend">
+                            <div className="card-head">
+                                <div><h3>{formatMoney(spent, currency)}</h3><div className="card-caption">Spent in the last {SPEND_DAYS} days</div></div>
                             </div>
-                            <div className="stat">
-                                <span className="stat__label">{isPrepaid ? 'Balance' : 'Outstanding'}</span>
-                                <strong className={`stat__value ${isPrepaid && Number(summary?.currentBalance || 0) < 0 ? 'stat__value--alert' : ''}`}>
-                                    {formatCurrency(isPrepaid ? summary?.currentBalance : summary?.outstandingAmount)}
-                                </strong>
+                            {prepaid ? (
+                                <StackedBarChart data={spend} series={SPEND_SERIES} labelKey="date" formatLabel={shortDate} height={130}
+                                                 formatValue={(v) => (v >= 1000 ? `${Math.round(v / 100) / 10}k` : String(Math.round(v)))} />
+                            ) : <div className="empty-state">Postpaid accounts are charged on their invoices.</div>}
+                        </div>
+
+                        <div className="card">
+                            <div className="card-head">
+                                <h3>Plan</h3>
+                                {superAdmin && pricing && (
+                                    <button className="btn btn--secondary btn--sm" onClick={() => { setForm({ pricePerCall: pricing.pricePerCall ?? '', freeQuota: pricing.freeQuota ?? '' }); setModal('price'); }}>
+                                        <Pencil size={13} /> Edit price
+                                    </button>
+                                )}
                             </div>
-                            <div className="stat">
-                                <span className="stat__label">{isPrepaid ? 'Available To Spend' : 'Ready To Invoice'}</span>
-                                <strong className="stat__value">{formatCurrency(isPrepaid ? summary?.availableToSpend : summary?.readyToInvoiceAmount)}</strong>
-                            </div>
-                            <div className="stat">
-                                <span className="stat__label">{isPrepaid ? 'Credit Limit' : 'Invoiced'}</span>
-                                <strong className="stat__value">{formatCurrency(isPrepaid ? (profile?.creditLimit || profileForm.creditLimit) : summary?.invoicedAmount)}</strong>
-                            </div>
-                            <div className="stat">
-                                <span className="stat__label">{isPrepaid ? 'Submissions Left' : 'Debited'}</span>
-                                <strong className="stat__value">{isPrepaid ? (summary?.estimatedSubmissionsRemaining ?? 0) : formatCurrency(summary?.debitedAmount)}</strong>
+                            <div className="kv-list">
+                                <div className="kv-row"><span>Model</span><strong>{MODEL_LABEL[profile?.billingModel] || humanize(profile?.billingModel)}</strong></div>
+                                <div className="kv-row"><span>Payment</span><strong>{prepaid ? 'Prepaid wallet' : 'Postpaid, invoiced'}</strong></div>
+                                <div className="kv-row"><span>Standard price</span><strong>{pricing ? `${formatMoney(pricing.pricePerCall, currency)} / verification` : 'Per service'}</strong></div>
+                                <div className="kv-row"><span>Free verifications</span><strong>{pricing ? formatCount(pricing.freeQuota) : '—'}</strong></div>
+                                <div className="kv-row"><span>Status</span><strong>{profile?.isActive === false ? <Badge kind="bad">Inactive</Badge> : <Badge kind="ok">Active</Badge>}</strong></div>
                             </div>
                         </div>
                     </div>
 
-                    <div className="billing-tabs">
-                        <Tabs tabs={tabs} />
+                    <div className="ins-grid-2">
+                        <div className="table-card">
+                            <div className="card-head"><div><h3>Prices</h3></div><span className="card-caption">What each service costs</span></div>
+                            <div className="table-scroll"><table className="data-table bill-table">
+                                <thead><tr><th>Service</th><th>Price</th><th>Source</th></tr></thead>
+                                <tbody>
+                                    {data.prices.length === 0 ? <tr><td colSpan={3}><div className="empty-state">No service prices set. The standard price applies.</div></td></tr>
+                                        : data.prices.map((p) => (
+                                            <tr key={p.serviceCode}>
+                                                <td><div className="name-primary">{p.name || humanize(p.serviceCode)}</div><div className="name-secondary mono">{p.serviceCode}</div></td>
+                                                <td className="bill-amount">{formatMoney(p.price, p.currency || currency)}</td>
+                                                <td>{String(p.source).toUpperCase().includes('GLOBAL') ? <Badge kind="neutral">Standard</Badge> : <Badge kind="info">Agreed price</Badge>}</td>
+                                            </tr>
+                                        ))}
+                                </tbody>
+                            </table></div>
+                        </div>
+
+                        <div className="table-card">
+                            <div className="card-head"><div><h3>Invoices</h3></div>{outstanding > 0 && <Badge kind="warn">{formatMoney(outstanding, currency)} due</Badge>}</div>
+                            <div className="table-scroll"><table className="data-table bill-table">
+                                <thead><tr><th>Period</th><th>Amount</th><th>Status</th>{superAdmin && <th />}</tr></thead>
+                                <tbody>
+                                    {data.invoices.length === 0 ? <tr><td colSpan={4}><div className="empty-state">No invoices yet.</div></td></tr>
+                                        : [...data.invoices].sort((a, b) => new Date(b.periodStart) - new Date(a.periodStart)).map((inv) => {
+                                            const status = INVOICE_STATUS[inv.status] || { label: humanize(inv.status), badge: 'neutral' };
+                                            return (
+                                                <tr key={inv.id}>
+                                                    <td><div className="name-primary">{formatDate(inv.periodStart)} – {formatDate(inv.periodEnd)}</div><div className="name-secondary mono">{inv.id.slice(0, 8)}</div></td>
+                                                    <td className="bill-amount">{formatMoney(inv.amount, inv.currency)}</td>
+                                                    <td><Badge kind={status.badge}>{status.label}</Badge></td>
+                                                    {superAdmin && (
+                                                        <td className="bill-actions">
+                                                            {inv.status === 'ISSUED' && <>
+                                                                <button className="btn btn--secondary btn--sm" disabled={busy} onClick={() => run(() => billingService.markInvoicePaid(inv.id), 'Invoice marked paid')}>Mark paid</button>
+                                                                <button className="btn btn--ghost btn--sm" disabled={busy} onClick={() => run(() => billingService.voidInvoice(inv.id), 'Invoice voided')}>Void</button>
+                                                            </>}
+                                                        </td>
+                                                    )}
+                                                </tr>
+                                            );
+                                        })}
+                                </tbody>
+                            </table></div>
+                        </div>
                     </div>
+
+                    {account.wallet && (
+                        <div className="table-card">
+                            <div className="card-head"><div><h3>Wallet activity</h3></div><span className="card-caption">Newest first</span></div>
+                            <div className="table-scroll"><table className="data-table bill-table">
+                                <thead><tr><th>Date</th><th>Description</th><th>Reference</th><th className="num">Amount</th><th className="num">Balance after</th></tr></thead>
+                                <tbody>
+                                    {history.length === 0 ? <tr><td colSpan={5}><div className="empty-state">No wallet activity yet.</div></td></tr>
+                                        : history.slice(0, 50).map((t) => (
+                                            <tr key={t.id}>
+                                                <td>{formatDateTime(t.createdAt)}</td>
+                                                <td>{t.description || (t.type === 'CREDIT' ? 'Top-up' : 'Verification charge')}</td>
+                                                <td className="mono name-secondary">{t.externalRef || '—'}</td>
+                                                <td className={`num bill-amount ${t.type === 'CREDIT' ? 'amount-pos' : 'amount-neg'}`}>{t.type === 'CREDIT' ? '+' : '−'} {formatMoney(t.amount, currency)}</td>
+                                                <td className="num">{formatMoney(t.balanceAfter, currency)}</td>
+                                            </tr>
+                                        ))}
+                                </tbody>
+                            </table></div>
+                        </div>
+                    )}
                 </>
             )}
+
+            <Modal isOpen={modal === 'topup'} onClose={() => setModal(null)} title="Top up wallet" caption={<><Lock size={11} /> Super admins · adds credit to this company’s wallet</>}
+                   footer={<>
+                       <button className="btn btn--secondary" onClick={() => setModal(null)}>Cancel</button>
+                       <button className="btn btn--primary" disabled={busy || !(Number(form.amount) > 0)}
+                               onClick={() => run(() => billingService.creditWallet(companyId, { amount: Number(form.amount), externalRef: form.externalRef.trim() || form.retryRef, description: form.description || undefined }), 'Wallet topped up')}>
+                           {busy ? 'Adding…' : `Add ${form.amount ? formatMoney(form.amount, currency) : 'credit'}`}
+                       </button>
+                   </>}>
+                <div className="field"><label>Amount ({currency})</label><input type="number" min="0" step="0.01" value={form.amount || ''} onChange={(e) => setForm({ ...form, amount: e.target.value })} autoFocus /></div>
+                <div className="field">
+                    <label>Payment reference</label>
+                    <input type="text" value={form.externalRef || ''} onChange={(e) => setForm({ ...form, externalRef: e.target.value })} placeholder="e.g. bank or M-Pesa reference" />
+                    <span className="field-hint">A reference can only be used once, so pressing Add again never credits twice.</span>
+                </div>
+                <div className="field"><label>Note</label><input type="text" value={form.description || ''} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Optional" /></div>
+            </Modal>
+
+            <Modal isOpen={modal === 'price'} onClose={() => setModal(null)} title="Standard price" caption="Applies to services without their own price"
+                   footer={<>
+                       <button className="btn btn--secondary" onClick={() => setModal(null)}>Cancel</button>
+                       <button className="btn btn--primary" disabled={busy || form.pricePerCall === ''}
+                               onClick={() => run(() => billingService.updatePerCallPricing(companyId, { pricePerCall: Number(form.pricePerCall), freeQuota: form.freeQuota === '' ? undefined : Number(form.freeQuota) }), 'Price updated')}>
+                           {busy ? 'Saving…' : 'Save'}
+                       </button>
+                   </>}>
+                <div className="form-grid">
+                    <div className="field"><label>Price per verification ({currency})</label><input type="number" min="0" step="0.01" value={form.pricePerCall ?? ''} onChange={(e) => setForm({ ...form, pricePerCall: e.target.value })} /></div>
+                    <div className="field"><label>Free verifications</label><input type="number" min="0" step="1" value={form.freeQuota ?? ''} onChange={(e) => setForm({ ...form, freeQuota: e.target.value })} /></div>
+                </div>
+            </Modal>
         </div>
     );
 }

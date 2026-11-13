@@ -1,0 +1,29 @@
+.bell { position: relative; }
+.bell .topbar-bell { cursor: pointer; background: var(--surface, transparent); }
+.bell-count {
+    position: absolute; top: -5px; right: -5px; min-width: 17px; height: 17px; padding: 0 4px;
+    border-radius: 9px; background: var(--bad, #c0392b); color: #fff; font-size: 10.5px; font-weight: 700;
+    display: inline-flex; align-items: center; justify-content: center; line-height: 1;
+}
+.bell-panel {
+    position: absolute; right: 0; top: calc(100% + 8px); width: 360px; max-width: calc(100vw - 32px); z-index: 50;
+    background: var(--surface, #fff); border: 1px solid var(--rule); border-radius: 10px;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.14); overflow: hidden;
+}
+.bell-head { display: flex; justify-content: space-between; align-items: center; padding: 12px 14px; border-bottom: 1px solid var(--rule); }
+.bell-head .link-btn { display: inline-flex; align-items: center; gap: 4px; }
+.bell-head .link-btn:disabled { opacity: 0.45; cursor: default; }
+.bell-list { max-height: 380px; overflow-y: auto; }
+.bell-list .loading-state, .bell-list .empty-state { padding: 22px 14px; }
+.bell-item {
+    display: flex; gap: 10px; width: 100%; text-align: left; padding: 11px 14px; border: none; background: transparent;
+    border-bottom: 1px solid var(--rule); cursor: pointer; color: inherit; font: inherit;
+}
+.bell-item:hover { background: var(--bg-soft); }
+.bell-item.is-unread { background: color-mix(in srgb, var(--info, #2563eb) 6%, transparent); }
+.bell-item.is-unread .bell-item-title::after { content: ''; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--info, #2563eb); margin-left: 6px; vertical-align: middle; }
+.bell-item-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.bell-item-title { font-size: 13px; font-weight: 600; color: var(--ink); }
+.bell-item-message { font-size: 12.5px; color: var(--ink-2); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.bell-item-when { font-size: 11.5px; color: var(--ink-3); }
+.bell-foot { display: block; text-align: center; padding: 10px; font-size: 12.5px; font-weight: 600; color: var(--accent); }

@@ -1,0 +1,36 @@
+/* Billing */
+.bill-hero { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr) minmax(0, 1fr); gap: 16px; align-items: stretch; }
+.bill-balance {
+  position: relative; overflow: hidden; display: flex; flex-direction: column; gap: 8px;
+  padding: 22px; border-radius: var(--radius);
+  background: linear-gradient(145deg, var(--brand-green) 0%, var(--brand-deep) 100%); color: var(--on-ink);
+}
+.bill-balance::after {
+  content: ''; position: absolute; right: -60px; top: -60px; width: 200px; height: 200px; border-radius: 50%;
+  background: radial-gradient(circle, color-mix(in srgb, var(--brand-mint) 30%, transparent), transparent 70%);
+  pointer-events: none;
+}
+.bill-balance-head { display: flex; justify-content: space-between; align-items: center; font-size: 13px; font-weight: 600; color: var(--brand-mint); }
+.bill-balance-value { font-family: var(--font-display); font-size: 32px; font-weight: 600; letter-spacing: -0.02em; line-height: 1.1; margin-top: 6px; font-variant-numeric: tabular-nums; }
+.bill-balance-foot { font-size: 13px; color: var(--on-ink-2); }
+.bill-balance-btn {
+  margin-top: auto; align-self: flex-start; position: relative; z-index: 1;
+  background: var(--bg); color: var(--brand-green); border-color: transparent;
+}
+.bill-balance-btn:hover:not(:disabled) { background: var(--brand-pale); }
+.bill-spend .card-head h3 { font-family: var(--font-display); font-size: 22px; font-variant-numeric: tabular-nums; }
+.bill-spend .card-head { margin-bottom: 10px; }
+.bill-amount { font-variant-numeric: tabular-nums; color: var(--ink); font-weight: 600; white-space: nowrap; }
+.bill-table td.num, .bill-table th.num { text-align: right; }
+.bill-actions { text-align: right; white-space: nowrap; }
+.bill-actions .btn { margin-left: 6px; }
+.bill-empty { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 8px; padding: 48px 22px; color: var(--ink-3); }
+.bill-empty svg { color: var(--accent); }
+.bill-empty strong { font-size: 15px; color: var(--ink); }
+.bill-empty span { font-size: 13px; max-width: 420px; }
+.bill-setup { max-width: 720px; }
+.bill-setup-foot { display: flex; justify-content: flex-end; margin-top: 18px; }
+
+@media (max-width: 1100px) {
+  .bill-hero { grid-template-columns: minmax(0, 1fr); }
+}

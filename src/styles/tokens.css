@@ -1,0 +1,65 @@
+/* Intact ID console — design tokens.
+   Colours and type follow the Intact ID website brand. This is the only theme in the app.
+   Values marked "derived" are not in the brand sheet; they are tints of brand colours used
+   where the console needs an extra step (hints, text on the dark sidebar). */
+@import url('https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap');
+
+:root {
+  /* Brand */
+  --brand-green: #0B5D45;   /* Intact green: logo, primary buttons, links */
+  --brand-bright: #1DB980;  /* Bright green: ticks, success, highlights */
+  --brand-mint: #5FD3A3;    /* Mint: accents on dark green */
+  --brand-deep: #094D39;    /* Deep green: button hover, gradient ends */
+  --brand-pale: #E3F5EC;    /* Pale green: tags, icon backgrounds */
+
+  /* Surfaces */
+  --bg: #FFFFFF;            /* White: page background */
+  --bg-soft: #F2F6F4;       /* Surface: section and card backgrounds */
+  --bg-ink: #0A0C0E;        /* Ink: dark backgrounds (sidebar, tooltips) */
+  --panel-ink: #15191C;     /* derived: raised panel on Ink */
+  --rule-ink: #262C30;      /* derived: divider on Ink */
+
+  /* Text */
+  --ink: #0A0C0E;           /* Ink: headings, main text */
+  --ink-body: #2A2F36;      /* Body grey: paragraph text */
+  --ink-2: #5B6461;         /* Muted grey: small labels, hints */
+  --ink-3: #8A938F;         /* derived: placeholders, disabled */
+  --on-ink: #FFFFFF;        /* text on Ink */
+  --on-ink-2: #C9D3CE;      /* secondary text on Ink */
+  --on-ink-3: #8A938F;      /* derived: tertiary text on Ink */
+
+  --rule: #C9D3CE;          /* Border: input borders, lines */
+
+  /* Interactive */
+  --accent: var(--brand-green);
+  --accent-hover: var(--brand-deep);
+  --accent-soft: var(--brand-pale);
+  --accent-ink: var(--brand-mint);
+  --success: var(--brand-bright);
+
+  /* Status — text / background / dot */
+  --ok: #0A5A3C;            /* Allow / approved */
+  --ok-soft: #E3F6EC;
+  --amber: #8A4B0B;         /* Review / warning */
+  --amber-soft: #FDF1E2;
+  --amber-ink: #E0A030;     /* warning dot, warning icon on Ink */
+  --danger: #B23434;        /* Block / error */
+  --danger-soft: #FBE3E3;
+  --danger-dot: #D64545;
+  --info: #1F4E86;
+  --info-soft: #E1ECF7;
+
+  /* Charts */
+  --chart-1: var(--brand-green);
+  --chart-2: var(--brand-bright);
+  --chart-3: var(--amber-ink);
+  --chart-4: var(--rule);
+
+  --font-display: 'Geist', system-ui, -apple-system, sans-serif;
+  --font-body: 'Geist', system-ui, -apple-system, sans-serif;
+  --font-mono: 'Geist Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+
+  --radius: 10px;
+  --radius-lg: 12px;
+  --sidebar-w: 252px;
+}

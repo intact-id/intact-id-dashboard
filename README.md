@@ -1,16 +1,33 @@
-# React + Vite
+# Intact ID console
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+The web console for Intact ID: verifications, manual review, workflows, companies and applications,
+billing, analytics, webhooks and API keys. Super admins also manage the service catalog and see
+turnaround times and service health.
 
-Currently, two official plugins are available:
+React 19 + Vite. It talks only to auth-server.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## Run it
 
-## React Compiler
+```bash
+cp .env.example .env.local    # set VITE_API_BASE_URL to the auth-server you want
+npm ci
+npm run dev                   # http://localhost:5173
+npm run build                 # production bundle in dist/
+npm run lint                  # oxlint
+```
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+`VITE_API_BASE_URL` is read at build time. A value without `https://` gets it added.
 
-## Expanding the ESLint configuration
+## Deploy
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+Vercel builds this repo (Node 20.19 or newer). `vercel.json` sends every path to `index.html` so
+links like `/dashboard/verifications/123` work on refresh.
+
+## Layout
+
+- `src/pages/` one folder or file per page; `src/components/` shared UI and layout
+- `src/services/` one file per auth-server area; each unwraps the `{ success, data }` envelope
+- `src/utils/` formatting, roles and chart helpers
+
+Addresses from the old dashboard (`/dashboard/approvals`, `/maker-checker`, `/catalog`, `/team`,
+`/usage`) redirect to their new pages.

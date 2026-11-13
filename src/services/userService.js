@@ -1,211 +1,63 @@
 import api from './api';
 
+// auth-server wraps responses as { success, responseMessage, data }; return just `data`, or throw.
+function unwrap(response) {
+    if (!response.data.success) throw new Error(response.data.responseMessage || 'Request failed');
+    return response.data.data;
+}
+
+// Admins see their own company's users; super admins see everyone. Most changes are super-admin only.
 const userService = {
-    async getAllUsers(pagination = { page: 0, size: 100 }) {
-        try {
-            const params = new URLSearchParams({
-                page: pagination.page,
-                size: pagination.size
-            });
-
-            const response = await api.get(`/api/admin/users?${params}`);
-            return response.data;
-        } catch (error) {
-            console.error('Get all users error:', error);
-            throw error;
-        }
+    // Spring page of { id, username, email, firstName, lastName, phone, status, lastLoginAt, roles, companyId, ... }
+    async list({ status, search, page = 0, size = 20 } = {}) {
+        // The list is a native SQL query, so the sort names the column (created_at), not the Java field.
+        const params = { page, size, sort: 'created_at,desc', ...(status && { status }), ...(search && { search }) };
+        return unwrap(await api.get('/api/admin/users', { params }));
     },
 
-    /**
-     * Get all users with optional filters
-     * @param {object} filters - Filter parameters (status, search)
-     * @param {object} pagination - Pagination parameters (page, size)
-     * @returns {Promise<object>}
-     */
-    async getUsers(filters = {}, pagination = { page: 0, size: 10 }) {
-        try {
-            const params = new URLSearchParams({
-                page: pagination.page,
-                size: pagination.size,
-                ...(filters.status && { status: filters.status }),
-                ...(filters.search && { search: filters.search }),
-            });
-
-            const response = await api.get(`/api/admin/users?${params}`);
-            return response.data;
-        } catch (error) {
-            console.error('Get users error:', error);
-            throw error;
-        }
+    // Super admins only: [{ id, name, description, status }]
+    async roles() {
+        return unwrap(await api.get('/api/admin/users/roles'));
     },
 
-    /**
-     * Get user by ID
-     * @param {string} userId - User ID
-     * @returns {Promise<object>}
-     */
-    async getUserById(userId) {
-        try {
-            const response = await api.get(`/api/admin/users/${userId}`);
-            return response.data;
-        } catch (error) {
-            console.error('Get user error:', error);
-            throw error;
-        }
+    // { username, email, password, firstName, lastName, phone, roleIds, mustChangePassword, companyId }
+    async create(user) {
+        return unwrap(await api.post('/api/admin/users', user));
     },
 
-    /**
-     * Create new user
-     * @param {object} userData - User data
-     * @returns {Promise<object>}
-     */
-    async createUser(userData) {
-        try {
-            const response = await api.post('/api/admin/users', userData);
-            return response.data;
-        } catch (error) {
-            console.error('Create user error:', error);
-            throw error;
-        }
+    // Fields left out stay as they are.
+    async update(userId, user) {
+        return unwrap(await api.put(`/api/admin/users/${userId}`, user));
     },
 
-    /**
-     * Update user
-     * @param {string} userId - User ID
-     * @param {object} userData - Updated user data
-     * @returns {Promise<object>}
-     */
-    async updateUser(userId, userData) {
-        try {
-            const response = await api.put(`/api/admin/users/${userId}`, userData);
-            return response.data;
-        } catch (error) {
-            console.error('Update user error:', error);
-            throw error;
-        }
-    },
-
-    /**
-     * Delete user
-     * @param {string} userId - User ID
-     * @returns {Promise<object>}
-     */
-    async deleteUser(userId) {
-        try {
-            const response = await api.delete(`/api/admin/users/${userId}`);
-            return response.data;
-        } catch (error) {
-            console.error('Delete user error:', error);
-            throw error;
-        }
-    },
-
-    /**
-     * Suspend user
-     * @param {string} userId - User ID
-     * @returns {Promise<object>}
-     */
-    async suspendUser(userId) {
-        try {
-            const response = await api.post(`/api/admin/users/${userId}/suspend`);
-            return response.data;
-        } catch (error) {
-            console.error('Suspend user error:', error);
-            throw error;
-        }
-    },
-
-    /**
-     * Activate user
-     * @param {string} userId - User ID
-     * @returns {Promise<object>}
-     */
-    async activateUser(userId) {
-        try {
-            const response = await api.post(`/api/admin/users/${userId}/activate`);
-            return response.data;
-        } catch (error) {
-            console.error('Activate user error:', error);
-            throw error;
-        }
-    },
-
-    /**
-     * Unlock user account
-     * @param {string} userId - User ID
-     * @returns {Promise<object>}
-     */
-    async unlockUser(userId) {
-        try {
-            const response = await api.post(`/api/admin/users/${userId}/unlock`);
-            return response.data;
-        } catch (error) {
-            console.error('Unlock user error:', error);
-            throw error;
-        }
-    },
-
-    /**
-     * Assign roles to user
-     * @param {string} userId - User ID
-     * @param {string[]} roleIds - Array of role IDs
-     * @returns {Promise<object>}
-     */
     async assignRoles(userId, roleIds) {
-        try {
-            const response = await api.post(`/api/admin/users/${userId}/roles`, roleIds);
-            return response.data;
-        } catch (error) {
-            console.error('Assign roles error:', error);
-            throw error;
-        }
+        return unwrap(await api.post(`/api/admin/users/${userId}/roles`, roleIds));
     },
 
-    /**
-     * Remove role from user
-     * @param {string} userId - User ID
-     * @param {string} roleId - Role ID to remove
-     * @returns {Promise<object>}
-     */
     async removeRole(userId, roleId) {
-        try {
-            const response = await api.delete(`/api/admin/users/${userId}/roles/${roleId}`);
-            return response.data;
-        } catch (error) {
-            console.error('Remove role error:', error);
-            throw error;
-        }
+        return unwrap(await api.delete(`/api/admin/users/${userId}/roles/${roleId}`));
     },
 
-    /**
-     * Force-logout a user (revokes all active sessions)
-     * @param {string} userId - User ID
-     * @returns {Promise<object>}
-     */
-    async logoutUser(userId) {
-        try {
-            const response = await api.post(`/api/admin/users/${userId}/logout`);
-            return response.data;
-        } catch (error) {
-            console.error('Logout user error:', error);
-            throw error;
-        }
+    async suspend(userId) {
+        return unwrap(await api.post(`/api/admin/users/${userId}/suspend`));
     },
 
-    /**
-     * Change user password
-     * @param {string} userId - User ID
-     * @param {object} passwordData - Password change data (currentPassword, newPassword, confirmPassword)
-     * @returns {Promise<object>}
-     */
-    async changePassword(userId, passwordData) {
-        try {
-            const response = await api.post(`/api/admin/users/${userId}/change-password`, passwordData);
-            return response.data;
-        } catch (error) {
-            console.error('Change password error:', error);
-            throw error;
-        }
+    async activate(userId) {
+        return unwrap(await api.post(`/api/admin/users/${userId}/activate`));
+    },
+
+    // Clears a lock from too many failed sign-ins.
+    async unlock(userId) {
+        return unwrap(await api.post(`/api/admin/users/${userId}/unlock`));
+    },
+
+    // Ends every session the user has.
+    async signOutEverywhere(userId) {
+        return unwrap(await api.post(`/api/admin/users/${userId}/logout`));
+    },
+
+    async remove(userId) {
+        return unwrap(await api.delete(`/api/admin/users/${userId}`));
     },
 };
 
