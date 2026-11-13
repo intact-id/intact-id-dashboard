@@ -345,7 +345,7 @@ export function SummaryPanel({ validation, versions, saving, readOnly, onSelectN
                                     <div className="wf-hint">{formatDateTime(v.publishedAt)}{v.publishedBy ? ` · ${v.publishedBy}` : ''}</div>
                                     {v.notes && <div className="wf-hint">{v.notes}</div>}
                                 </div>
-                                {!v.live && !readOnly && <button className="btn btn--ghost btn--sm" onClick={() => onPromote(v.number)}>Make live</button>}
+                                {!v.live && !readOnly && <button className="btn btn--ghost btn--sm" onClick={() => onPromote(v.number)}>Use this version</button>}
                             </li>
                         ))}
                     </ul>

@@ -298,11 +298,11 @@ function Editor({ workflowId, initial, scope, readOnly, onDetail }) {
         try {
             await workflowService.promote(workflowId, number, scope);
             onDetail(await workflowService.get(workflowId, scope));
-            toast.success(`Version ${number} is live`);
+            toast.success(`Version ${number} is in use`);
             setPromoting(null);
             setPublishing(null);
         } catch (error) {
-            toast.error(errorMessage(error, 'Could not make that version live.'));
+            toast.error(errorMessage(error, 'Could not switch to that version.'));
         } finally {
             setBusy(false);
         }
@@ -357,7 +357,7 @@ function Editor({ workflowId, initial, scope, readOnly, onDetail }) {
                             <div className="wf-subline">
                                 <Badge kind="neutral" dot={false}>{SUBJECT_TYPES[initial.subjectType]?.label || initial.subjectType}</Badge>
                                 {scope.template ? <Badge kind="info" dot={false}>Template · copy it to use it</Badge>
-                                    : initial.liveVersion ? <Badge kind="ok">Live v{initial.liveVersion}</Badge> : <Badge kind="warn">Not live</Badge>}
+                                    : initial.liveVersion ? <Badge kind="ok">Live v{initial.liveVersion}</Badge> : <Badge kind="warn">Not published</Badge>}
                                 {!scope.template && initial.defaultWorkflow && <Badge kind="info" dot={false}>Default</Badge>}
                                 {!scope.template && !readOnly && (initial.defaultWorkflow || initial.liveVersion) && (
                                     <button className="link-btn" onClick={() => setDefaultChange(initial.defaultWorkflow ? 'clear' : 'set')}>
@@ -501,19 +501,16 @@ function Editor({ workflowId, initial, scope, readOnly, onDetail }) {
                             ? `The draft is the same as v${publishing.version?.number}, so no new version was created.`
                             : scope.template
                             ? 'Saved as a fixed version merchants can copy. Later edits go into the draft until you publish again.'
-                            : `Sandbox keys use it now. Production ${initial.liveVersion
-                                ? `keeps using v${initial.liveVersion} until you make this one live.`
-                                : 'can’t use this workflow until you make a version live.'} This version can’t be edited; later changes go into the draft.`)
-                        : 'Saves the current draft as a fixed version. Sandbox uses it straight away; you choose when production does.'}
+                            : 'It is live: new sessions and API calls use it now. Verifications already running finish on the version they started with. Later edits go into the draft until you publish again.')
+                        : 'Saves the current draft as a new version and puts it live straight away.'}
                     footer={publishing?.step === 'done' ? (
                         <>
-                            <button className="btn btn--secondary" onClick={() => setPublishing(null)}>Later</button>
-                            {!scope.template && !publishing.version?.live && <button className="btn btn--primary" disabled={busy} onClick={() => promote(publishing.version.number)}>{busy ? 'Working…' : 'Make it live now'}</button>}
+                            <button className="btn btn--primary" onClick={() => setPublishing(null)}>Done</button>
                         </>
                     ) : (
                         <>
                             <button className="btn btn--secondary" onClick={() => setPublishing(null)} disabled={busy}>Cancel</button>
-                            <button className="btn btn--primary" onClick={publish} disabled={busy}>{busy ? 'Publishing…' : 'Publish'}</button>
+                            <button className="btn btn--primary" onClick={publish} disabled={busy}>{busy ? 'Publishing…' : scope.template ? 'Publish' : 'Publish and go live'}</button>
                         </>
                     )}
                 >
@@ -528,12 +525,12 @@ function Editor({ workflowId, initial, scope, readOnly, onDetail }) {
                 <Modal
                     isOpen={promoting !== null}
                     onClose={() => setPromoting(null)}
-                    title={`Make version ${promoting} live?`}
-                    caption="New verifications start using it straight away. Verifications already running finish on the version they started with."
+                    title={`Go back to version ${promoting}?`}
+                    caption="New sessions and API calls use it straight away, and billing is re-priced for its checks. Verifications already running finish on the version they started with."
                     footer={(
                         <>
                             <button className="btn btn--secondary" onClick={() => setPromoting(null)} disabled={busy}>Cancel</button>
-                            <button className="btn btn--primary" onClick={() => promote(promoting)} disabled={busy}>{busy ? 'Working…' : 'Make live'}</button>
+                            <button className="btn btn--primary" onClick={() => promote(promoting)} disabled={busy}>{busy ? 'Working…' : `Use version ${promoting}`}</button>
                         </>
                     )}
                 />

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Link, useParams, useSearchParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import { ArrowLeft, X, Check, ShieldQuestion, FileText, Image as ImageIcon, ExternalLink, PlayCircle } from 'lucide-react';
 import Badge from '../components/ui/Badge';
 import { useAuth } from '../contexts/AuthContext';
@@ -85,8 +85,6 @@ function DocumentCard({ verificationId, doc }) {
 
 export default function VerificationDetail() {
     const { id } = useParams();
-    const [searchParams] = useSearchParams();
-    const environment = searchParams.get('env') === 'DEV' ? 'DEV' : 'PROD';
     const { user } = useAuth();
     const { toast } = useToast();
     const isStaff = hasAnyRole(user, ['ADMIN', 'SUPER_ADMIN']);
@@ -100,11 +98,11 @@ export default function VerificationDetail() {
     const load = useCallback(async () => {
         setError('');
         try {
-            setV(await verificationService.get(id, environment));
+            setV(await verificationService.get(id));
         } catch (e) {
             setError(errorMessage(e, 'Could not load this verification.'));
         }
-    }, [id, environment]);
+    }, [id]);
 
     useEffect(() => { load(); }, [load]);
 
@@ -309,7 +307,6 @@ export default function VerificationDetail() {
                         <div className="card-head"><h3>Request</h3></div>
                         <div className="kv-list">
                             <div className="kv-row"><span>Company</span><strong>{v.companyName || '—'}</strong></div>
-                            <div className="kv-row"><span>Environment</span><strong>{v.environment === 'DEV' ? 'Sandbox' : v.environment === 'PROD' ? 'Production' : '—'}</strong></div>
                             <div className="kv-row"><span>Tier</span><strong>{v.tier || '—'}</strong></div>
                             <div className="kv-row"><span>Workflow</span><strong className="mono">{v.workflowId ? `${v.workflowId.slice(0, 8)} · v${v.workflowVersion ?? '?'}` : 'Standard checks'}</strong></div>
                             <div className="kv-row"><span>Completed</span><strong>{formatDateTime(v.completedAt)}</strong></div>

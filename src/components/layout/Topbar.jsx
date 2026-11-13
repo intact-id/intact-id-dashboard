@@ -1,7 +1,6 @@
 import { useLocation } from 'react-router-dom';
 import NotificationBell from '../notifications/NotificationBell';
 import { ChevronRight, Search } from 'lucide-react';
-import { useEnvironment } from '../../contexts/EnvironmentContext';
 import './Topbar.css';
 
 const ROUTE_LABELS = {
@@ -36,7 +35,6 @@ function currentLabel(pathname) {
 
 export default function Topbar() {
     const { pathname } = useLocation();
-    const { environment, setEnvironment } = useEnvironment();
     return (
         <div className="topbar">
             <div className="topbar-crumbs">
@@ -45,14 +43,6 @@ export default function Topbar() {
                 <span className="crumb-current">{currentLabel(pathname)}</span>
             </div>
             <div className="topbar-actions">
-                <div className="env-switch">
-                    <button className={environment === 'PROD' ? 'is-active' : ''} onClick={() => setEnvironment('PROD')}>
-                        <span className="env-dot" /> Production
-                    </button>
-                    <button className={environment === 'DEV' ? 'is-active' : ''} onClick={() => setEnvironment('DEV')}>
-                        Sandbox
-                    </button>
-                </div>
                 <div className="topbar-search">
                     <Search size={15} />
                     <span>Search verifications</span>
