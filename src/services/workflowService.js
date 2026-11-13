@@ -57,6 +57,15 @@ const workflowService = {
         return unwrap(await api.get('/api/v1/workflows/archived', scoped(companyId, template ? { template } : {})));
     },
 
+    // Sessions and API calls that name no workflow run the company's default (instead of the tier checks).
+    async makeDefault(id, { companyId } = {}) {
+        return unwrap(await api.put(`/api/v1/workflows/${id}/default`, null, scoped(companyId)));
+    },
+
+    async clearDefault(id, { companyId } = {}) {
+        return unwrap(await api.delete(`/api/v1/workflows/${id}/default`, scoped(companyId)));
+    },
+
     // Brings it back with its versions and live version as they were.
     async restore(id, { companyId, template = false } = {}) {
         return unwrap(await api.post(`/api/v1/workflows/${id}/restore`, null, scoped(companyId, template ? { template } : {})));
