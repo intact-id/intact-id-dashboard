@@ -164,7 +164,7 @@ export default function Verifications() {
                                             <span className="avatar avatar--light">{initialsOf(name)}</span>
                                             <div>
                                                 <div className="name-primary">{name}</div>
-                                                <div className="name-secondary">{v.customerData?.email || v.externalReference || v.verificationId}</div>
+                                                <div className="name-secondary">{v.customerData?.registrationNumber || v.customerData?.email || v.externalReference || v.verificationId}</div>
                                             </div>
                                         </Link>
                                     </td>

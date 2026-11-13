@@ -1,5 +1,5 @@
 import {
-    IdCard, ListChecks, ScanFace, Calendar, Landmark, House, ShieldAlert, Building2, Gauge, Puzzle,
+    IdCard, ListChecks, ScanFace, Calendar, Landmark, House, ShieldAlert, Building2, Gauge, Puzzle, Users,
 } from 'lucide-react';
 
 // Catalog services carry an icon hint in ui.icon; map the ones the catalog uses today.
@@ -14,6 +14,7 @@ const SERVICE_ICONS = {
     'shield-search': ShieldAlert,
     building: Building2,
     gauge: Gauge,
+    users: Users,
 };
 
 // Icon names the catalog editor offers, in the order shown.

@@ -30,6 +30,8 @@ const STEP_LABEL = {
     liveness_detection: 'Liveness',
     sanctions_screening: 'Sanctions and PEP screening',
     risk_assessment: 'Risk assessment',
+    business_registry: 'Business registry',
+    owner_verification: 'Directors and owners',
     system_check: 'System check',
 };
 
@@ -44,11 +46,26 @@ export const statusOf = (value) => STATUS[value] || { label: value || '—', bad
 export const decisionOf = (value) => DECISION[value] || { label: value || '—', badge: 'neutral' };
 export const stepLabel = (name) => STEP_LABEL[name] || name;
 
+export const isBusiness = (verification) => verification?.verificationType?.toLowerCase() === 'business';
+
+// A person's name, or a business's registered name.
 export function applicantName(verification) {
     const data = verification?.customerData || {};
+    if (isBusiness(verification)) return data.companyName || 'Unnamed business';
     const name = [data.firstName, data.lastName].filter(Boolean).join(' ');
     return name || 'Unnamed applicant';
 }
+
+// Where one director or owner is in their check.
+export const PARTY_STATUS = {
+    NOT_REQUIRED: { label: 'Not required', badge: 'neutral' },
+    PENDING: { label: 'Not started', badge: 'neutral' },
+    INVITED: { label: 'Link sent', badge: 'info' },
+    VERIFYING: { label: 'Verifying', badge: 'info' },
+    PASSED: { label: 'Passed', badge: 'ok' },
+    FAILED: { label: 'Failed', badge: 'bad' },
+    REVIEW: { label: 'Needs review', badge: 'warn' },
+};
 
 // "12345678" → "1••••••8". Shown on screen; the full value stays in the API response.
 export function maskId(value) {
