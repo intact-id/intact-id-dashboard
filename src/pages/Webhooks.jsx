@@ -1,702 +1,365 @@
-import { useEffect, useState } from 'react';
-import { Building2, Mail, Phone, Globe, Webhook as WebhookIcon, RefreshCcw, Save, TestTube, Copy, RotateCcw, Eye, EyeOff, Bell } from 'lucide-react';
-import Card from '../components/ui/Card';
-import Button from '../components/ui/Button';
-import Badge from '../components/ui/Badge';
+import { useCallback, useEffect, useState } from 'react';
+import { Send, Copy, RotateCw, ShieldCheck, Search } from 'lucide-react';
+import Modal from '../components/ui/Modal';
 import { useAuth } from '../contexts/AuthContext';
-import { isAdminOrSuperAdmin, hasAnyRole } from '../utils/roles';
-import companyService from '../services/companyService';
+import { useToast } from '../contexts/ToastContext';
 import webhookService from '../services/webhookService';
-import apiKeyService from '../services/apiKeyService';
-import './Webhooks.css';
+import companyService from '../services/companyService';
+import { errorMessage } from '../services/api';
+import { hasAnyRole, isSuperAdmin } from '../utils/roles';
+import { humanize, initialsOf } from '../utils/format';
+import { DeliveryHealth, DeliveryLog } from './webhooks/Deliveries';
+import ApplicantEmails from './webhooks/ApplicantEmails';
+
+// The only events auth-server sends today. There is no per-event subscription in the API.
+const EVENTS_SENT = ['verification.completed', 'verification.failed'];
+
+// Payload fields a company can switch on or off. `byDefault` mirrors auth-server's
+// CompanyCommunicationDetails.isPayloadFieldEnabled: everything on except raw scores and applicant PII.
+const PAYLOAD_FIELDS = [
+    { key: 'includeVerificationId', label: 'Verification ID', byDefault: true },
+    { key: 'includeCompanyId', label: 'Company ID', byDefault: true },
+    { key: 'includeCompanyName', label: 'Company name', byDefault: true },
+    { key: 'includeTier', label: 'Verification tier', byDefault: true },
+    { key: 'includeTimestamps', label: 'Timestamps', byDefault: true },
+    { key: 'includeRejectionReason', label: 'Rejection reason', byDefault: true },
+    { key: 'includeResults', label: 'Step results', byDefault: true },
+    { key: 'includeRawScores', label: 'Raw scores (inside step results)', byDefault: false },
+    { key: 'includeApplicant', label: 'Applicant details (personal data)', byDefault: false },
+];
+
+function formFromSettings(settings) {
+    const saved = settings?.payloadFields || {};
+    return {
+        webhookUrl: settings?.webhookUrl || '',
+        webhookEnabled: !!settings?.webhookEnabled,
+        payloadFields: Object.fromEntries(PAYLOAD_FIELDS.map((f) => [
+            f.key,
+            typeof saved[f.key] === 'boolean' ? saved[f.key] : f.byDefault,
+        ])),
+    };
+}
+
+function isValidWebhookUrl(value) {
+    try {
+        return new URL(value).protocol === 'https:';
+    } catch {
+        return false;
+    }
+}
 
 export default function Webhooks() {
     const { user } = useAuth();
+    const { toast } = useToast();
+    const isAdmin = hasAnyRole(user, ['ADMIN', 'SUPER_ADMIN']);
+    const superAdmin = isSuperAdmin(user);
+
+    // Admins pick any company; company users only see their own, read-only (changes are admin-only).
     const [companies, setCompanies] = useState([]);
-    const [filteredCompanies, setFilteredCompanies] = useState([]);
-    const [selectedCompany, setSelectedCompany] = useState(null);
-    const [communication, setCommunication] = useState(null);
-    const [credentialStatuses, setCredentialStatuses] = useState({ DEV: 'N/A', PROD: 'N/A' });
-    const [loadingCompanies, setLoadingCompanies] = useState(true);
-    const [loadingDetails, setLoadingDetails] = useState(false);
-    const [searchQuery, setSearchQuery] = useState('');
-    const [statusFilter, setStatusFilter] = useState('ACTIVE');
-    const [pagination, setPagination] = useState({ page: 0, size: 20, totalPages: 0, totalElements: 0 });
-    const [error, setError] = useState('');
-    const [notice, setNotice] = useState(null);
+    const [companyId, setCompanyId] = useState(isAdmin ? null : user?.companyId);
+    const [search, setSearch] = useState('');
+
+    const [settings, setSettings] = useState(null);
+    const [form, setForm] = useState(formFromSettings(null));
+    const [loadError, setLoadError] = useState('');
     const [saving, setSaving] = useState(false);
     const [testing, setTesting] = useState(false);
-    const [rotating, setRotating] = useState(false);
-    const [secretVisible, setSecretVisible] = useState(false);
-    const [revealedSecret, setRevealedSecret] = useState(null);
-    const [notifyOnApproval, setNotifyOnApproval] = useState(true);
-    const [notifyOnRejection, setNotifyOnRejection] = useState(true);
-    const [notifyOnPending, setNotifyOnPending] = useState(false);
-    const [notifSaving, setNotifSaving] = useState(false);
-
-    const [webhookUrl, setWebhookUrl] = useState('');
-    const [payloadFields, setPayloadFields] = useState({
-        includeVerificationId: true,
-        includeCompanyId: true,
-        includeCompanyName: true,
-        includeRejectionReason: true,
-        includeTier: true,
-        includeTimestamps: true,
-        includeResults: true,
-        includeRawScores: false,
-        includeApplicant: false,
-    });
-    const [webhookEnabled, setWebhookEnabled] = useState(false);
-    const [emailNotifications, setEmailNotifications] = useState(true);
-    const [smsNotifications, setSmsNotifications] = useState(false);
-    const isAdminUser = isAdminOrSuperAdmin(user);
-    const isSuperAdmin = hasAnyRole(user, ['SUPER_ADMIN']);
+    const [confirmRotate, setConfirmRotate] = useState(false);
+    const [newSecret, setNewSecret] = useState(null);
+    const [deliveriesRefresh, setDeliveriesRefresh] = useState(0);
 
     useEffect(() => {
-        fetchCompanies();
-    }, [pagination.page, statusFilter]);
+        if (!isAdmin) return;
+        companyService
+            .list({ size: 100 })
+            .then((page) => {
+                setCompanies(page.content);
+                setCompanyId((current) => current ?? page.content[0]?.id ?? null);
+            })
+            .catch((error) => setLoadError(errorMessage(error, 'Could not load companies.')));
+    }, [isAdmin]);
+
+    const load = useCallback(async (id) => {
+        setSettings(null);
+        setLoadError('');
+        try {
+            const data = await webhookService.get(id);
+            setSettings(data);
+            setForm(formFromSettings(data));
+        } catch (error) {
+            setLoadError(errorMessage(error, 'Could not load webhook settings.'));
+        }
+    }, []);
 
     useEffect(() => {
-        if (!searchQuery.trim()) {
-            setFilteredCompanies(companies);
+        if (companyId) load(companyId);
+    }, [companyId, load]);
+
+    const saved = formFromSettings(settings);
+    const isDirty = JSON.stringify(form) !== JSON.stringify(saved);
+    const urlError = form.webhookUrl && !isValidWebhookUrl(form.webhookUrl) ? 'Use a full https:// URL.' : '';
+
+    const save = async () => {
+        if (form.webhookEnabled && !form.webhookUrl) {
+            toast.error('Add an endpoint URL before enabling webhooks.');
             return;
         }
-        const query = searchQuery.toLowerCase();
-        setFilteredCompanies(
-            companies.filter((company) =>
-                company.legalName?.toLowerCase().includes(query) ||
-                company.registrationNumber?.toLowerCase().includes(query) ||
-                company.country?.toLowerCase().includes(query)
-            )
-        );
-    }, [searchQuery, companies]);
-
-    const fetchCompanies = async () => {
-        setLoadingCompanies(true);
-        setError('');
-        try {
-            const response = await companyService.getAllCompanies(
-                statusFilter === 'all' ? {} : { status: statusFilter },
-                { page: pagination.page, size: pagination.size }
-            );
-            if (response.success) {
-                const pageData = response.data || {};
-                const list = pageData.content || [];
-                setCompanies(list);
-                setFilteredCompanies(list);
-                setPagination((prev) => ({
-                    ...prev,
-                    totalPages: pageData.totalPages || 0,
-                    totalElements: pageData.totalElements || 0
-                }));
-                if (list.length > 0) {
-                    const next = list.find((c) => c.id === selectedCompany?.id) || list[0];
-                    await selectCompany(next);
-                } else {
-                    setSelectedCompany(null);
-                    setCommunication(null);
-                }
-            }
-        } catch (err) {
-            setError(err.response?.data?.errorMessage || err.message || 'Failed to load companies');
-        } finally {
-            setLoadingCompanies(false);
-        }
-    };
-
-    const selectCompany = async (company) => {
-        setSelectedCompany(company);
-        setLoadingDetails(true);
-        setError('');
-        setNotice(null);
-        try {
-            const [communicationResponse, keysResponse] = await Promise.allSettled([
-                webhookService.getCompanyCommunication(company.id),
-                isAdminUser ? apiKeyService.getApiKeys(company.id) : Promise.resolve({ success: false, data: [] })
-            ]);
-
-            if (communicationResponse.status === 'fulfilled' && communicationResponse.value.success) {
-                const data = communicationResponse.value.data || null;
-                setCommunication(data);
-                setWebhookUrl(data?.webhookUrl || '');
-                setWebhookEnabled(data?.webhookEnabled || false);
-                setEmailNotifications(data?.emailNotifications !== false);
-                setSmsNotifications(data?.smsNotifications || false);
-                const ns = data?.notificationSettings || {};
-                setNotifyOnApproval(ns.notifyApplicantOnApproval !== false);
-                setNotifyOnRejection(ns.notifyApplicantOnRejection !== false);
-                setNotifyOnPending(ns.notifyApplicantOnPendingReview === true);
-                setPayloadFields({
-                    includeVerificationId: data?.payloadFields?.includeVerificationId !== false,
-                    includeCompanyId: data?.payloadFields?.includeCompanyId !== false,
-                    includeCompanyName: data?.payloadFields?.includeCompanyName !== false,
-                    includeRejectionReason: data?.payloadFields?.includeRejectionReason !== false,
-                    includeTier: data?.payloadFields?.includeTier !== false,
-                    includeTimestamps: data?.payloadFields?.includeTimestamps !== false,
-                    includeResults: data?.payloadFields?.includeResults !== false,
-                    includeRawScores: data?.payloadFields?.includeRawScores || false,
-                    includeApplicant: data?.payloadFields?.includeApplicant || false,
-                });
-            } else {
-                setCommunication(null);
-            }
-
-            if (keysResponse.status === 'fulfilled' && keysResponse.value.success) {
-                const statuses = { DEV: 'NOT GENERATED', PROD: 'NOT GENERATED' };
-                (keysResponse.value.data || []).forEach((k) => {
-                    if (k.environment === 'DEV') statuses.DEV = k.status || 'UNKNOWN';
-                    if (k.environment === 'PROD') statuses.PROD = k.status || 'UNKNOWN';
-                });
-                setCredentialStatuses(statuses);
-            } else {
-                setCredentialStatuses({ DEV: 'N/A', PROD: 'N/A' });
-            }
-        } catch (err) {
-            setCommunication(null);
-            setCredentialStatuses({ DEV: 'N/A', PROD: 'N/A' });
-            setWebhookUrl('');
-            setWebhookEnabled(false);
-            setEmailNotifications(true);
-            setSmsNotifications(false);
-            setPayloadFields({ includeVerificationId: true, includeCompanyId: true, includeCompanyName: true, includeRejectionReason: true, includeTier: true, includeTimestamps: true, includeResults: true, includeRawScores: false, includeApplicant: false });
-            setError(err.response?.data?.errorMessage || err.message || 'Failed to load webhook settings');
-        } finally {
-            setLoadingDetails(false);
-        }
-    };
-
-    const handleSaveWebhook = async () => {
-        if (!selectedCompany) return;
-        if (webhookEnabled && !webhookUrl.trim()) {
-            setError('Webhook URL is required when webhook is enabled.');
+        if (urlError) {
+            toast.error(urlError);
             return;
         }
         setSaving(true);
-        setError('');
-        setNotice(null);
         try {
-            const response = await webhookService.updateWebhookSettings(selectedCompany.id, {
-                webhookUrl: webhookUrl.trim(),
-                webhookEnabled,
-                emailNotifications,
-                smsNotifications,
-                payloadFields,
-            });
-            if (response.success) {
-                setNotice({ type: 'success', message: 'Webhook settings saved successfully.' });
-                await selectCompany(selectedCompany);
-            } else {
-                setError(response.responseMessage || 'Failed to save webhook settings');
-            }
-        } catch (err) {
-            setError(err.response?.data?.errorMessage || err.message || 'Failed to save webhook settings');
+            const updated = await webhookService.update(companyId, form);
+            setSettings(updated);
+            setForm(formFromSettings(updated));
+            toast.success('Webhook settings saved');
+        } catch (error) {
+            toast.error(errorMessage(error, 'Could not save webhook settings.'));
         } finally {
             setSaving(false);
         }
     };
 
-    const handleRotateSecret = async () => {
-        if (!selectedCompany) return;
-        setRotating(true);
-        setError('');
-        setNotice(null);
-        setRevealedSecret(null);
-        setSecretVisible(false);
-        try {
-            const response = await webhookService.rotateWebhookSecret(selectedCompany.id);
-            if (response.success) {
-                setRevealedSecret(response.data?.webhookSecret || null);
-                setSecretVisible(true);
-                setNotice({ type: 'success', message: 'Secret rotated. Copy it now — it will not be shown in full again.' });
-                await selectCompany(selectedCompany);
-            } else {
-                setError(response.responseMessage || 'Failed to rotate secret.');
-            }
-        } catch (err) {
-            setError(err.response?.data?.errorMessage || err.message || 'Failed to rotate secret.');
-        } finally {
-            setRotating(false);
-        }
-    };
-
-    const handleTestWebhook = async () => {
-        if (!selectedCompany) return;
-        if (!webhookUrl.trim()) {
-            setError('Add a webhook URL before running test.');
-            return;
-        }
+    const sendTest = async () => {
         setTesting(true);
-        setError('');
-        setNotice(null);
         try {
-            const response = await webhookService.testWebhook(selectedCompany.id);
-            if (response.success) {
-                setNotice({ type: 'success', message: 'Webhook test sent successfully.' });
-            } else {
-                setNotice({ type: 'error', message: response.responseMessage || 'Webhook test failed.' });
-            }
-        } catch (err) {
-            setNotice({
-                type: 'error',
-                message: err.response?.data?.errorMessage || err.message || 'Webhook test failed.'
-            });
+            await webhookService.sendTest(companyId);
+            toast.success('Test event sent. Check your endpoint logs.');
+        } catch (error) {
+            toast.error(errorMessage(error, 'The test event could not be delivered.'));
         } finally {
             setTesting(false);
         }
     };
 
-    const handleSaveApplicantNotifications = async () => {
-        if (!selectedCompany) return;
-        setNotifSaving(true);
-        setError('');
-        setNotice(null);
+    const rotate = async () => {
+        setSaving(true);
         try {
-            const res = await webhookService.updateApplicantNotifications(selectedCompany.id, {
-                notifyApplicantOnApproval: notifyOnApproval,
-                notifyApplicantOnRejection: notifyOnRejection,
-                notifyApplicantOnPendingReview: notifyOnPending,
-            });
-            if (res.success) {
-                setNotice({ type: 'success', message: 'Applicant notification settings saved.' });
-            } else {
-                setError(res.responseMessage || 'Failed to save notification settings');
-            }
-        } catch (err) {
-            setError(err.response?.data?.errorMessage || err.message || 'Failed to save notification settings');
+            const updated = await webhookService.rotateSecret(companyId);
+            setNewSecret(updated.webhookSecret);
+            setConfirmRotate(false);
+            await load(companyId); // re-read so the page shows the masked value again
+        } catch (error) {
+            toast.error(errorMessage(error, 'Could not rotate the signing secret.'));
         } finally {
-            setNotifSaving(false);
+            setSaving(false);
         }
     };
 
-    const formatDate = (dateString) => {
-        if (!dateString) return 'N/A';
-        return new Date(dateString).toLocaleString('en-US', {
-            month: 'short',
-            day: 'numeric',
-            year: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit'
-        });
+    const copySecret = () => {
+        navigator.clipboard.writeText(newSecret).then(
+            () => toast.success('Copied'),
+            () => toast.error('Could not copy — select the text and copy it manually'),
+        );
     };
 
-    return (
-        <div className="webhooks-page">
-            <div className="page-header">
-                <div>
-                    <h1>Webhook Management</h1>
-                    <p className="page-subtitle">Configure webhook endpoints and communication channels per company.</p>
-                </div>
-                <Button variant="secondary" onClick={fetchCompanies}>
-                    <RefreshCcw size={14} />
-                    Refresh
-                </Button>
-            </div>
+    const selectedCompany = companies.find((c) => c.id === companyId);
+    const query = search.trim().toLowerCase();
+    const filteredCompanies = companies.filter((c) =>
+        [c.legalName, c.tradingName].some((name) => name?.toLowerCase().includes(query)));
 
-            {error && <div className="error-banner">{error}</div>}
-            {notice && (
-                <div className={`notice-banner ${notice.type === 'success' ? 'success' : 'error'}`}>
-                    {notice.message}
+    const detail = loadError ? (
+        <div className="card"><div className="empty-state">{loadError}</div></div>
+    ) : !settings ? (
+        <div className="card"><div className="loading-state">Loading webhook settings…</div></div>
+    ) : (
+        <>
+            {selectedCompany && (
+                <div className="card">
+                    <div className="card-head">
+                        <div className="subject-head" style={{ marginBottom: 0 }}>
+                            <span className="avatar avatar--dark avatar--lg">{initialsOf(selectedCompany.tradingName || selectedCompany.legalName)}</span>
+                            <div>
+                                <div className="name-primary">{selectedCompany.legalName}</div>
+                                <div className="name-secondary">{settings.webhookEnabled ? 'Webhooks enabled' : 'Webhooks disabled'}</div>
+                            </div>
+                        </div>
+                        <div className="head-actions">
+                            <button
+                                className="btn btn--secondary btn--sm"
+                                onClick={sendTest}
+                                disabled={testing || !settings.webhookUrl || isDirty}
+                                title={isDirty ? 'Save your changes first' : !settings.webhookUrl ? 'Save an endpoint URL first' : undefined}
+                            >
+                                <Send size={15} /> {testing ? 'Sending…' : 'Send test event'}
+                            </button>
+                        </div>
+                    </div>
                 </div>
             )}
 
-            <div className="webhooks-layout">
-                <Card className="companies-panel">
-                    <div className="panel-header">
-                        <h3>Companies</h3>
-                        <Badge variant="info">{pagination.totalElements}</Badge>
-                    </div>
+            <DeliveryHealth companyId={companyId} refreshKey={deliveriesRefresh} />
 
-                    <div className="panel-filters">
-                        <input
-                            className="panel-input"
-                            placeholder="Search company..."
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                        />
-                        <select
-                            className="panel-input"
-                            value={statusFilter}
-                            onChange={(e) => {
-                                setPagination((prev) => ({ ...prev, page: 0 }));
-                                setStatusFilter(e.target.value);
-                            }}
-                        >
-                            <option value="all">All Status</option>
-                            <option value="ACTIVE">Active</option>
-                            <option value="SUSPENDED">Suspended</option>
-                            <option value="INACTIVE">Inactive</option>
-                            <option value="PENDING">Pending</option>
-                        </select>
-                    </div>
+            <div className="card">
+                <div className="settings-grid">
+                    <section>
+                        <div className="card-head">
+                            <h3>Endpoint</h3>
+                            <label className="checkbox-row">
+                                <span>{form.webhookEnabled ? 'Enabled' : 'Disabled'}</span>
+                                <button
+                                    type="button"
+                                    className={`toggle${form.webhookEnabled ? ' is-on' : ''}`}
+                                    onClick={() => setForm((f) => ({ ...f, webhookEnabled: !f.webhookEnabled }))}
+                                    disabled={!isAdmin}
+                                    aria-pressed={form.webhookEnabled}
+                                    aria-label="Send webhooks"
+                                >
+                                    <span className="toggle-knob" />
+                                </button>
+                            </label>
+                        </div>
 
-                    <div className="panel-table-wrap">
-                        {loadingCompanies ? (
-                            <div className="loading-state">Loading companies...</div>
-                        ) : (
-                            <table className="companies-table">
-                                <thead>
-                                    <tr>
-                                        <th>Company</th>
-                                        <th>Status</th>
-                                        <th>Country</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {filteredCompanies.map((company) => (
-                                        <tr
-                                            key={company.id}
-                                            className={selectedCompany?.id === company.id ? 'selected' : ''}
-                                            onClick={() => selectCompany(company)}
-                                        >
-                                            <td>
-                                                <div className="company-main">
-                                                    <Building2 size={14} />
-                                                    <span>{company.legalName}</span>
-                                                </div>
-                                            </td>
-                                            <td>
-                                                <Badge
-                                                    variant={
-                                                        company.status === 'ACTIVE'
-                                                            ? 'success'
-                                                            : company.status === 'SUSPENDED'
-                                                                ? 'warning'
-                                                                : 'default'
-                                                    }
-                                                >
-                                                    {company.status}
-                                                </Badge>
-                                            </td>
-                                            <td>{company.country || 'N/A'}</td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        )}
-                    </div>
+                        <div className="field">
+                            <label htmlFor="webhook-url">URL</label>
+                            <input
+                                id="webhook-url"
+                                className="input mono"
+                                type="url"
+                                placeholder="https://api.example.com/hooks/intact"
+                                value={form.webhookUrl}
+                                onChange={(e) => setForm((f) => ({ ...f, webhookUrl: e.target.value }))}
+                                disabled={!isAdmin}
+                            />
+                            {urlError && <div className="field-error">{urlError}</div>}
+                        </div>
 
-                    <div className="pagination-controls">
-                        <button
-                            className="pagination-btn"
-                            disabled={pagination.page === 0}
-                            onClick={() => setPagination((prev) => ({ ...prev, page: prev.page - 1 }))}
-                        >
-                            Previous
-                        </button>
-                        <span>Page {pagination.page + 1} of {Math.max(pagination.totalPages, 1)}</span>
-                        <button
-                            className="pagination-btn"
-                            disabled={pagination.page >= pagination.totalPages - 1 || pagination.totalPages === 0}
-                            onClick={() => setPagination((prev) => ({ ...prev, page: prev.page + 1 }))}
-                        >
-                            Next
-                        </button>
-                    </div>
-                </Card>
-
-                <Card className="details-panel">
-                    {!selectedCompany ? (
-                        <div className="empty-state">Select a company to manage webhook settings.</div>
-                    ) : loadingDetails ? (
-                        <div className="loading-state">Loading details...</div>
-                    ) : (
-                        <div className="details-content">
-                            <div className="details-header">
-                                <div>
-                                    <h2>{selectedCompany.legalName}</h2>
-                                    <p>{selectedCompany.registrationNumber || selectedCompany.id}</p>
-                                    <div className="details-meta">
-                                        <Badge variant={selectedCompany.status === 'ACTIVE' ? 'success' : 'warning'}>
-                                            {selectedCompany.status}
-                                        </Badge>
-                                        <span>Created: {formatDate(selectedCompany.createdAt)}</span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className="details-grid">
-                                <div className="detail-box">
-                                    <h4>Company Details</h4>
-                                    <div className="detail-row"><span>Trading Name</span><strong>{selectedCompany.tradingName || 'N/A'}</strong></div>
-                                    <div className="detail-row"><span>Business Type</span><strong>{selectedCompany.businessType || 'N/A'}</strong></div>
-                                    <div className="detail-row"><span>Country</span><strong>{selectedCompany.country || 'N/A'}</strong></div>
-                                    <div className="detail-row"><span>Company Code</span><strong>{selectedCompany.companyIdentifierCode || 'N/A'}</strong></div>
-                                </div>
-
-                                <div className="detail-box">
-                                    <h4>Communication Channels</h4>
-                                    <div className="detail-row"><span><Mail size={14} /> Primary Email</span><strong>{communication?.email || 'N/A'}</strong></div>
-                                    <div className="detail-row"><span><Phone size={14} /> Primary Phone</span><strong>{communication?.phone || 'N/A'}</strong></div>
-                                    <div className="detail-row"><span><Mail size={14} /> Support Email</span><strong>{communication?.supportEmail || 'N/A'}</strong></div>
-                                    <div className="detail-row"><span><Globe size={14} /> Website</span><strong>{communication?.website || 'N/A'}</strong></div>
-                                </div>
-
-                                <div className="detail-box detail-box-full">
-                                    <h4>Webhook Configuration</h4>
-                                    <div className="field-grid">
-                                        <div className="field-group field-group-full">
-                                            <label className="field-label">
-                                                <WebhookIcon size={14} />
-                                                Webhook URL
-                                            </label>
-                                            <input
-                                                type="url"
-                                                className="panel-input"
-                                                placeholder="https://your-domain.com/webhook"
-                                                value={webhookUrl}
-                                                onChange={(e) => setWebhookUrl(e.target.value)}
-                                            />
-                                        </div>
-                                    </div>
-
-                                    {isAdminUser && (
-                                        <>
-                                            <div className="switch-stack">
-                                                <label className="switch-row">
-                                                    <span className="switch-text">Enable Webhook</span>
-                                                    <input className="switch-input" type="checkbox" checked={webhookEnabled} onChange={(e) => setWebhookEnabled(e.target.checked)} />
-                                                    <span className="switch-control">
-                                                        <span className="switch-pill" aria-hidden="true"></span>
-                                                        <span className={`switch-state ${webhookEnabled ? 'on' : 'off'}`}>{webhookEnabled ? 'ON' : 'OFF'}</span>
-                                                    </span>
-                                                </label>
-                                                <label className="switch-row">
-                                                    <span className="switch-text">Email Notifications</span>
-                                                    <input className="switch-input" type="checkbox" checked={emailNotifications} onChange={(e) => setEmailNotifications(e.target.checked)} />
-                                                    <span className="switch-control">
-                                                        <span className="switch-pill" aria-hidden="true"></span>
-                                                        <span className={`switch-state ${emailNotifications ? 'on' : 'off'}`}>{emailNotifications ? 'ON' : 'OFF'}</span>
-                                                    </span>
-                                                </label>
-                                                <label className="switch-row">
-                                                    <span className="switch-text">SMS Notifications</span>
-                                                    <input className="switch-input" type="checkbox" checked={smsNotifications} onChange={(e) => setSmsNotifications(e.target.checked)} />
-                                                    <span className="switch-control">
-                                                        <span className="switch-pill" aria-hidden="true"></span>
-                                                        <span className={`switch-state ${smsNotifications ? 'on' : 'off'}`}>{smsNotifications ? 'ON' : 'OFF'}</span>
-                                                    </span>
-                                                </label>
-                                            </div>
-
-                                            <div className="payload-fields-section">
-                                                <p className="payload-fields-title">Payload Fields</p>
-                                                <div className="switch-stack">
-                                                    <label className="switch-row">
-                                                        <span className="switch-text">
-                                                            Include Verification ID
-                                                            <span className="switch-subtext">verificationId</span>
-                                                        </span>
-                                                        <input className="switch-input" type="checkbox" checked={payloadFields.includeVerificationId} onChange={() => setPayloadFields(p => ({ ...p, includeVerificationId: !p.includeVerificationId }))} />
-                                                        <span className="switch-control">
-                                                            <span className="switch-pill" aria-hidden="true"></span>
-                                                            <span className={`switch-state ${payloadFields.includeVerificationId ? 'on' : 'off'}`}>{payloadFields.includeVerificationId ? 'ON' : 'OFF'}</span>
-                                                        </span>
-                                                    </label>
-                                                    <label className="switch-row">
-                                                        <span className="switch-text">
-                                                            Include Company ID
-                                                            <span className="switch-subtext">companyId</span>
-                                                        </span>
-                                                        <input className="switch-input" type="checkbox" checked={payloadFields.includeCompanyId} onChange={() => setPayloadFields(p => ({ ...p, includeCompanyId: !p.includeCompanyId }))} />
-                                                        <span className="switch-control">
-                                                            <span className="switch-pill" aria-hidden="true"></span>
-                                                            <span className={`switch-state ${payloadFields.includeCompanyId ? 'on' : 'off'}`}>{payloadFields.includeCompanyId ? 'ON' : 'OFF'}</span>
-                                                        </span>
-                                                    </label>
-                                                    <label className="switch-row">
-                                                        <span className="switch-text">
-                                                            Include Company Name
-                                                            <span className="switch-subtext">companyName (legalName)</span>
-                                                        </span>
-                                                        <input className="switch-input" type="checkbox" checked={payloadFields.includeCompanyName} onChange={() => setPayloadFields(p => ({ ...p, includeCompanyName: !p.includeCompanyName }))} />
-                                                        <span className="switch-control">
-                                                            <span className="switch-pill" aria-hidden="true"></span>
-                                                            <span className={`switch-state ${payloadFields.includeCompanyName ? 'on' : 'off'}`}>{payloadFields.includeCompanyName ? 'ON' : 'OFF'}</span>
-                                                        </span>
-                                                    </label>
-                                                    <label className="switch-row">
-                                                        <span className="switch-text">
-                                                            Include Rejection Reason
-                                                            <span className="switch-subtext">rejection_reason, rejection_details</span>
-                                                        </span>
-                                                        <input className="switch-input" type="checkbox" checked={payloadFields.includeRejectionReason} onChange={() => setPayloadFields(p => ({ ...p, includeRejectionReason: !p.includeRejectionReason }))} />
-                                                        <span className="switch-control">
-                                                            <span className="switch-pill" aria-hidden="true"></span>
-                                                            <span className={`switch-state ${payloadFields.includeRejectionReason ? 'on' : 'off'}`}>{payloadFields.includeRejectionReason ? 'ON' : 'OFF'}</span>
-                                                        </span>
-                                                    </label>
-                                                    <label className="switch-row">
-                                                        <span className="switch-text">
-                                                            Include Tier
-                                                            <span className="switch-subtext">Verification tier (tier1, tier2…)</span>
-                                                        </span>
-                                                        <input className="switch-input" type="checkbox" checked={payloadFields.includeTier} onChange={() => setPayloadFields(p => ({ ...p, includeTier: !p.includeTier }))} />
-                                                        <span className="switch-control">
-                                                            <span className="switch-pill" aria-hidden="true"></span>
-                                                            <span className={`switch-state ${payloadFields.includeTier ? 'on' : 'off'}`}>{payloadFields.includeTier ? 'ON' : 'OFF'}</span>
-                                                        </span>
-                                                    </label>
-                                                    <label className="switch-row">
-                                                        <span className="switch-text">
-                                                            Include Timestamps
-                                                            <span className="switch-subtext">started_at / completed_at</span>
-                                                        </span>
-                                                        <input className="switch-input" type="checkbox" checked={payloadFields.includeTimestamps} onChange={() => setPayloadFields(p => ({ ...p, includeTimestamps: !p.includeTimestamps }))} />
-                                                        <span className="switch-control">
-                                                            <span className="switch-pill" aria-hidden="true"></span>
-                                                            <span className={`switch-state ${payloadFields.includeTimestamps ? 'on' : 'off'}`}>{payloadFields.includeTimestamps ? 'ON' : 'OFF'}</span>
-                                                        </span>
-                                                    </label>
-                                                    <label className="switch-row">
-                                                        <span className="switch-text">
-                                                            Include Results
-                                                            <span className="switch-subtext">Per-check decision & status</span>
-                                                        </span>
-                                                        <input className="switch-input" type="checkbox" checked={payloadFields.includeResults} onChange={() => setPayloadFields(p => ({ ...p, includeResults: !p.includeResults, includeRawScores: !p.includeResults ? p.includeRawScores : false }))} />
-                                                        <span className="switch-control">
-                                                            <span className="switch-pill" aria-hidden="true"></span>
-                                                            <span className={`switch-state ${payloadFields.includeResults ? 'on' : 'off'}`}>{payloadFields.includeResults ? 'ON' : 'OFF'}</span>
-                                                        </span>
-                                                    </label>
-                                                    <label className={`switch-row${!payloadFields.includeResults ? ' disabled' : ''}`}>
-                                                        <span className="switch-text">
-                                                            Include Raw Scores
-                                                            <span className="switch-subtext">face_match_score, quality_score — sensitive</span>
-                                                        </span>
-                                                        <input className="switch-input" type="checkbox" checked={payloadFields.includeRawScores} disabled={!payloadFields.includeResults} onChange={() => setPayloadFields(p => ({ ...p, includeRawScores: !p.includeRawScores }))} />
-                                                        <span className="switch-control">
-                                                            <span className="switch-pill" aria-hidden="true"></span>
-                                                            <span className={`switch-state ${payloadFields.includeRawScores ? 'on' : 'off'}`}>{payloadFields.includeRawScores ? 'ON' : 'OFF'}</span>
-                                                        </span>
-                                                    </label>
-                                                    <label className="switch-row">
-                                                        <span className="switch-text">
-                                                            Include Applicant Info
-                                                            <span className="switch-subtext">name & internal ID — PII</span>
-                                                        </span>
-                                                        <input className="switch-input" type="checkbox" checked={payloadFields.includeApplicant} onChange={() => setPayloadFields(p => ({ ...p, includeApplicant: !p.includeApplicant }))} />
-                                                        <span className="switch-control">
-                                                            <span className="switch-pill" aria-hidden="true"></span>
-                                                            <span className={`switch-state ${payloadFields.includeApplicant ? 'on' : 'off'}`}>{payloadFields.includeApplicant ? 'ON' : 'OFF'}</span>
-                                                        </span>
-                                                    </label>
-                                                </div>
-                                            </div>
-                                        </>
-                                    )}
-
-                                    <div className="detail-row">
-                                        <span>Webhook Status</span>
-                                        <strong>{webhookEnabled ? 'Enabled' : 'Disabled'}</strong>
-                                    </div>
-                                    <div className="detail-row">
-                                        <span>PROD Credential Status</span>
-                                        <strong>{credentialStatuses.PROD}</strong>
-                                    </div>
-                                    <div className="detail-row">
-                                        <span>DEV Credential Status</span>
-                                        <strong>{credentialStatuses.DEV}</strong>
-                                    </div>
-                                    <div className="detail-row">
-                                        <span>Current URL</span>
-                                        <strong className="mono">{communication?.webhookUrl || 'Not configured'}</strong>
-                                    </div>
-                                    <div className="detail-row">
-                                        <span>Signing Secret</span>
-                                        <div className="secret-row">
-                                            <span className="mono secret-value">
-                                                {revealedSecret && secretVisible
-                                                    ? revealedSecret
-                                                    : (communication?.webhookSecret || 'Not generated')}
-                                            </span>
-                                            {(revealedSecret || communication?.webhookSecret) && (
-                                                <>
-                                                    <button className="secret-btn" title="Copy" onClick={() => navigator.clipboard.writeText(revealedSecret || communication?.webhookSecret)}>
-                                                        <Copy size={13} />
-                                                    </button>
-                                                    {revealedSecret && (
-                                                        <button className="secret-btn" title={secretVisible ? 'Hide' : 'Show'} onClick={() => setSecretVisible(v => !v)}>
-                                                            {secretVisible ? <EyeOff size={13} /> : <Eye size={13} />}
-                                                        </button>
-                                                    )}
-                                                </>
-                                            )}
-                                        </div>
-                                    </div>
-
-                                    {isAdminUser && (
-                                        <div className="actions-row">
-                                            <Button variant="secondary" onClick={handleRotateSecret} disabled={rotating}>
-                                                <RotateCcw size={14} />
-                                                {rotating ? 'Rotating...' : 'Rotate Secret'}
-                                            </Button>
-                                            <Button variant="secondary" onClick={handleTestWebhook} disabled={testing || !webhookUrl.trim()}>
-                                                <TestTube size={14} />
-                                                {testing ? 'Testing...' : 'Test Webhook'}
-                                            </Button>
-                                            <Button onClick={handleSaveWebhook} disabled={saving}>
-                                                <Save size={14} />
-                                                {saving ? 'Saving...' : 'Save Settings'}
-                                            </Button>
-                                        </div>
-                                    )}
-                                </div>
-
-                                {isSuperAdmin && (
-                                    <div className="detail-box detail-box-full">
-                                        <div className="notif-section-header">
-                                            <Bell size={15} />
-                                            <h4>Applicant Email Notifications</h4>
-                                            <span className="notif-section-hint">Emails sent to the end-user after KYC completion. Requires applicant email collected during verification.</span>
-                                        </div>
-                                        <div className="switch-stack">
-                                            <label className="switch-row">
-                                                <span className="switch-text">
-                                                    Notify on Approval
-                                                    <span className="switch-subtext">Send email when verification is approved</span>
-                                                </span>
-                                                <input className="switch-input" type="checkbox" checked={notifyOnApproval} onChange={e => setNotifyOnApproval(e.target.checked)} />
-                                                <span className="switch-control">
-                                                    <span className="switch-pill" aria-hidden="true"></span>
-                                                    <span className={`switch-state ${notifyOnApproval ? 'on' : 'off'}`}>{notifyOnApproval ? 'ON' : 'OFF'}</span>
-                                                </span>
-                                            </label>
-                                            <label className="switch-row">
-                                                <span className="switch-text">
-                                                    Notify on Rejection
-                                                    <span className="switch-subtext">Send email with rejection reason when verification fails</span>
-                                                </span>
-                                                <input className="switch-input" type="checkbox" checked={notifyOnRejection} onChange={e => setNotifyOnRejection(e.target.checked)} />
-                                                <span className="switch-control">
-                                                    <span className="switch-pill" aria-hidden="true"></span>
-                                                    <span className={`switch-state ${notifyOnRejection ? 'on' : 'off'}`}>{notifyOnRejection ? 'ON' : 'OFF'}</span>
-                                                </span>
-                                            </label>
-                                            <label className="switch-row">
-                                                <span className="switch-text">
-                                                    Notify on Manual Review
-                                                    <span className="switch-subtext">Send email when sent to pending review (off by default)</span>
-                                                </span>
-                                                <input className="switch-input" type="checkbox" checked={notifyOnPending} onChange={e => setNotifyOnPending(e.target.checked)} />
-                                                <span className="switch-control">
-                                                    <span className="switch-pill" aria-hidden="true"></span>
-                                                    <span className={`switch-state ${notifyOnPending ? 'on' : 'off'}`}>{notifyOnPending ? 'ON' : 'OFF'}</span>
-                                                </span>
-                                            </label>
-                                        </div>
-                                        <div className="actions-row" style={{ marginTop: '0.75rem' }}>
-                                            <Button onClick={handleSaveApplicantNotifications} disabled={notifSaving}>
-                                                <Save size={14} />
-                                                {notifSaving ? 'Saving…' : 'Save Notification Settings'}
-                                            </Button>
-                                        </div>
-                                    </div>
+                        <div className="field">
+                            <label>Signing secret</label>
+                            <div className="head-actions" style={{ justifyContent: 'space-between' }}>
+                                <div className="copy-field mono" style={{ flex: 1 }}>{settings.webhookSecret || 'Not generated yet'}</div>
+                                {isAdmin && (
+                                    <button className="btn btn--ghost btn--sm" onClick={() => setConfirmRotate(true)}>
+                                        <RotateCw size={14} /> {settings.webhookSecret ? 'Rotate' : 'Generate'}
+                                    </button>
                                 )}
                             </div>
+                            <div className="card-caption" style={{ display: 'flex', gap: 6, alignItems: 'flex-start' }}>
+                                <ShieldCheck size={14} style={{ flex: 'none', marginTop: 2 }} />
+                                <span>
+                                    Each event carries <span className="mono">X-Webhook-Signature: sha256=…</span>, an HMAC-SHA256 of the raw
+                                    body keyed with this secret. Reject events whose signature does not match. Failed deliveries are retried
+                                    after 1, 5 and 15 minutes.
+                                </span>
+                            </div>
                         </div>
-                    )}
-                </Card>
+                    </section>
+
+                    <section>
+                        <div className="card-head"><h3>Payload</h3></div>
+
+                        <div className="field">
+                            <label>Events sent</label>
+                            <div className="event-checklist">
+                                {EVENTS_SENT.map((event) => <span key={event} className="mono">{event}</span>)}
+                            </div>
+                        </div>
+
+                        <div className="field">
+                            <label>Fields included</label>
+                            <div className="event-checklist">
+                                {PAYLOAD_FIELDS.map((f) => (
+                                    <label key={f.key} className="checkbox-row">
+                                        <input
+                                            type="checkbox"
+                                            checked={form.payloadFields[f.key]}
+                                            disabled={!isAdmin || (f.key === 'includeRawScores' && !form.payloadFields.includeResults)}
+                                            onChange={(e) => setForm((prev) => ({
+                                                ...prev,
+                                                payloadFields: { ...prev.payloadFields, [f.key]: e.target.checked },
+                                            }))}
+                                        />
+                                        <span>{f.label}</span>
+                                    </label>
+                                ))}
+                            </div>
+                        </div>
+                    </section>
+                </div>
+
+                {isAdmin && (
+                    <div className="modal-footer" style={{ margin: '4px -22px -22px', borderRadius: '0 0 12px 12px' }}>
+                        <button className="btn btn--secondary btn--sm" onClick={() => setForm(saved)} disabled={!isDirty || saving}>Discard</button>
+                        <button className="btn btn--primary btn--sm" onClick={save} disabled={!isDirty || saving}>
+                            {saving ? 'Saving…' : 'Save changes'}
+                        </button>
+                    </div>
+                )}
             </div>
+
+            {superAdmin && <ApplicantEmails key={companyId} companyId={companyId} settings={settings} />}
+
+            <DeliveryLog
+                companyId={companyId}
+                refreshKey={deliveriesRefresh}
+                onRefresh={() => setDeliveriesRefresh((n) => n + 1)}
+            />
+        </>
+    );
+
+    return (
+        <div className="page">
+            <div className="page-head">
+                <div>
+                    <h1>Webhooks</h1>
+                    <p>Where Intact ID posts verification events for your systems{superAdmin ? ', and which emails applicants get' : ''}.</p>
+                </div>
+            </div>
+
+            {isAdmin ? (
+                <div className="api-layout">
+                    <div className="card api-companies-card">
+                        <div className="card-head"><h3>Companies</h3></div>
+                        <div className="search-input" style={{ marginBottom: 12 }}>
+                            <Search size={14} />
+                            <input placeholder="Search company" value={search} onChange={(e) => setSearch(e.target.value)} />
+                        </div>
+                        <div className="api-company-list">
+                            {companies.length === 0 && !loadError && <div className="loading-state">Loading companies…</div>}
+                            {filteredCompanies.map((c) => (
+                                <button
+                                    key={c.id}
+                                    className={`api-company-item${c.id === companyId ? ' is-selected' : ''}`}
+                                    onClick={() => setCompanyId(c.id)}
+                                >
+                                    <span className="avatar avatar--light">{initialsOf(c.tradingName || c.legalName)}</span>
+                                    <div>
+                                        <div className="name-primary">{c.tradingName || c.legalName}</div>
+                                        <div className="name-secondary">{[humanize(c.status), c.country].filter(Boolean).join(' · ')}</div>
+                                    </div>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                    <div className="api-detail">{detail}</div>
+                </div>
+            ) : detail}
+
+            <Modal
+                isOpen={confirmRotate}
+                onClose={() => setConfirmRotate(false)}
+                title={settings?.webhookSecret ? 'Rotate the signing secret?' : 'Generate a signing secret?'}
+                caption={settings?.webhookSecret
+                    ? 'Events are signed with the new secret straight away. Signature checks using the old secret will start failing until the endpoint is updated.'
+                    : 'The secret is shown once. Copy it before closing.'}
+                footer={(
+                    <>
+                        <button className="btn btn--secondary" onClick={() => setConfirmRotate(false)} disabled={saving}>Cancel</button>
+                        <button className="btn btn--primary" onClick={rotate} disabled={saving}>{saving ? 'Working…' : settings?.webhookSecret ? 'Rotate secret' : 'Generate secret'}</button>
+                    </>
+                )}
+            />
+
+            <Modal
+                isOpen={!!newSecret}
+                onClose={() => setNewSecret(null)}
+                title="New signing secret"
+                caption="Copy it now. It will not be shown again in full."
+                footer={<button className="btn btn--primary" onClick={() => setNewSecret(null)}>I have copied it</button>}
+            >
+                <button className="copy-field mono" onClick={copySecret}>{newSecret} <Copy size={14} /></button>
+            </Modal>
         </div>
     );
 }

@@ -1,73 +1,44 @@
 import api from './api';
 
+// auth-server wraps responses as { success, responseMessage, data }; return just `data`, or throw.
+function unwrap(response) {
+    if (!response.data.success) throw new Error(response.data.responseMessage || 'Request failed');
+    return response.data.data;
+}
+
+// In-console notifications. Everyone has an inbox: a company's users see their company's notifications,
+// super admins see the Intact staff inbox (new applications, manual reviews, services down).
 const notificationService = {
-    // Get all notifications (admin)
-    getAllNotifications: async (page = 0, size = 20) => {
-        try {
-            const response = await api.get(`/api/notifications`, {
-                params: { page, size }
-            });
-            return response.data;
-        } catch (error) {
-            console.error('Error fetching all notifications:', error);
-            throw error;
-        }
+    // Spring page of { id, companyId, companyName, title, message, link, type, status, createdAt, readAt }
+    async inbox({ page = 0, size = 20 } = {}) {
+        return unwrap(await api.get('/api/notifications/inbox', { params: { page, size } }));
     },
 
-    // Get notifications for a specific company
-    getNotificationsByCompany: async (companyId) => {
-        try {
-            const response = await api.get(`/api/notifications/company/${companyId}`);
-            return response.data;
-        } catch (error) {
-            console.error('Error fetching company notifications:', error);
-            throw error;
-        }
+    async inboxUnreadCount() {
+        return unwrap(await api.get('/api/notifications/inbox/unread-count'));
     },
 
-    // Get unread count for a company
-    getUnreadCount: async (companyId) => {
-        try {
-            const response = await api.get(`/api/notifications/company/${companyId}/unread-count`);
-            return response.data;
-        } catch (error) {
-            console.error('Error fetching unread count:', error);
-            throw error;
-        }
+    async markInboxRead() {
+        return unwrap(await api.put('/api/notifications/inbox/read'));
     },
 
-    // Create a new notification
-    createNotification: async (notificationData) => {
-        try {
-            const response = await api.post(`/api/notifications`, notificationData);
-            return response.data;
-        } catch (error) {
-            console.error('Error creating notification:', error);
-            throw error;
-        }
+    // Super admins: what was sent to companies. Same page shape as inbox.
+    async sent({ page = 0, size = 20 } = {}) {
+        return unwrap(await api.get('/api/notifications', { params: { page, size } }));
     },
 
-    // Mark notification as read
-    markAsRead: async (notificationId) => {
-        try {
-            const response = await api.put(`/api/notifications/${notificationId}/read`);
-            return response.data;
-        } catch (error) {
-            console.error('Error marking notification as read:', error);
-            throw error;
-        }
+    // { companyId, title, message, type: INFO | SUCCESS | WARNING | ERROR }
+    async send(notification) {
+        return unwrap(await api.post('/api/notifications', notification));
     },
 
-    // Delete notification
-    deleteNotification: async (notificationId) => {
-        try {
-            const response = await api.delete(`/api/notifications/${notificationId}`);
-            return response.data;
-        } catch (error) {
-            console.error('Error deleting notification:', error);
-            throw error;
-        }
-    }
+    async markRead(id) {
+        return unwrap(await api.put(`/api/notifications/${id}/read`));
+    },
+
+    async remove(id) {
+        return unwrap(await api.delete(`/api/notifications/${id}`));
+    },
 };
 
 export default notificationService;

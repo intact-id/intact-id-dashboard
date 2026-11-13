@@ -1,23 +1,19 @@
-export function normalizeRoleName(role) {
+// auth-server sends roles as strings, sometimes with Spring's ROLE_ prefix.
+export function normalizeRole(role) {
+    return String(role || '').replace(/^ROLE_/, '').toUpperCase();
+}
+
+export function hasAnyRole(user, accepted) {
+    const wanted = new Set(accepted.map(normalizeRole));
+    return (user?.roles || []).some((role) => wanted.has(normalizeRole(role)));
+}
+
+export const isSuperAdmin = (user) => hasAnyRole(user, ['SUPER_ADMIN']);
+
+// "SUPER_ADMIN" → "Super admin"
+export function roleLabel(user) {
+    const role = normalizeRole(user?.roles?.[0]);
     if (!role) return '';
-    if (typeof role === 'string') {
-        return role.replace(/^ROLE_/, '').toUpperCase();
-    }
-    if (typeof role === 'object') {
-        const candidate = role.name || role.role || role.authority || role.code;
-        if (typeof candidate === 'string') {
-            return candidate.replace(/^ROLE_/, '').toUpperCase();
-        }
-    }
-    return '';
-}
-
-export function hasAnyRole(user, acceptedRoles = []) {
-    if (!user || !Array.isArray(user.roles) || user.roles.length === 0) return false;
-    const accepted = new Set(acceptedRoles.map((r) => String(r).toUpperCase()));
-    return user.roles.some((role) => accepted.has(normalizeRoleName(role)));
-}
-
-export function isAdminOrSuperAdmin(user) {
-    return hasAnyRole(user, ['ADMIN', 'SUPER_ADMIN']);
+    const words = role.toLowerCase().replace(/_/g, ' ');
+    return words[0].toUpperCase() + words.slice(1);
 }

@@ -1,253 +1,208 @@
-import React, { useState, useEffect } from 'react';
-import { Bell, Send, Trash2, CheckCircle, AlertCircle, Info, AlertTriangle } from 'lucide-react';
-import Card from '../components/ui/Card';
-import Button from '../components/ui/Button';
-import Input from '../components/ui/Input';
-import Badge from '../components/ui/Badge';
-import companyService from '../services/companyService';
+import { useCallback, useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { CheckCheck, Trash2, Send, ChevronLeft, ChevronRight, ArrowRight } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
+import { useToast } from '../contexts/ToastContext';
 import notificationService from '../services/notificationService';
-import './Notifications.css';
+import companyService from '../services/companyService';
+import { errorMessage } from '../services/api';
+import { isSuperAdmin } from '../utils/roles';
+import { formatDateTime } from '../utils/format';
+import { NOTIFICATION_TYPES, isUnread } from '../components/notifications/types';
 
-const Notifications = () => {
-    const [notifications, setNotifications] = useState([]);
+const PAGE_SIZE = 20;
+
+// Everyone sees their own inbox: a company's users get their company's notifications, super admins get
+// the Intact staff inbox. Super admins also see what they sent to companies, and send new ones.
+export default function Notifications() {
+    const { user } = useAuth();
+    const { toast } = useToast();
+    const superAdmin = isSuperAdmin(user);
+
+    const [tab, setTab] = useState('inbox'); // inbox | sent
+    const [filter, setFilter] = useState('all');
+    const [page, setPage] = useState(0);
+    const [result, setResult] = useState(null);
+    const [error, setError] = useState('');
+
     const [companies, setCompanies] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [showCreateModal, setShowCreateModal] = useState(false);
-    const [createForm, setCreateForm] = useState({
-        companyId: '',
-        title: '',
-        message: '',
-        type: 'INFO'
-    });
+    const [draft, setDraft] = useState({ companyId: '', type: 'INFO', title: '', message: '' });
+    const [sending, setSending] = useState(false);
+
+    const load = useCallback(async () => {
+        setError('');
+        try {
+            const fetchPage = tab === 'sent' ? notificationService.sent : notificationService.inbox;
+            setResult(await fetchPage({ page, size: PAGE_SIZE }));
+        } catch (e) {
+            setError(errorMessage(e, 'Could not load notifications.'));
+        }
+    }, [tab, page]);
+
+    useEffect(() => { load(); }, [load]);
 
     useEffect(() => {
-        fetchNotifications();
-        fetchCompanies();
-    }, []);
+        if (!superAdmin) return;
+        companyService.list({ size: 100 }).then((p) => {
+            setCompanies(p.content);
+            setDraft((d) => ({ ...d, companyId: d.companyId || p.content[0]?.id || '' }));
+        }).catch(() => {});
+    }, [superAdmin]);
 
-    const fetchNotifications = async () => {
+    const switchTab = (next) => {
+        setTab(next);
+        setPage(0);
+        setFilter('all');
+        setResult(null);
+    };
+
+    const markRead = async (n) => {
         try {
-            setLoading(true);
-            const response = await notificationService.getAllNotifications(0, 100);
-            if (response.success) {
-                setNotifications(response.data.content || []);
-            }
-        } catch (error) {
-            console.error('Error fetching notifications:', error);
+            await notificationService.markRead(n.id);
+            setResult((r) => ({ ...r, content: r.content.map((x) => (x.id === n.id ? { ...x, readAt: new Date().toISOString(), status: 'READ' } : x)) }));
+        } catch (e) {
+            toast.error(errorMessage(e, 'Could not mark it as read.'));
+        }
+    };
+
+    const markAllRead = async () => {
+        try {
+            const count = await notificationService.markInboxRead();
+            toast.success(`${count} marked as read`);
+            load();
+        } catch (e) {
+            toast.error(errorMessage(e, 'Could not mark them as read.'));
+        }
+    };
+
+    const remove = async (n) => {
+        try {
+            await notificationService.remove(n.id);
+            setResult((r) => ({ ...r, content: r.content.filter((x) => x.id !== n.id), totalElements: r.totalElements - 1 }));
+        } catch (e) {
+            toast.error(errorMessage(e, 'Could not delete it.'));
+        }
+    };
+
+    const send = async () => {
+        setSending(true);
+        try {
+            await notificationService.send({ companyId: draft.companyId, type: draft.type, title: draft.title.trim(), message: draft.message.trim() });
+            toast.success('Notification sent');
+            setDraft((d) => ({ ...d, title: '', message: '' }));
+            setPage(0);
+            load();
+        } catch (e) {
+            toast.error(errorMessage(e, 'Could not send the notification.'));
         } finally {
-            setLoading(false);
+            setSending(false);
         }
     };
 
-    const fetchCompanies = async () => {
-        try {
-            const response = await companyService.getAllCompanies({}, { page: 0, size: 100 });
-            if (response.success) {
-                setCompanies(response.data.content || []);
-            }
-        } catch (error) {
-            console.error('Error fetching companies:', error);
-        }
-    };
-
-    const handleCreateNotification = async (e) => {
-        e.preventDefault();
-        try {
-            const response = await notificationService.createNotification(createForm);
-            if (response.success) {
-                setShowCreateModal(false);
-                setCreateForm({ companyId: '', title: '', message: '', type: 'INFO' });
-                fetchNotifications();
-            }
-        } catch (error) {
-            console.error('Error creating notification:', error);
-        }
-    };
-
-    const handleMarkAsRead = async (id) => {
-        try {
-            await notificationService.markAsRead(id);
-            fetchNotifications();
-        } catch (error) {
-            console.error('Error marking as read:', error);
-        }
-    };
-
-    const handleDelete = async (id) => {
-        if (window.confirm('Are you sure you want to delete this notification?')) {
-            try {
-                await notificationService.deleteNotification(id);
-                fetchNotifications();
-            } catch (error) {
-                console.error('Error deleting notification:', error);
-            }
-        }
-    };
-
-    const getTypeIcon = (type) => {
-        switch (type) {
-            case 'SUCCESS': return <CheckCircle size={20} />;
-            case 'ERROR': return <AlertCircle size={20} />;
-            case 'WARNING': return <AlertTriangle size={20} />;
-            default: return <Info size={20} />;
-        }
-    };
-
-    const getTypeBadge = (type) => {
-        const variants = {
-            'SUCCESS': 'success',
-            'ERROR': 'danger',
-            'WARNING': 'warning',
-            'INFO': 'info'
-        };
-        return <Badge variant={variants[type] || 'info'}>{type}</Badge>;
-    };
-
-    const formatDate = (dateString) => {
-        if (!dateString) return 'N/A';
-        return new Date(dateString).toLocaleString();
-    };
+    const all = result?.content || [];
+    const rows = filter === 'unread' ? all.filter(isUnread) : all;
+    const unreadOnPage = all.filter(isUnread).length;
+    const totalPages = result?.totalPages ?? 0;
+    const inbox = tab === 'inbox';
 
     return (
-        <div className="notifications-page">
-            <div className="page-header">
+        <div className="page">
+            <div className="page-head">
                 <div>
-                    <h1><Bell size={32} /> Notifications</h1>
-                    <p className="page-subtitle">Manage system notifications</p>
+                    <h1>Notifications</h1>
+                    <p>{superAdmin
+                        ? 'Your inbox: new applications, verifications waiting for review and services that went down.'
+                        : 'Messages for your company: account changes, suspensions and announcements.'}</p>
                 </div>
-                <Button onClick={() => setShowCreateModal(true)}>
-                    <Send size={16} /> Send Notification
-                </Button>
+                {inbox && (
+                    <div className="head-actions">
+                        <button className="btn btn--secondary btn--sm" onClick={markAllRead} disabled={!unreadOnPage}><CheckCheck size={15} /> Mark all as read</button>
+                    </div>
+                )}
             </div>
 
-            <Card>
-                {loading ? (
-                    <div className="loading-state">
-                        <div className="spinner"></div>
-                        <p>Loading notifications...</p>
-                    </div>
-                ) : notifications.length > 0 ? (
-                    <div className="notifications-list">
-                        {notifications.map((notification) => (
-                            <div
-                                key={notification.id}
-                                className={`notification-item ${notification.status === 'UNREAD' ? 'unread' : ''}`}
-                            >
-                                <div className="notification-icon">
-                                    {getTypeIcon(notification.type)}
-                                </div>
-                                <div className="notification-content">
-                                    <div className="notification-header">
-                                        <h4>{notification.title}</h4>
-                                        {getTypeBadge(notification.type)}
-                                    </div>
-                                    <p className="notification-message">{notification.message}</p>
-                                    <div className="notification-meta">
-                                        <span className="company-name">{notification.companyName}</span>
-                                        <span className="notification-date">{formatDate(notification.createdAt)}</span>
-                                        {notification.status === 'READ' && notification.readAt && (
-                                            <span className="read-date">Read: {formatDate(notification.readAt)}</span>
-                                        )}
-                                    </div>
-                                </div>
-                                <div className="notification-actions">
-                                    {notification.status === 'UNREAD' && (
-                                        <button
-                                            className="action-btn action-btn--success"
-                                            onClick={() => handleMarkAsRead(notification.id)}
-                                            title="Mark as Read"
-                                        >
-                                            <CheckCircle size={16} />
-                                        </button>
-                                    )}
-                                    <button
-                                        className="action-btn action-btn--delete"
-                                        onClick={() => handleDelete(notification.id)}
-                                        title="Delete"
-                                    >
-                                        <Trash2 size={16} />
-                                    </button>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                ) : (
-                    <div className="no-data">No notifications found</div>
-                )}
-            </Card>
-
-            {/* Create Notification Modal */}
-            {showCreateModal && (
-                <div className="modal-overlay" onClick={() => setShowCreateModal(false)}>
-                    <div className="modal" onClick={(e) => e.stopPropagation()}>
-                        <div className="modal-header">
-                            <h3>Send Notification</h3>
-                            <button className="modal-close" onClick={() => setShowCreateModal(false)}>×</button>
-                        </div>
-                        <form onSubmit={handleCreateNotification}>
-                            <div className="modal-body">
-                                <div className="form-group">
-                                    <label>Company</label>
-                                    <select
-                                        value={createForm.companyId}
-                                        onChange={(e) => setCreateForm({ ...createForm, companyId: e.target.value })}
-                                        required
-                                    >
-                                        <option value="">Select Company</option>
-                                        {companies.map((company) => (
-                                            <option key={company.id} value={company.id}>
-                                                {company.legalName}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
-                                <div className="form-group">
-                                    <label>Type</label>
-                                    <select
-                                        value={createForm.type}
-                                        onChange={(e) => setCreateForm({ ...createForm, type: e.target.value })}
-                                        required
-                                    >
-                                        <option value="INFO">Info</option>
-                                        <option value="SUCCESS">Success</option>
-                                        <option value="WARNING">Warning</option>
-                                        <option value="ERROR">Error</option>
-                                    </select>
-                                </div>
-                                <div className="form-group">
-                                    <label>Title</label>
-                                    <Input
-                                        value={createForm.title}
-                                        onChange={(e) => setCreateForm({ ...createForm, title: e.target.value })}
-                                        required
-                                        placeholder="Notification title"
-                                    />
-                                </div>
-                                <div className="form-group">
-                                    <label>Message</label>
-                                    <textarea
-                                        value={createForm.message}
-                                        onChange={(e) => setCreateForm({ ...createForm, message: e.target.value })}
-                                        required
-                                        placeholder="Notification message"
-                                        rows="4"
-                                    />
-                                </div>
-                            </div>
-                            <div className="modal-footer">
-                                <Button type="button" variant="secondary" onClick={() => setShowCreateModal(false)}>
-                                    Cancel
-                                </Button>
-                                <Button type="submit">
-                                    <Send size={16} /> Send Notification
-                                </Button>
-                            </div>
-                        </form>
-                    </div>
+            {superAdmin && (
+                <div className="page-tabs" role="tablist">
+                    <button role="tab" aria-selected={inbox} className={inbox ? 'is-active' : ''} onClick={() => switchTab('inbox')}>Inbox</button>
+                    <button role="tab" aria-selected={!inbox} className={!inbox ? 'is-active' : ''} onClick={() => switchTab('sent')}>Sent to companies</button>
                 </div>
             )}
+
+            <div className={inbox ? '' : 'notifications-row'}>
+                <div className="card">
+                    <div className="card-head">
+                        {inbox ? (
+                            <div className="view-toggle">
+                                <button className={filter === 'all' ? 'is-active' : ''} onClick={() => setFilter('all')}>All</button>
+                                <button className={filter === 'unread' ? 'is-active' : ''} onClick={() => setFilter('unread')}>Unread{unreadOnPage ? ` (${unreadOnPage})` : ''}</button>
+                            </div>
+                        ) : <h3>Sent</h3>}
+                        <span className="card-caption">{result ? `${result.totalElements.toLocaleString()} in total` : ''}</span>
+                    </div>
+                    {error ? <div className="empty-state">{error}</div>
+                        : !result ? <div className="loading-state">Loading notifications…</div>
+                            : rows.length === 0 ? <div className="empty-state">{filter === 'unread' ? 'Nothing unread on this page.' : 'No notifications yet.'}</div>
+                                : (
+                                    <div className="notification-list">
+                                        {rows.map((n) => {
+                                            const type = NOTIFICATION_TYPES[n.type] || NOTIFICATION_TYPES.INFO;
+                                            const Icon = type.icon;
+                                            return (
+                                                <div key={n.id} className={`notification-row${inbox && isUnread(n) ? ' is-unread' : ''}`}>
+                                                    <span className={`notification-icon notification-icon--${type.tone}`}><Icon size={16} /></span>
+                                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                                        <div className="notification-title">{n.title}</div>
+                                                        <div className="notification-message">{n.message}</div>
+                                                        <div className="notification-meta">
+                                                            {formatDateTime(n.createdAt)}
+                                                            {!inbox && n.companyName && <> · to {n.companyName}{isUnread(n) ? ' · not read yet' : ' · read'}</>}
+                                                            {inbox && isUnread(n) && <> · <button className="link-btn" onClick={() => markRead(n)}>Mark as read</button></>}
+                                                            {n.link && <> · <Link className="link-btn" to={n.link} onClick={() => inbox && isUnread(n) && markRead(n)}>Open <ArrowRight size={12} /></Link></>}
+                                                        </div>
+                                                    </div>
+                                                    <button className="btn btn--ghost btn--sm" onClick={() => remove(n)} aria-label="Delete notification"><Trash2 size={14} /></button>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                    {totalPages > 1 && (
+                        <div className="pagination">
+                            <span>Page {page + 1} of {totalPages}</span>
+                            <div className="pagination-controls">
+                                <button className="btn btn--ghost btn--sm" disabled={page === 0} onClick={() => setPage((p) => p - 1)}><ChevronLeft size={14} /> Previous</button>
+                                <button className="btn btn--ghost btn--sm" disabled={page + 1 >= totalPages} onClick={() => setPage((p) => p + 1)}>Next <ChevronRight size={14} /></button>
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                {!inbox && (
+                    <div className="card">
+                        <div className="card-head"><div><h3>Send a notification</h3><div className="card-caption">Shows in that company's bell and is emailed to its main address.</div></div></div>
+                        <div className="field">
+                            <label>Company</label>
+                            <select className="input" value={draft.companyId} onChange={(e) => setDraft({ ...draft, companyId: e.target.value })}>
+                                {companies.map((c) => <option key={c.id} value={c.id}>{c.tradingName || c.legalName}</option>)}
+                            </select>
+                            <label style={{ marginTop: 10 }}>Type</label>
+                            <div className="view-toggle" style={{ alignSelf: 'flex-start' }}>
+                                {Object.entries(NOTIFICATION_TYPES).map(([value, t]) => (
+                                    <button key={value} className={draft.type === value ? 'is-active' : ''} onClick={() => setDraft({ ...draft, type: value })}>{t.label}</button>
+                                ))}
+                            </div>
+                            <label style={{ marginTop: 10 }} htmlFor="ntf-title">Title</label>
+                            <input id="ntf-title" className="input" maxLength={200} value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} />
+                            <label style={{ marginTop: 10 }} htmlFor="ntf-message">Message</label>
+                            <textarea id="ntf-message" className="input" rows={4} value={draft.message} onChange={(e) => setDraft({ ...draft, message: e.target.value })} />
+                            <button className="btn btn--primary" style={{ justifyContent: 'center', marginTop: 12 }} onClick={send}
+                                disabled={sending || !draft.title.trim() || !draft.message.trim() || !draft.companyId}>
+                                <Send size={15} /> {sending ? 'Sending…' : 'Send notification'}
+                            </button>
+                        </div>
+                    </div>
+                )}
+            </div>
         </div>
     );
-};
-
-export default Notifications;
+}

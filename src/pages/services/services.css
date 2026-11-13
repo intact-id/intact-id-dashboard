@@ -1,0 +1,62 @@
+/* Services (catalog management) */
+.svc-toolbar { flex-wrap: wrap; height: auto !important; padding: 12px 20px !important; gap: 12px; }
+.svc-count { margin-left: 4px; font-variant-numeric: tabular-nums; color: var(--ink-3); font-weight: 500; }
+.view-toggle button.is-active .svc-count { color: var(--ink-2); }
+.svc-search { max-width: 260px; }
+
+.svc-name { display: flex; align-items: center; gap: 11px; border: none; background: none; padding: 0; font: inherit; text-align: left; cursor: pointer; }
+.svc-name:disabled { cursor: default; }
+.svc-name > span:last-child { display: flex; flex-direction: column; }
+.svc-name:hover:not(:disabled) .name-primary { color: var(--accent); }
+.svc-icon {
+  width: 32px; height: 32px; flex: none; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center;
+  background: var(--accent-soft); color: var(--accent);
+}
+.svc-icon--lg { width: 44px; height: 44px; border-radius: 11px; }
+.svc-row--retired td { opacity: 0.55; }
+.svc-chips { display: flex; gap: 5px; }
+.svc-chip { padding: 2px 8px; border-radius: 100px; background: var(--bg-soft); font-size: 12px; font-weight: 600; color: var(--ink-2); }
+.svc-needs { font-family: var(--font-mono); font-size: 12px; color: var(--ink-2); }
+.svc-price { font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.svc-unpriced { font-size: 12.5px; color: var(--amber); font-weight: 600; }
+.svc-actions { text-align: right; white-space: nowrap; }
+.svc-actions .btn { margin-right: 4px; }
+.svc-effect { font-size: 14px; line-height: 1.55; color: var(--ink-body); }
+
+/* Editor */
+.svc-editor-head { display: flex; gap: 14px; align-items: flex-start; }
+.svc-editor-head .svc-icon--lg { margin-top: 22px; }
+.svc-grow { flex: 1; min-width: 0; }
+.svc-section { display: flex; flex-direction: column; gap: 14px; padding-top: 16px; border-top: 1px solid var(--rule); }
+.svc-section-title { font-size: 12px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: var(--ink-3); }
+.svc-checks { display: flex; gap: 16px; min-height: 42px; align-items: center; }
+.svc-checks--wrap { flex-wrap: wrap; gap: 8px 16px; min-height: 0; }
+.svc-check { display: inline-flex; align-items: center; gap: 7px; font-size: 13.5px; font-weight: 400 !important; color: var(--ink); cursor: pointer; }
+.svc-check input { accent-color: var(--accent); width: 15px; height: 15px; }
+.svc-footer-hint { margin-right: auto; align-self: center; font-size: 12.5px; color: var(--amber); }
+.svc-advanced-toggle {
+  display: inline-flex; align-items: center; gap: 6px; align-self: flex-start;
+  border: none; background: none; padding: 0; font: inherit; font-size: 13px; font-weight: 600; color: var(--ink-2); cursor: pointer;
+}
+.svc-advanced-toggle:hover { color: var(--ink); }
+
+/* Chip input */
+.svc-tags { display: flex; flex-direction: column; gap: 7px; }
+.svc-tags-box {
+  display: flex; flex-wrap: wrap; gap: 6px; align-items: center; min-height: 42px; padding: 6px 8px;
+  border: 1px solid var(--rule); border-radius: 8px; background: var(--bg-soft);
+}
+.svc-tags-box:focus-within { border-color: var(--accent); }
+.svc-tags-box input { flex: 1; min-width: 140px; border: none; background: none; outline: none; font: inherit; font-size: 13.5px; color: var(--ink); height: 28px; }
+.svc-tag {
+  display: inline-flex; align-items: center; gap: 4px; padding: 3px 4px 3px 9px; border-radius: 6px;
+  background: var(--bg); border: 1px solid var(--rule); font-family: var(--font-mono); font-size: 12px; color: var(--ink);
+}
+.svc-tag button { display: inline-flex; border: none; background: none; padding: 2px; border-radius: 4px; color: var(--ink-3); cursor: pointer; }
+.svc-tag button:hover { background: var(--bg-soft); color: var(--danger); }
+.svc-suggest { display: flex; flex-wrap: wrap; gap: 5px; }
+.svc-suggest button {
+  border: 1px dashed var(--rule); background: none; border-radius: 6px; padding: 2px 8px;
+  font-family: var(--font-mono); font-size: 11.5px; color: var(--ink-3); cursor: pointer;
+}
+.svc-suggest button:hover { border-color: var(--accent); color: var(--accent); }

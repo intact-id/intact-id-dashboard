@@ -1,333 +1,101 @@
-import { useState, useEffect } from 'react';
-import { FileText, Eye, Download, Upload, Filter, Search } from 'lucide-react';
-import Card from '../components/ui/Card';
+import { useEffect, useState } from 'react';
+import { Download, Upload, UploadCloud, FileText } from 'lucide-react';
 import Badge from '../components/ui/Badge';
-import DataTable from '../components/ui/DataTable';
-import Modal from '../components/ui/Modal';
-import Button from '../components/ui/Button';
-import FileUpload from '../components/ui/FileUpload';
-import Dropdown from '../components/ui/Dropdown';
-import EmptyState from '../components/ui/EmptyState';
-import { useToast } from '../contexts/ToastContext';
-import './Documents.css';
+import { fetchDocuments } from '../services/mockApi';
+
+const STATUS_BADGE = { approved: 'ok', expiring: 'warn', rejected: 'bad', missing: 'bad' };
+const STATUS_LABEL = { approved: 'Approved', expiring: 'Expiring soon', rejected: 'Rejected', missing: 'Missing' };
 
 export default function Documents() {
-    const [documents, setDocuments] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [selectedDocument, setSelectedDocument] = useState(null);
-    const [isViewerOpen, setIsViewerOpen] = useState(false);
-    const [isUploadOpen, setIsUploadOpen] = useState(false);
-    const [statusFilter, setStatusFilter] = useState('all');
-    const [typeFilter, setTypeFilter] = useState('all');
-    const [searchQuery, setSearchQuery] = useState('');
-    const { toast } = useToast();
+    const [data, setData] = useState(null);
+    const [filter, setFilter] = useState('all');
 
     useEffect(() => {
-        fetchDocuments();
+        fetchDocuments().then((res) => setData(res.data));
     }, []);
 
-    const fetchDocuments = async () => {
-        try {
-            const response = await fetch('http://localhost:3001/documents');
-            const data = await response.json();
-            setDocuments(data);
-        } catch (error) {
-            toast.error('Failed to load documents');
-        } finally {
-            setLoading(false);
-        }
-    };
+    if (!data) return <div className="page"><div className="loading-state">Loading documents…</div></div>;
 
-    const handleViewDocument = (document) => {
-        setSelectedDocument(document);
-        setIsViewerOpen(true);
-    };
-
-    const handleUploadComplete = (files) => {
-        toast.success(`${files.length} document(s) uploaded successfully`);
-        setIsUploadOpen(false);
-        // In production, this would upload to server and refresh list
-        fetchDocuments();
-    };
-
-    const getStatusBadge = (status) => {
-        const statusMap = {
-            verified: 'success',
-            pending: 'warning',
-            rejected: 'error'
-        };
-        return statusMap[status] || 'info';
-    };
-
-    const getDocumentTypeLabel = (type) => {
-        const labels = {
-            passport: 'Passport',
-            id_card: 'ID Card',
-            drivers_license: 'Driver\'s License',
-            utility_bill: 'Utility Bill',
-            bank_statement: 'Bank Statement'
-        };
-        return labels[type] || type;
-    };
-
-    const filteredDocuments = documents.filter(doc => {
-        const matchesStatus = statusFilter === 'all' || doc.status === statusFilter;
-        const matchesType = typeFilter === 'all' || doc.type === typeFilter;
-        const matchesSearch = doc.userName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            doc.documentNumber.toLowerCase().includes(searchQuery.toLowerCase());
-        return matchesStatus && matchesType && matchesSearch;
+    const rows = data.documents.filter((d) => {
+        if (filter === 'all') return true;
+        if (filter === 'needs-action') return d.status === 'rejected' || d.status === 'missing' || d.status === 'expiring';
+        return d.status === 'approved';
     });
-
-    const columns = [
-        {
-            key: 'userName',
-            label: 'User Name',
-            render: (value) => <strong>{value}</strong>
-        },
-        {
-            key: 'type',
-            label: 'Document Type',
-            render: (value) => getDocumentTypeLabel(value)
-        },
-        {
-            key: 'documentNumber',
-            label: 'Document Number',
-            render: (value) => <code className="doc-number">{value}</code>
-        },
-        {
-            key: 'status',
-            label: 'Status',
-            render: (value) => (
-                <Badge variant={getStatusBadge(value)}>
-                    {value.toUpperCase()}
-                </Badge>
-            )
-        },
-        {
-            key: 'country',
-            label: 'Country'
-        },
-        {
-            key: 'uploadedAt',
-            label: 'Uploaded',
-            render: (value) => new Date(value).toLocaleDateString()
-        },
-        {
-            key: 'actions',
-            label: 'Actions',
-            sortable: false,
-            render: (_, doc) => (
-                <div className="doc-actions">
-                    <button
-                        className="action-btn"
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            handleViewDocument(doc);
-                        }}
-                        title="View document"
-                    >
-                        <Eye size={16} />
-                    </button>
-                    <button
-                        className="action-btn"
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            toast.info('Download started');
-                        }}
-                        title="Download document"
-                    >
-                        <Download size={16} />
-                    </button>
-                </div>
-            )
-        }
-    ];
-
-    const statusOptions = [
-        { value: 'all', label: 'All Statuses' },
-        { value: 'verified', label: 'Verified' },
-        { value: 'pending', label: 'Pending' },
-        { value: 'rejected', label: 'Rejected' }
-    ];
-
-    const typeOptions = [
-        { value: 'all', label: 'All Types' },
-        { value: 'passport', label: 'Passport' },
-        { value: 'id_card', label: 'ID Card' },
-        { value: 'drivers_license', label: 'Driver\'s License' }
-    ];
+    const pct = Math.round((data.readiness.approved / data.readiness.of) * 100);
 
     return (
-        <div className="documents-page">
-            <div className="page-header">
-                <div className="page-title-section">
-                    <h1 className="page-title">
-                        <FileText size={28} />
-                        Document Management
-                    </h1>
-                    <p className="page-subtitle">
-                        View and manage all KYC documents
-                    </p>
+        <div className="page">
+            <div className="page-head">
+                <div>
+                    <h1>Documents</h1>
+                    <p>Compliance files your team maintains for Intact ID onboarding and ongoing review.</p>
                 </div>
-                <Button
-                    variant="primary"
-                    onClick={() => setIsUploadOpen(true)}
-                >
-                    <Upload size={18} />
-                    Upload Document
-                </Button>
+                <div className="head-actions">
+                    <button className="btn btn--secondary"><Download size={15} /> Bulk download</button>
+                    <button className="btn btn--primary"><Upload size={15} /> Upload document</button>
+                </div>
             </div>
 
-            <Card>
-                <div className="documents-filters">
-                    <div className="search-box">
-                        <Search size={18} className="search-icon" />
-                        <input
-                            type="text"
-                            placeholder="Search by name or document number..."
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            className="search-input"
-                        />
-                    </div>
-                    <div className="filter-controls">
-                        <Dropdown
-                            options={statusOptions}
-                            value={statusFilter}
-                            onChange={setStatusFilter}
-                            placeholder="Filter by status"
-                        />
-                        <Dropdown
-                            options={typeOptions}
-                            value={typeFilter}
-                            onChange={setTypeFilter}
-                            placeholder="Filter by type"
-                        />
+            <div className="card readiness-card">
+                <div className="readiness-progress">
+                    <span className="eyebrow">COMPLIANCE READINESS</span>
+                    <div className="readiness-count">{data.readiness.approved} of {data.readiness.of} <span>required documents approved</span></div>
+                    <div className="bar-track"><div className="bar-fill" style={{ width: `${pct}%` }} /></div>
+                    <p className="readiness-note">New uploads are reviewed by your compliance team within two business days.</p>
+                </div>
+                <div className="readiness-stats">
+                    <div className="readiness-stat"><strong className="tone-accent">{data.readiness.approved}</strong><span>Approved</span></div>
+                    <div className="readiness-stat"><strong>{data.readiness.awaiting}</strong><span>Awaiting review</span></div>
+                    <div className="readiness-stat"><strong className="tone-danger">{data.readiness.actionNeeded}</strong><span>Action needed</span></div>
+                </div>
+            </div>
+
+            <div className="card dropzone">
+                <span className="dropzone-icon"><UploadCloud size={19} /></span>
+                <div className="dropzone-text">
+                    <h3>Drag files here to upload</h3>
+                    <p>PDF, JPG or PNG · up to 25 MB per file · scanned copies must be legible</p>
+                </div>
+                <button className="btn btn--secondary">Browse files</button>
+            </div>
+
+            <div className="table-card">
+                <div className="card-head">
+                    <div><h3>Required documents</h3><div className="card-caption">· Kestrel Capital</div></div>
+                    <div className="segmented">
+                        <button className={filter === 'all' ? 'is-active' : ''} onClick={() => setFilter('all')}>All</button>
+                        <button className={filter === 'needs-action' ? 'is-active' : ''} onClick={() => setFilter('needs-action')}>Needs action</button>
+                        <button className={filter === 'approved' ? 'is-active' : ''} onClick={() => setFilter('approved')}>Approved</button>
                     </div>
                 </div>
-
-                <DataTable
-                    columns={columns}
-                    data={filteredDocuments}
-                    loading={loading}
-                    onRowClick={handleViewDocument}
-                    emptyState={
-                        <EmptyState
-                            icon={FileText}
-                            title="No documents found"
-                            description="Upload your first document to get started"
-                            action={
-                                <Button variant="primary" onClick={() => setIsUploadOpen(true)}>
-                                    <Upload size={18} />
-                                    Upload Document
-                                </Button>
-                            }
-                        />
-                    }
-                />
-            </Card>
-
-            {/* Document Viewer Modal */}
-            {selectedDocument && (
-                <Modal
-                    isOpen={isViewerOpen}
-                    onClose={() => setIsViewerOpen(false)}
-                    title="Document Details"
-                    size="lg"
-                >
-                    <div className="document-viewer">
-                        <div className="document-info-grid">
-                            <div className="info-item">
-                                <span className="info-label">User Name</span>
-                                <span className="info-value">{selectedDocument.userName}</span>
-                            </div>
-                            <div className="info-item">
-                                <span className="info-label">Document Type</span>
-                                <span className="info-value">{getDocumentTypeLabel(selectedDocument.type)}</span>
-                            </div>
-                            <div className="info-item">
-                                <span className="info-label">Document Number</span>
-                                <span className="info-value">
-                                    <code>{selectedDocument.documentNumber}</code>
-                                </span>
-                            </div>
-                            <div className="info-item">
-                                <span className="info-label">Status</span>
-                                <Badge variant={getStatusBadge(selectedDocument.status)}>
-                                    {selectedDocument.status.toUpperCase()}
-                                </Badge>
-                            </div>
-                            <div className="info-item">
-                                <span className="info-label">Country</span>
-                                <span className="info-value">{selectedDocument.country}</span>
-                            </div>
-                            <div className="info-item">
-                                <span className="info-label">Expiry Date</span>
-                                <span className="info-value">
-                                    {new Date(selectedDocument.expiryDate).toLocaleDateString()}
-                                </span>
-                            </div>
-                            <div className="info-item">
-                                <span className="info-label">Uploaded</span>
-                                <span className="info-value">
-                                    {new Date(selectedDocument.uploadedAt).toLocaleString()}
-                                </span>
-                            </div>
-                            {selectedDocument.verifiedAt && (
-                                <div className="info-item">
-                                    <span className="info-label">Verified By</span>
-                                    <span className="info-value">{selectedDocument.verifiedBy}</span>
-                                </div>
-                            )}
-                        </div>
-
-                        {selectedDocument.notes && (
-                            <div className="document-notes">
-                                <h4>Notes</h4>
-                                <p>{selectedDocument.notes}</p>
-                            </div>
-                        )}
-
-                        <div className="document-preview">
-                            <div className="preview-placeholder">
-                                <FileText size={64} />
-                                <p>Document Preview</p>
-                                <span className="preview-filename">{selectedDocument.fileUrl}</span>
-                            </div>
-                        </div>
-                    </div>
-                </Modal>
-            )}
-
-            {/* Upload Modal */}
-            <Modal
-                isOpen={isUploadOpen}
-                onClose={() => setIsUploadOpen(false)}
-                title="Upload Document"
-                size="md"
-                footer={
-                    <>
-                        <Button variant="ghost" onClick={() => setIsUploadOpen(false)}>
-                            Cancel
-                        </Button>
-                        <Button variant="primary" onClick={() => handleUploadComplete([])}>
-                            Upload
-                        </Button>
-                    </>
-                }
-            >
-                <div className="upload-modal-content">
-                    <FileUpload
-                        onFileSelect={handleUploadComplete}
-                        accept="image/*,application/pdf"
-                        multiple={true}
-                        label="Select documents to upload"
-                    />
-                    <p className="upload-hint">
-                        Accepted formats: PDF, JPG, PNG. Maximum size: 10MB per file.
-                    </p>
+                <div className="table-scroll">
+                    <table className="data-table">
+                        <thead>
+                            <tr><th>Document</th><th>Category</th><th>Status</th><th>Version</th><th>Expires</th><th>Updated by</th></tr>
+                        </thead>
+                        <tbody>
+                            {rows.map((d) => (
+                                <tr key={d.id}>
+                                    <td>
+                                        <div className="name-cell">
+                                            <span className="doc-icon"><FileText size={15} /></span>
+                                            <div>
+                                                <div className="name-primary">{d.name}</div>
+                                                {d.note && <div className="name-secondary doc-note">{d.note}</div>}
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>{d.category}</td>
+                                    <td><Badge kind={STATUS_BADGE[d.status]}>{STATUS_LABEL[d.status]}</Badge></td>
+                                    <td className="mono">{d.version}</td>
+                                    <td>{d.expires}</td>
+                                    <td>{d.updatedBy}<div className="name-secondary">{d.updatedOn}</div></td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
                 </div>
-            </Modal>
+            </div>
         </div>
     );
 }

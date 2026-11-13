@@ -1,31 +1,22 @@
+import { CircleCheck, CircleX, TriangleAlert, Info, X } from 'lucide-react';
 import { useToast } from '../../contexts/ToastContext';
-import { X, CheckCircle, XCircle, AlertTriangle, Info } from 'lucide-react';
 import './Toast.css';
 
-const iconMap = {
-    success: CheckCircle,
-    error: XCircle,
-    warning: AlertTriangle,
-    info: Info,
-};
+const ICONS = { success: CircleCheck, error: CircleX, warning: TriangleAlert, info: Info };
 
 export default function ToastContainer() {
     const { toasts, removeToast } = useToast();
-
+    if (!toasts.length) return null;
     return (
-        <div className="toast-container">
-            {toasts.map(toast => {
-                const Icon = iconMap[toast.type];
+        <div className="toast-stack">
+            {toasts.map((t) => {
+                const Icon = ICONS[t.type] || Info;
                 return (
-                    <div key={toast.id} className={`toast toast--${toast.type}`}>
-                        <Icon className="toast-icon" size={20} />
-                        <span className="toast-message">{toast.message}</span>
-                        <button
-                            className="toast-close"
-                            onClick={() => removeToast(toast.id)}
-                            aria-label="Close notification"
-                        >
-                            <X size={16} />
+                    <div key={t.id} className={`toast toast--${t.type}`}>
+                        <Icon size={16} />
+                        <span>{t.message}</span>
+                        <button onClick={() => removeToast(t.id)} aria-label="Dismiss">
+                            <X size={14} />
                         </button>
                     </div>
                 );

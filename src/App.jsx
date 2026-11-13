@@ -1,127 +1,81 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider, useAuth } from './contexts/AuthContext';
-import { ToastProvider } from './contexts/ToastContext';
-import ToastContainer from './components/ui/Toast';
+import { lazy, Suspense } from 'react';
+import { Routes, Route, Navigate } from 'react-router-dom';
+import ProtectedRoute from './components/ProtectedRoute';
 import DashboardLayout from './components/layout/DashboardLayout';
 import Login from './pages/Login';
 import Overview from './pages/Overview';
 import Verifications from './pages/Verifications';
-import ApiManagement from './pages/ApiManagement';
-import Webhooks from './pages/Webhooks';
-import Billing from './pages/Billing';
-import Settings from './pages/Settings';
+import VerificationDetail from './pages/VerificationDetail';
 import Documents from './pages/Documents';
 import Analytics from './pages/Analytics';
-import VerificationDetail from './pages/VerificationDetail';
-import MakerChecker from './pages/MakerChecker';
-import Approvals from './pages/Approvals';
-import Companies from './pages/Companies';
-import Notifications from './pages/Notifications';
-import TeamMembers from './pages/TeamMembers';
-import Usage from './pages/Usage';
+import ApiManagement from './pages/ApiManagement';
+import Webhooks from './pages/Webhooks';
 import RequestLogs from './pages/RequestLogs';
-import Workflows from './pages/Workflows';
-import WorkflowBuilder from './pages/WorkflowBuilder';
-import ServiceCatalog from './pages/ServiceCatalog';
+import UserManagement from './pages/UserManagement';
+import Notifications from './pages/Notifications';
+import KycReviews from './pages/KycReviews';
+import Companies from './pages/Companies';
+import Billing from './pages/Billing';
+import Settings from './pages/Settings';
+import RiskModels from './pages/cra/RiskModels';
+import Workflows from './pages/workflows/Workflows';
+import Services from './pages/services/Services';
+import Applications from './pages/Applications';
+// The builder pulls in the canvas library; load it only when a workflow is opened.
+const WorkflowBuilder = lazy(() => import('./pages/workflows/WorkflowBuilder'));
+import RiskModelBuilder from './pages/cra/builder/RiskModelBuilder';
+import Assessments from './pages/cra/Assessments';
+import Screening from './pages/cra/Screening';
 
-// Protected Route Component
-function ProtectedRoute({ children }) {
-  const { user, loading } = useAuth();
-
-  if (loading) {
+export default function App() {
     return (
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        minHeight: '100vh',
-        color: '#d1d5db'
-      }}>
-        Loading...
-      </div>
+        <Routes>
+            <Route path="/login" element={<Login />} />
+
+            <Route
+                path="/dashboard"
+                element={
+                    <ProtectedRoute>
+                        <DashboardLayout />
+                    </ProtectedRoute>
+                }
+            >
+                <Route index element={<Overview />} />
+                <Route path="verifications" element={<Verifications />} />
+                <Route path="verifications/:id" element={<VerificationDetail />} />
+                <Route path="workflows" element={<Workflows />} />
+                <Route path="workflows/:id" element={<Suspense fallback={<div className="page"><div className="loading-state">Loading builder…</div></div>}><WorkflowBuilder /></Suspense>} />
+                <Route path="documents" element={<Documents />} />
+                <Route path="analytics" element={<Analytics />} />
+
+                <Route path="api" element={<ApiManagement />} />
+                <Route path="webhooks" element={<Webhooks />} />
+                <Route path="logs" element={<RequestLogs />} />
+
+                <Route path="users" element={<UserManagement />} />
+                <Route path="notifications" element={<Notifications />} />
+                <Route path="kyc-reviews" element={<KycReviews />} />
+                <Route path="companies" element={<Companies />} />
+                <Route path="services" element={<Services />} />
+                <Route path="applications" element={<Applications />} />
+                {/* Addresses from the old dashboard */}
+                <Route path="approvals" element={<Navigate to="/dashboard/applications" replace />} />
+                <Route path="maker-checker" element={<Navigate to="/dashboard/applications" replace />} />
+                <Route path="catalog" element={<Navigate to="/dashboard/services" replace />} />
+                <Route path="team" element={<Navigate to="/dashboard/users" replace />} />
+                <Route path="usage" element={<Navigate to="/dashboard/api" replace />} />
+
+                <Route path="risk-models" element={<RiskModels />} />
+                <Route path="risk-models/:id" element={<RiskModelBuilder />} />
+                <Route path="assessments" element={<Assessments />} />
+                <Route path="screening" element={<Screening />} />
+
+                <Route path="billing" element={<Billing />} />
+                <Route path="settings" element={<Settings />} />
+            </Route>
+
+            <Route path="/" element={<Navigate to="/dashboard" replace />} />
+            <Route path="*" element={<Navigate to="/dashboard" replace />} />
+        </Routes>
     );
-  }
-
-  return user ? children : <Navigate to="/login" />;
 }
-
-// Public Route (redirect if already logged in)
-function PublicRoute({ children }) {
-  const { user, loading } = useAuth();
-
-  if (loading) {
-    return (
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        minHeight: '100vh',
-        color: '#d1d5db'
-      }}>
-        Loading...
-      </div>
-    );
-  }
-
-  return user ? <Navigate to="/dashboard" /> : children;
-}
-
-function AppRoutes() {
-  return (
-    <Routes>
-      {/* Public Routes */}
-      <Route path="/login" element={
-        <PublicRoute>
-          <Login />
-        </PublicRoute>
-      } />
-
-      {/* Protected Dashboard Routes */}
-      <Route path="/dashboard" element={
-        <ProtectedRoute>
-          <DashboardLayout />
-        </ProtectedRoute>
-      }>
-        <Route index element={<Overview />} />
-        <Route path="verifications" element={<Verifications />} />
-        <Route path="verifications/:id" element={<VerificationDetail />} />
-        <Route path="documents" element={<Documents />} />
-        <Route path="analytics" element={<Analytics />} />
-        <Route path="approvals" element={<Approvals />} />
-        <Route path="maker-checker" element={<MakerChecker />} />
-        <Route path="companies" element={<Companies />} />
-        <Route path="notifications" element={<Notifications />} />
-        <Route path="team" element={<Navigate to="/dashboard/users" replace />} />
-        <Route path="users" element={<TeamMembers />} />
-        <Route path="usage" element={<Usage />} />
-        <Route path="logs" element={<RequestLogs />} />
-        <Route path="api" element={<ApiManagement />} />
-        <Route path="webhooks" element={<Webhooks />} />
-        <Route path="workflows" element={<Workflows />} />
-        <Route path="workflows/:id" element={<WorkflowBuilder />} />
-        <Route path="catalog" element={<ServiceCatalog />} />
-        <Route path="billing" element={<Billing />} />
-        <Route path="settings" element={<Settings />} />
-      </Route>
-
-      {/* Default Redirect */}
-      <Route path="/" element={<Navigate to="/dashboard" />} />
-      <Route path="*" element={<Navigate to="/dashboard" />} />
-    </Routes>
-  );
-}
-
-function App() {
-  return (
-    <BrowserRouter>
-      <AuthProvider>
-        <ToastProvider>
-          <AppRoutes />
-          <ToastContainer />
-        </ToastProvider>
-      </AuthProvider>
-    </BrowserRouter>
-  );
-}
-
-export default App;

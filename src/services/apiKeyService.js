@@ -1,108 +1,43 @@
 import api from './api';
 
+// auth-server wraps responses as { success, responseMessage, data }; return just `data`, or throw.
+function unwrap(response) {
+    if (!response.data.success) throw new Error(response.data.responseMessage || 'Request failed');
+    return response.data.data;
+}
+
+// Each company has one credential pair per environment ('dev' | 'prod'). All of these are
+// admin-only on auth-server; `companyId` is honoured for super admins and ignored for everyone
+// else (the server substitutes the caller's own company).
 const apiKeyService = {
-    /**
-     * Generate new API key for a company
-     * @param {string} companyId - Company ID
-     * @returns {Promise<object>}
-     */
-    async generateApiKey(companyId) {
-        try {
-            const response = await api.post('/api/companies/api-keys/generate', null, {
-                params: { companyId }
-            });
-            return response.data;
-        } catch (error) {
-            console.error('Generate API key error:', error);
-            throw error;
-        }
+    // [{ environment: 'PROD' | 'DEV', status, expiresAt, apiKey: '****', apiSecret: '****' }]
+    async listKeys(companyId) {
+        return unwrap(await api.get('/api/companies/api-keys', { params: { companyId } }));
     },
 
-    /**
-     * Generate or regenerate DEV API key for a company
-     * @param {string} companyId - Company ID
-     * @returns {Promise<object>}
-     */
-    async generateDevApiKey(companyId) {
-        try {
-            const response = await api.post('/api/companies/api-keys/generate/dev', null, {
-                params: { companyId }
-            });
-            return response.data;
-        } catch (error) {
-            console.error('Generate DEV API key error:', error);
-            throw error;
-        }
-    },
-
-    /**
-     * Generate or regenerate PROD API key for a company
-     * @param {string} companyId - Company ID
-     * @returns {Promise<object>}
-     */
-    async generateProdApiKey(companyId) {
-        try {
-            const response = await api.post('/api/companies/api-keys/generate/prod', null, {
-                params: { companyId }
-            });
-            return response.data;
-        } catch (error) {
-            console.error('Generate PROD API key error:', error);
-            throw error;
-        }
-    },
-
-    /**
-     * Revoke an API key
-     * @param {string} companyId - Company ID
-     * @param {string} keyId - API Key ID to revoke
-     * @returns {Promise<object>}
-     */
-    async revokeApiKey(companyId, keyId) {
-        try {
-            const response = await api.delete(`/api/companies/api-keys/${keyId}`, {
-                params: { companyId }
-            });
-            return response.data;
-        } catch (error) {
-            console.error('Revoke API key error:', error);
-            throw error;
-        }
-    },
-
-    /**
-     * Get all API keys for a company
-     * @param {string} companyId - Company ID
-     * @returns {Promise<object>}
-     */
-    async getApiKeys(companyId) {
-        try {
-            const response = await api.get('/api/companies/api-keys', {
-                params: { companyId }
-            });
-            return response.data;
-        } catch (error) {
-            console.error('Get API keys error:', error);
-            throw error;
-        }
-    },
-
-    /**
-     * Get API usage metrics (SUPER_ADMIN only)
-     * @param {string} companyId - Optional company ID
-     * @returns {Promise<object>}
-     */
+    // Request totals, last-used times and rate limits for both environments.
     async getUsage(companyId) {
-        try {
-            const response = await api.get('/api/companies/api-keys/usage', {
-                params: companyId ? { companyId } : undefined
-            });
-            return response.data;
-        } catch (error) {
-            console.error('Get API usage error:', error);
-            throw error;
-        }
-    }
+        return unwrap(await api.get('/api/companies/api-keys/usage', { params: { companyId } }));
+    },
+
+    // Issues a new key + secret for one environment, replacing any existing pair immediately.
+    // The raw values are only ever returned here — they are stored hashed.
+    async issueKey(companyId, environment) {
+        return unwrap(await api.post(`/api/companies/api-keys/generate/${environment}`, null, { params: { companyId } }));
+    },
+
+    async suspendKey(companyId, environment) {
+        return unwrap(await api.post(`/api/companies/${companyId}/credentials/suspend`, null, { params: { environment } }));
+    },
+
+    async activateKey(companyId, environment) {
+        return unwrap(await api.post(`/api/companies/${companyId}/credentials/activate`, null, { params: { environment } }));
+    },
+
+    // Super admin only. limits = { dev: { perHour, perDay, perMonth }, prod: { … } }
+    async updateRateLimits(companyId, limits) {
+        return unwrap(await api.put(`/api/companies/${companyId}/rate-limits`, limits));
+    },
 };
 
 export default apiKeyService;

@@ -1,0 +1,6 @@
+.proportion-bars { display: flex; flex-direction: column; gap: 16px; }
+.proportion-row { display: flex; flex-direction: column; gap: 7px; }
+.proportion-row-head { display: flex; align-items: center; gap: 8px; font-size: 13.5px; }
+.proportion-label { color: var(--ink); font-weight: 500; }
+.proportion-value { margin-left: auto; font-weight: 600; color: var(--ink); }
+.proportion-swatch { width: 9px; height: 9px; border-radius: 3px; flex: none; }
