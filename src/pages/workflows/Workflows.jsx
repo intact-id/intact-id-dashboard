@@ -35,6 +35,7 @@ function WorkflowCard({ workflow, href, onArchive }) {
                 <Badge kind="neutral" dot={false}>{SUBJECT_TYPES[workflow.subjectType]?.label || 'Any applicant'}</Badge>
                 {workflow.template ? <Badge kind="info" dot={false}>Template</Badge>
                     : workflow.liveVersion ? <Badge kind="ok">Live v{workflow.liveVersion}</Badge> : <Badge kind="warn">Not live</Badge>}
+                {workflow.defaultWorkflow && <Badge kind="info" dot={false}>Default</Badge>}
                 {workflow.latestVersion > (workflow.liveVersion || 0) && !workflow.template && (
                     <Badge kind="neutral" dot={false}>v{workflow.latestVersion} published</Badge>
                 )}

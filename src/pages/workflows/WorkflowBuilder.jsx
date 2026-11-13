@@ -58,6 +58,7 @@ function Editor({ workflowId, initial, scope, readOnly, onDetail }) {
 
     const [publishing, setPublishing] = useState(null); // { notes, step: 'notes' | 'done', version }
     const [promoting, setPromoting] = useState(null);
+    const [defaultChange, setDefaultChange] = useState(null); // 'set' | 'clear' while the confirm is open
     const [busy, setBusy] = useState(false);
 
     // ----- catalog -----
@@ -280,9 +281,11 @@ function Editor({ workflowId, initial, scope, readOnly, onDetail }) {
         setBusy(true);
         try {
             await save();
+            const latestBefore = initial.latestVersion || 0;
             const version = await workflowService.publish(workflowId, publishing.notes, scope);
             onDetail(await workflowService.get(workflowId, scope));
-            setPublishing({ ...publishing, step: 'done', version });
+            // The server returns the latest version instead of a new one when nothing changed
+            setPublishing({ ...publishing, step: 'done', version, unchanged: version.number <= latestBefore });
         } catch (error) {
             toast.error(errorMessage(error, 'Could not publish.'));
         } finally {
@@ -300,6 +303,22 @@ function Editor({ workflowId, initial, scope, readOnly, onDetail }) {
             setPublishing(null);
         } catch (error) {
             toast.error(errorMessage(error, 'Could not make that version live.'));
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    const changeDefault = async () => {
+        setBusy(true);
+        try {
+            const detail = defaultChange === 'set'
+                ? await workflowService.makeDefault(workflowId, scope)
+                : await workflowService.clearDefault(workflowId, scope);
+            onDetail(detail);
+            toast.success(defaultChange === 'set' ? 'This is now the default workflow' : 'No longer the default workflow');
+            setDefaultChange(null);
+        } catch (error) {
+            toast.error(errorMessage(error, 'Could not change the default workflow.'));
         } finally {
             setBusy(false);
         }
@@ -339,6 +358,12 @@ function Editor({ workflowId, initial, scope, readOnly, onDetail }) {
                                 <Badge kind="neutral" dot={false}>{SUBJECT_TYPES[initial.subjectType]?.label || initial.subjectType}</Badge>
                                 {scope.template ? <Badge kind="info" dot={false}>Template · copy it to use it</Badge>
                                     : initial.liveVersion ? <Badge kind="ok">Live v{initial.liveVersion}</Badge> : <Badge kind="warn">Not live</Badge>}
+                                {!scope.template && initial.defaultWorkflow && <Badge kind="info" dot={false}>Default</Badge>}
+                                {!scope.template && !readOnly && (initial.defaultWorkflow || initial.liveVersion) && (
+                                    <button className="link-btn" onClick={() => setDefaultChange(initial.defaultWorkflow ? 'clear' : 'set')}>
+                                        {initial.defaultWorkflow ? 'Stop using as default' : 'Make default'}
+                                    </button>
+                                )}
                                 <span className={`wf-save wf-save--${saveState}`}>{readOnly ? 'Read-only' : saveLabel}</span>
                             </div>
                         </div>
@@ -451,11 +476,30 @@ function Editor({ workflowId, initial, scope, readOnly, onDetail }) {
                 )}
 
                 <Modal
+                    isOpen={!!defaultChange}
+                    onClose={() => setDefaultChange(null)}
+                    title={defaultChange === 'set' ? 'Make this the default workflow?' : 'Stop using it as the default?'}
+                    caption={defaultChange === 'set'
+                        ? `Every session and API call that names no workflow will run this one (live v${initial.liveVersion}) instead of the tier checks. Any other default is replaced.`
+                        : 'Sessions and API calls that name no workflow go back to the tier checks.'}
+                    footer={(
+                        <>
+                            <button className="btn btn--secondary" onClick={() => setDefaultChange(null)} disabled={busy}>Cancel</button>
+                            <button className="btn btn--primary" onClick={changeDefault} disabled={busy}>{busy ? 'Working…' : defaultChange === 'set' ? 'Make default' : 'Stop using as default'}</button>
+                        </>
+                    )}
+                />
+
+                <Modal
                     isOpen={!!publishing}
                     onClose={() => setPublishing(null)}
-                    title={publishing?.step === 'done' ? `Version ${publishing.version?.number} published` : 'Publish a new version'}
+                    title={publishing?.step === 'done'
+                        ? (publishing.unchanged ? `No changes since v${publishing.version?.number}` : `Version ${publishing.version?.number} published`)
+                        : 'Publish a new version'}
                     caption={publishing?.step === 'done'
-                        ? (scope.template
+                        ? (publishing.unchanged
+                            ? `The draft is the same as v${publishing.version?.number}, so no new version was created.`
+                            : scope.template
                             ? 'Saved as a fixed version merchants can copy. Later edits go into the draft until you publish again.'
                             : `Sandbox keys use it now. Production ${initial.liveVersion
                                 ? `keeps using v${initial.liveVersion} until you make this one live.`
@@ -464,7 +508,7 @@ function Editor({ workflowId, initial, scope, readOnly, onDetail }) {
                     footer={publishing?.step === 'done' ? (
                         <>
                             <button className="btn btn--secondary" onClick={() => setPublishing(null)}>Later</button>
-                            {!scope.template && <button className="btn btn--primary" disabled={busy} onClick={() => promote(publishing.version.number)}>{busy ? 'Working…' : 'Make it live now'}</button>}
+                            {!scope.template && !publishing.version?.live && <button className="btn btn--primary" disabled={busy} onClick={() => promote(publishing.version.number)}>{busy ? 'Working…' : 'Make it live now'}</button>}
                         </>
                     ) : (
                         <>
@@ -544,6 +588,8 @@ export default function WorkflowBuilder() {
                     name: detail.workflow.name,
                     subjectType: detail.workflow.subjectType || 'INDIVIDUAL',
                     liveVersion: detail.workflow.liveVersion,
+                    latestVersion: detail.workflow.latestVersion,
+                    defaultWorkflow: detail.workflow.defaultWorkflow,
                     versions: detail.versions || [],
                 }}
             />
