@@ -1,8 +1,6 @@
-import './Badge.css';
-
-export default function Badge({ children, variant = 'default', size = 'md', dot = false }) {
+export default function Badge({ children, kind = 'neutral', dot = true }) {
     return (
-        <span className={`badge badge--${variant} badge--${size} ${dot ? 'badge--with-dot' : ''}`}>
+        <span className={`badge badge--${kind}`}>
             {dot && <span className="badge-dot" />}
             {children}
         </span>

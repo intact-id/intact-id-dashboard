@@ -1,429 +1,375 @@
-import { useState, useEffect, useCallback } from 'react';
-import { Building2, ShieldCheck, ShieldOff, KeyRound, Lock, Monitor, RefreshCw, Trash2, Copy, Check } from 'lucide-react';
-import Card from '../components/ui/Card';
-import Button from '../components/ui/Button';
-import Input from '../components/ui/Input';
+import { useCallback, useEffect, useState } from 'react';
+import { QRCodeSVG } from 'qrcode.react';
+import { UserRound, ShieldCheck, Building2, Copy } from 'lucide-react';
 import Badge from '../components/ui/Badge';
 import Modal from '../components/ui/Modal';
-import EmptyState from '../components/ui/EmptyState';
-import ChangePasswordModal from '../components/ui/ChangePasswordModal';
-import TwoFactorSetupModal from '../components/ui/TwoFactorSetupModal';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
+import accountService from '../services/accountService';
 import companyService from '../services/companyService';
-import twoFactorService from '../services/twoFactorService';
-import deviceService from '../services/deviceService';
-import './Settings.css';
+import api, { errorMessage } from '../services/api';
+import { hasAnyRole, roleLabel } from '../utils/roles';
+import { formatDateTime } from '../utils/format';
 
-const SECTIONS = [
-    { id: 'profile', label: 'Company Profile', description: 'Business identity & details', icon: Building2 },
-    { id: 'security', label: 'Security', description: 'Password, 2FA & sessions', icon: KeyRound },
-];
+const PASSWORD_RULE = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
 
-export default function Settings() {
-    const { user: currentUser, updateUser } = useAuth();
+// ---------------------------------------------------------------------------
+// Account
+// ---------------------------------------------------------------------------
+
+function AccountTab({ user }) {
     const { toast } = useToast();
+    const [pw, setPw] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
+    const [saving, setSaving] = useState(false);
 
-    const [activeSection, setActiveSection] = useState('profile');
-    const [loading, setLoading] = useState(true);
+    const problem = !pw.currentPassword ? 'Enter your current password.'
+        : !PASSWORD_RULE.test(pw.newPassword) ? 'The new password needs 8+ characters with upper and lower case, a digit and one of @$!%*?&.'
+            : pw.newPassword !== pw.confirmPassword ? 'The new passwords do not match.' : '';
 
-    // Profile
-    const [company, setCompany] = useState(null);
-    const [profileForm, setProfileForm] = useState(null);
-    const [savingProfile, setSavingProfile] = useState(false);
-
-    // Security
-    const [showChangePassword, setShowChangePassword] = useState(false);
-    const [show2FASetup, setShow2FASetup] = useState(false);
-    const [showDisable2FA, setShowDisable2FA] = useState(false);
-    const [disabling2FA, setDisabling2FA] = useState(false);
-    const [backupCodeCount, setBackupCodeCount] = useState(null);
-    const [regeneratingCodes, setRegeneratingCodes] = useState(false);
-    const [newBackupCodes, setNewBackupCodes] = useState(null);
-    const [copiedNewCodes, setCopiedNewCodes] = useState(false);
-    const [trustedDevices, setTrustedDevices] = useState([]);
-    const [revokingDeviceId, setRevokingDeviceId] = useState(null);
-
-    const companyId = currentUser?.companyId;
-    const is2FAEnabled = !!currentUser?.is2faEnabled;
-
-    const fetchProfile = useCallback(async () => {
-        if (!companyId) return;
-        const res = await companyService.getCurrentCompany(companyId);
-        setCompany(res.data);
-        setProfileForm({
-            tradingName: res.data?.tradingName || '',
-            businessType: res.data?.businessType || '',
-        });
-    }, [companyId]);
-
-    const fetchSecurityData = useCallback(async () => {
-        const devicesRes = await deviceService.listTrustedDevices();
-        setTrustedDevices(devicesRes.data || []);
-
-        if (is2FAEnabled) {
-            const countRes = await twoFactorService.getRemainingBackupCodeCount();
-            setBackupCodeCount(countRes.success ? countRes.data : null);
-        } else {
-            setBackupCodeCount(null);
-        }
-    }, [is2FAEnabled]);
-
-    useEffect(() => {
-        let cancelled = false;
-        const load = async () => {
-            setLoading(true);
-            try {
-                if (activeSection === 'profile') await fetchProfile();
-                if (activeSection === 'security') await fetchSecurityData();
-            } catch (error) {
-                console.error('Error fetching settings data:', error);
-                toast.error('Failed to load settings data');
-            } finally {
-                if (!cancelled) setLoading(false);
-            }
-        };
-        load();
-        return () => { cancelled = true; };
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [activeSection, companyId, is2FAEnabled]);
-
-    const handleSaveProfile = async () => {
-        setSavingProfile(true);
+    const change = async () => {
+        setSaving(true);
         try {
-            const res = await companyService.updateCompany(companyId, profileForm);
-            setCompany(res.data);
-            toast.success('Company profile updated');
-        } catch (error) {
-            toast.error(error.response?.data?.errorMessage || 'Failed to update profile');
+            await accountService.changePassword(user.id, pw);
+            toast.success('Password changed');
+            setPw({ currentPassword: '', newPassword: '', confirmPassword: '' });
+        } catch (e) {
+            toast.error(errorMessage(e, 'Could not change the password.'));
         } finally {
-            setSavingProfile(false);
+            setSaving(false);
         }
     };
-
-    const handle2FAEnabled = () => {
-        setShow2FASetup(false);
-        updateUser({ ...currentUser, is2faEnabled: true });
-        toast.success('Two-factor authentication enabled');
-    };
-
-    const handleDisable2FA = async () => {
-        setDisabling2FA(true);
-        try {
-            await twoFactorService.disable();
-            updateUser({ ...currentUser, is2faEnabled: false });
-            toast.success('Two-factor authentication disabled');
-            setShowDisable2FA(false);
-        } catch (error) {
-            toast.error(error.response?.data?.errorMessage || 'Failed to disable 2FA');
-        } finally {
-            setDisabling2FA(false);
-        }
-    };
-
-    const handleRegenerateBackupCodes = async () => {
-        setRegeneratingCodes(true);
-        try {
-            const response = await twoFactorService.regenerateBackupCodes();
-            if (response.success) {
-                setNewBackupCodes(response.data?.codes || []);
-                setBackupCodeCount(response.data?.remainingCount ?? null);
-            } else {
-                toast.error(response.responseMessage || 'Failed to regenerate backup codes');
-            }
-        } catch (error) {
-            toast.error(error.response?.data?.errorMessage || 'Failed to regenerate backup codes');
-        } finally {
-            setRegeneratingCodes(false);
-        }
-    };
-
-    const handleCopyNewCodes = async () => {
-        if (!newBackupCodes?.length) return;
-        await navigator.clipboard.writeText(newBackupCodes.join('\n'));
-        setCopiedNewCodes(true);
-        setTimeout(() => setCopiedNewCodes(false), 2000);
-    };
-
-    const handleRevokeDevice = async (deviceId) => {
-        setRevokingDeviceId(deviceId);
-        try {
-            await deviceService.revokeTrustedDevice(deviceId);
-            setTrustedDevices((devices) => devices.filter((d) => d.id !== deviceId));
-            toast.success('Device revoked');
-        } catch (error) {
-            toast.error(error.response?.data?.errorMessage || 'Failed to revoke device');
-        } finally {
-            setRevokingDeviceId(null);
-        }
-    };
-
-    const initials = (currentUser?.username || '?').charAt(0).toUpperCase();
 
     return (
-        <div className="settings">
-            <div className="page-header">
-                <div>
-                    <h1>Settings</h1>
-                    <p className="page-subtitle">Manage your company profile and account security</p>
+        <>
+            <div className="card">
+                <div className="card-head"><h3>Your account</h3></div>
+                <div className="kv-grid">
+                    <div className="kv-cell"><span>Name</span><strong>{[user.firstName, user.lastName].filter(Boolean).join(' ') || '—'}</strong></div>
+                    <div className="kv-cell"><span>Username</span><strong>{user.username}</strong></div>
+                    <div className="kv-cell"><span>Email</span><strong>{user.email || '—'}</strong></div>
+                    <div className="kv-cell"><span>Phone</span><strong>{user.phone || '—'}</strong></div>
+                    <div className="kv-cell"><span>Role</span><strong>{roleLabel(user) || '—'}</strong></div>
+                    <div className="kv-cell"><span>Last sign-in</span><strong>{formatDateTime(user.lastLoginAt)}</strong></div>
+                </div>
+                <p className="card-caption" style={{ marginTop: 12 }}>To change your name or email, ask a super admin (User management).</p>
+            </div>
+
+            <div className="card">
+                <div className="card-head"><h3>Change password</h3></div>
+                <div className="form-grid">
+                    <div className="field form-grid-full">
+                        <label htmlFor="pw-current">Current password</label>
+                        <input id="pw-current" className="input" type="password" autoComplete="current-password" value={pw.currentPassword} onChange={(e) => setPw({ ...pw, currentPassword: e.target.value })} />
+                    </div>
+                    <div className="field">
+                        <label htmlFor="pw-new">New password</label>
+                        <input id="pw-new" className="input" type="password" autoComplete="new-password" value={pw.newPassword} onChange={(e) => setPw({ ...pw, newPassword: e.target.value })} />
+                    </div>
+                    <div className="field">
+                        <label htmlFor="pw-confirm">Repeat new password</label>
+                        <input id="pw-confirm" className="input" type="password" autoComplete="new-password" value={pw.confirmPassword} onChange={(e) => setPw({ ...pw, confirmPassword: e.target.value })} />
+                    </div>
+                </div>
+                {pw.currentPassword && problem && <div className="field-error">{problem}</div>}
+                <div className="head-actions" style={{ marginTop: 14 }}>
+                    <button className="btn btn--primary btn--sm" disabled={!!problem || saving} onClick={change}>{saving ? 'Saving…' : 'Change password'}</button>
+                </div>
+            </div>
+        </>
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Security: 2FA, backup codes, trusted browsers
+// ---------------------------------------------------------------------------
+
+const secretOf = (url) => {
+    try { return new URL(url).searchParams.get('secret') || ''; } catch { return ''; }
+};
+
+function SecurityTab({ user, onUserChange }) {
+    const { toast } = useToast();
+    const enabled = !!user.is2faEnabled;
+    const [setup, setSetup] = useState(null); // { url, code, codes }
+    const [codesLeft, setCodesLeft] = useState(null);
+    const [devices, setDevices] = useState(null);
+    const [confirmDisable, setConfirmDisable] = useState(false);
+    const [busy, setBusy] = useState(false);
+
+    const load = useCallback(() => {
+        accountService.trustedDevices().then(setDevices).catch(() => setDevices([]));
+        if (enabled) accountService.backupCodesLeft().then(setCodesLeft).catch(() => {});
+    }, [enabled]);
+
+    useEffect(() => { load(); }, [load]);
+
+    const start = async () => {
+        setBusy(true);
+        try {
+            const result = await accountService.startTwoFactor();
+            setSetup({ url: result.qrCodeEncodeUrl, code: '', codes: null });
+        } catch (e) {
+            toast.error(errorMessage(e, 'Could not start two-factor set-up.'));
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    const verify = async () => {
+        setBusy(true);
+        try {
+            await accountService.verifyTwoFactor(setup.code);
+            const backup = await accountService.newBackupCodes();
+            setSetup({ ...setup, codes: backup.codes });
+            onUserChange({ is2faEnabled: true });
+            setCodesLeft(backup.remainingCount ?? backup.codes.length);
+        } catch (e) {
+            toast.error(errorMessage(e, 'That code did not match. Try the newest one in your app.'));
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    const regenerate = async () => {
+        setBusy(true);
+        try {
+            const backup = await accountService.newBackupCodes();
+            setSetup({ url: null, code: '', codes: backup.codes });
+            setCodesLeft(backup.remainingCount ?? backup.codes.length);
+        } catch (e) {
+            toast.error(errorMessage(e, 'Could not create new backup codes.'));
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    const disable = async () => {
+        setBusy(true);
+        try {
+            await accountService.disableTwoFactor();
+            onUserChange({ is2faEnabled: false });
+            setConfirmDisable(false);
+            toast.success('Two-factor authentication turned off');
+        } catch (e) {
+            toast.error(errorMessage(e, 'Could not turn off two-factor authentication.'));
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    const forget = async (device) => {
+        try {
+            await accountService.forgetDevice(device.id);
+            setDevices((list) => list.filter((d) => d.id !== device.id));
+            toast.success('Browser forgotten; it will ask for a code next time');
+        } catch (e) {
+            toast.error(errorMessage(e, 'Could not forget that browser.'));
+        }
+    };
+
+    const copyCodes = () => navigator.clipboard.writeText(setup.codes.join('\n')).then(() => toast.success('Backup codes copied'));
+
+    return (
+        <>
+            <div className="card">
+                <div className="card-head">
+                    <div>
+                        <h3>Two-factor authentication</h3>
+                        <div className="card-caption">A code from an authenticator app (Google Authenticator, Authy, 1Password…) at every sign-in.</div>
+                    </div>
+                    {enabled ? <Badge kind="ok">On</Badge> : <Badge kind="warn">Off</Badge>}
+                </div>
+                {enabled ? (
+                    <div className="head-actions">
+                        <span className="card-caption">{codesLeft !== null ? `${codesLeft} backup codes left` : ''}</span>
+                        <button className="btn btn--secondary btn--sm" onClick={regenerate} disabled={busy}>New backup codes</button>
+                        <button className="btn btn--danger-outline btn--sm" onClick={() => setConfirmDisable(true)}>Turn off</button>
+                    </div>
+                ) : (
+                    <button className="btn btn--primary btn--sm" onClick={start} disabled={busy}>{busy ? 'Starting…' : 'Set up two-factor'}</button>
+                )}
+            </div>
+
+            <div className="table-card">
+                <div className="card-head"><div><h3>Trusted browsers</h3><div className="card-caption">These skip the code at sign-in.</div></div></div>
+                <div className="table-scroll">
+                    <table className="data-table">
+                        <thead><tr><th>Browser</th><th>IP address</th><th>Last used</th><th /></tr></thead>
+                        <tbody>
+                            {!devices ? <tr><td colSpan={4}><div className="loading-state">Loading…</div></td></tr>
+                                : devices.length === 0 ? <tr><td colSpan={4}><div className="empty-state">No trusted browsers.</div></td></tr>
+                                    : devices.map((d) => (
+                                        <tr key={d.id}>
+                                            <td>{d.deviceLabel || 'Unknown browser'}</td>
+                                            <td className="mono">{d.ipAddress || '—'}</td>
+                                            <td>{formatDateTime(d.lastUsedAt || d.createdAt)}</td>
+                                            <td><button className="btn btn--ghost btn--sm" onClick={() => forget(d)}>Forget</button></td>
+                                        </tr>
+                                    ))}
+                        </tbody>
+                    </table>
                 </div>
             </div>
 
-            <div className="settings-layout">
-                <nav className="settings-nav">
-                    <div className="settings-nav-profile">
-                        <div className="settings-nav-avatar">{initials}</div>
-                        <div>
-                            <div className="settings-nav-username">{currentUser?.username}</div>
-                            <div className="settings-nav-email">{currentUser?.email}</div>
+            <Modal
+                isOpen={!!setup}
+                onClose={() => setSetup(null)}
+                title={setup?.codes ? 'Save your backup codes' : 'Set up two-factor authentication'}
+                caption={setup?.codes
+                    ? 'Each code works once, if you lose your phone. They will not be shown again.'
+                    : 'Scan the QR code with your authenticator app, then enter the 6-digit code it shows.'}
+                footer={setup?.codes ? (
+                    <>
+                        <button className="btn btn--secondary" onClick={copyCodes}><Copy size={14} /> Copy</button>
+                        <button className="btn btn--primary" onClick={() => setSetup(null)}>I have saved them</button>
+                    </>
+                ) : (
+                    <>
+                        <button className="btn btn--secondary" onClick={() => setSetup(null)} disabled={busy}>Cancel</button>
+                        <button className="btn btn--primary" onClick={verify} disabled={busy || !/^\d{6}$/.test(setup?.code || '')}>{busy ? 'Checking…' : 'Turn on'}</button>
+                    </>
+                )}
+            >
+                {setup?.codes ? (
+                    <div className="backup-codes mono">{setup.codes.map((c) => <span key={c}>{c}</span>)}</div>
+                ) : setup?.url && (
+                    <div className="twofa-setup">
+                        <div className="twofa-qr"><QRCodeSVG value={setup.url} size={168} /></div>
+                        <div className="field">
+                            <label>Can't scan? Enter this key</label>
+                            <code className="mono">{secretOf(setup.url)}</code>
+                            <label htmlFor="twofa-code" style={{ marginTop: 12 }}>Code from the app</label>
+                            <input id="twofa-code" className="input mono" inputMode="numeric" maxLength={6} autoComplete="one-time-code" placeholder="123456"
+                                value={setup.code} onChange={(e) => setSetup({ ...setup, code: e.target.value.replace(/\D/g, '') })} autoFocus />
                         </div>
                     </div>
+                )}
+            </Modal>
 
-                    {SECTIONS.map((section) => {
-                        const SectionIcon = section.icon;
+            <Modal
+                isOpen={confirmDisable}
+                onClose={() => setConfirmDisable(false)}
+                title="Turn off two-factor authentication?"
+                caption="Signing in will only need your password. Your backup codes stop working."
+                footer={(
+                    <>
+                        <button className="btn btn--secondary" onClick={() => setConfirmDisable(false)} disabled={busy}>Cancel</button>
+                        <button className="btn btn--danger-outline" onClick={disable} disabled={busy}>{busy ? 'Working…' : 'Turn off'}</button>
+                    </>
+                )}
+            />
+        </>
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Company and applicant emails
+// ---------------------------------------------------------------------------
+
+const COMPANY_FIELDS = [
+    ['tradingName', 'Trading name'], ['businessType', 'Business type'], ['website', 'Website'],
+    ['email', 'Main email'], ['phone', 'Main phone'], ['supportEmail', 'Support email'],
+    ['billingEmail', 'Billing email'], ['secondaryEmail', 'Secondary email'], ['secondaryPhone', 'Secondary phone'],
+];
+
+function CompanyTab({ canEdit }) {
+    const { toast } = useToast();
+    const [company, setCompany] = useState(null);
+    const [form, setForm] = useState(null);
+    const [error, setError] = useState('');
+    const [saving, setSaving] = useState(false);
+
+    const load = useCallback(async () => {
+        try {
+            const mine = await companyService.getMine();
+            const contact = await companyService.getCommunication(mine.id).catch(() => ({}));
+            setCompany(mine);
+            setForm(Object.fromEntries(COMPANY_FIELDS.map(([key]) => [key, (key in mine ? mine[key] : contact[key]) || ''])));
+        } catch (e) {
+            setError(errorMessage(e, 'Could not load your company.'));
+        }
+    }, []);
+
+    useEffect(() => { load(); }, [load]);
+
+    const save = async () => {
+        setSaving(true);
+        try {
+            const body = Object.fromEntries(Object.entries(form).map(([k, v]) => [k, v.trim() || null]));
+            await api.put(`/api/companies/${company.id}`, body).then((r) => { if (!r.data.success) throw new Error(r.data.responseMessage); });
+            toast.success('Company details saved');
+            await load();
+        } catch (e) {
+            toast.error(errorMessage(e, 'Could not save company details.'));
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    if (error) return <div className="card"><div className="empty-state">{error}</div></div>;
+    if (!form) return <div className="card"><div className="loading-state">Loading…</div></div>;
+
+    return (
+        <div className="card">
+            <div className="card-head">
+                <div><h3>{company.legalName}</h3><div className="card-caption">{[company.registrationNumber, company.country, company.companyIdentifierCode].filter(Boolean).join(' · ')}</div></div>
+                <Badge kind={company.status === 'ACTIVE' ? 'ok' : 'warn'}>{company.status}</Badge>
+            </div>
+            <div className="form-grid">
+                {COMPANY_FIELDS.map(([key, label]) => (
+                    <div key={key} className="field">
+                        <label>{label}</label>
+                        <input className="input" disabled={!canEdit} value={form[key]} onChange={(e) => setForm({ ...form, [key]: e.target.value })} />
+                    </div>
+                ))}
+            </div>
+            {canEdit ? (
+                <div className="head-actions" style={{ marginTop: 14 }}>
+                    <button className="btn btn--primary btn--sm" onClick={save} disabled={saving}>{saving ? 'Saving…' : 'Save changes'}</button>
+                </div>
+            ) : <p className="card-caption" style={{ marginTop: 12 }}>Only administrators can change company details.</p>}
+        </div>
+    );
+}
+
+// ---------------------------------------------------------------------------
+
+export default function Settings() {
+    const { user, updateUser } = useAuth();
+    const isAdmin = hasAnyRole(user, ['ADMIN', 'SUPER_ADMIN']);
+
+    const tabs = [
+        { id: 'account', label: 'Account', desc: 'Your profile and password', icon: UserRound },
+        { id: 'security', label: 'Security', desc: 'Two-factor and trusted browsers', icon: ShieldCheck },
+        ...(user?.companyId ? [{ id: 'company', label: 'Company', desc: 'Contact details', icon: Building2 }] : []),
+    ];
+    const [tab, setTab] = useState('account');
+
+    if (!user) return null;
+
+    return (
+        <div className="page">
+            <div className="page-head">
+                <div><h1>Settings</h1><p>Your account and security{user.companyId ? ', and your company' : ''}.</p></div>
+            </div>
+            <div className="settings-layout">
+                <nav className="settings-nav">
+                    {tabs.map((t) => {
+                        const Icon = t.icon;
                         return (
-                            <button
-                                key={section.id}
-                                className={`settings-nav-item ${activeSection === section.id ? 'settings-nav-item--active' : ''}`}
-                                onClick={() => setActiveSection(section.id)}
-                            >
-                                <SectionIcon size={18} className="settings-nav-icon" />
-                                <span className="settings-nav-text">
-                                    <span className="settings-nav-label">{section.label}</span>
-                                    <span className="settings-nav-desc">{section.description}</span>
-                                </span>
+                            <button key={t.id} className={`settings-nav-item${tab === t.id ? ' is-active' : ''}`} onClick={() => setTab(t.id)}>
+                                <Icon size={16} />
+                                <div><div className="settings-nav-label">{t.label}</div><div className="settings-nav-desc">{t.desc}</div></div>
                             </button>
                         );
                     })}
                 </nav>
-
                 <div className="settings-content">
-                    {activeSection === 'profile' && (
-                        !companyId ? (
-                            <Card className="settings-panel">
-                                <EmptyState
-                                    icon={Building2}
-                                    title="No Company Profile"
-                                    description="This account isn't associated with a single company, so there's no company profile to manage here."
-                                />
-                            </Card>
-                        ) : loading || !profileForm ? (
-                            <div className="page-loading"><div className="spinner"></div></div>
-                        ) : (
-                            <Card className="settings-panel">
-                                <div className="card__header">
-                                    <div>
-                                        <h3 className="card__title">Company Profile</h3>
-                                        <p className="card__subtitle">Identity and business details for your organization</p>
-                                    </div>
-                                    <Badge variant="info">{company?.status || 'Active'}</Badge>
-                                </div>
-                                <div className="card__body">
-                                    <div className="settings-fieldset">
-                                        <span className="settings-fieldset-label">Verified identity</span>
-                                        <div className="settings-form settings-form--grid">
-                                            <Input label="Legal Name" name="legalName" value={company?.legalName || ''} disabled />
-                                            <Input label="Registration Number" name="regNumber" value={company?.registrationNumber || ''} disabled />
-                                            <Input label="Country" name="country" value={company?.country || ''} disabled />
-                                        </div>
-                                        <p className="field-hint field-hint--block">
-                                            These details are locked to your verified KYB record and can't be edited here.
-                                        </p>
-                                    </div>
-
-                                    <div className="settings-fieldset">
-                                        <span className="settings-fieldset-label">Business details</span>
-                                        <div className="settings-form settings-form--grid">
-                                            <Input
-                                                label="Trading Name"
-                                                name="tradingName"
-                                                value={profileForm.tradingName}
-                                                onChange={(e) => setProfileForm({ ...profileForm, tradingName: e.target.value })}
-                                                placeholder="Trading Name"
-                                            />
-                                            <Input
-                                                label="Business Type"
-                                                name="businessType"
-                                                value={profileForm.businessType}
-                                                onChange={(e) => setProfileForm({ ...profileForm, businessType: e.target.value })}
-                                                placeholder="e.g. Fintech, E-commerce"
-                                            />
-                                        </div>
-                                    </div>
-
-                                    <div className="form-actions">
-                                        <Button variant="primary" onClick={handleSaveProfile} disabled={savingProfile}>
-                                            {savingProfile ? 'Saving...' : 'Save Changes'}
-                                        </Button>
-                                    </div>
-                                </div>
-                            </Card>
-                        )
-                    )}
-
-                    {activeSection === 'security' && (
-                        <div className="security-section">
-                            <Card className="settings-panel">
-                                <div className="card__header">
-                                    <div className="card__header-icon"><Lock size={18} /></div>
-                                    <div>
-                                        <h3 className="card__title">Password</h3>
-                                        <p className="card__subtitle">Change your password regularly to keep your account secure</p>
-                                    </div>
-                                </div>
-                                <div className="card__body">
-                                    <Button variant="secondary" onClick={() => setShowChangePassword(true)}>
-                                        Change Password
-                                    </Button>
-                                </div>
-                            </Card>
-
-                            <Card className="settings-panel">
-                                <div className="card__header">
-                                    <div className="card__header-icon"><ShieldCheck size={18} /></div>
-                                    <div>
-                                        <h3 className="card__title">Two-Factor Authentication</h3>
-                                        <p className="card__subtitle">Protect your account with a time-based authenticator app</p>
-                                    </div>
-                                    <Badge variant={is2FAEnabled ? 'success' : 'warning'}>
-                                        {is2FAEnabled ? 'Enabled' : 'Not Enabled'}
-                                    </Badge>
-                                </div>
-                                <div className="card__body">
-                                    {is2FAEnabled ? (
-                                        <>
-                                            <div className="settings-inline-actions">
-                                                <Button variant="secondary" onClick={() => setShowDisable2FA(true)}>
-                                                    <ShieldOff size={16} /> Disable 2FA
-                                                </Button>
-                                                <Button
-                                                    variant="secondary"
-                                                    onClick={handleRegenerateBackupCodes}
-                                                    disabled={regeneratingCodes}
-                                                >
-                                                    <RefreshCw size={16} />
-                                                    {regeneratingCodes ? 'Generating...' : 'Regenerate backup codes'}
-                                                </Button>
-                                            </div>
-                                            {backupCodeCount !== null && (
-                                                <p className="field-hint field-hint--block">
-                                                    {backupCodeCount} backup code{backupCodeCount === 1 ? '' : 's'} remaining
-                                                </p>
-                                            )}
-                                        </>
-                                    ) : (
-                                        <Button variant="secondary" onClick={() => setShow2FASetup(true)}>
-                                            <ShieldCheck size={16} /> Enable 2FA
-                                        </Button>
-                                    )}
-                                </div>
-                            </Card>
-
-                            <Card className="settings-panel">
-                                <div className="card__header">
-                                    <div className="card__header-icon"><Monitor size={18} /></div>
-                                    <div>
-                                        <h3 className="card__title">Trusted Devices</h3>
-                                        <p className="card__subtitle">Devices that can skip 2FA on this account</p>
-                                    </div>
-                                </div>
-                                <div className="card__body">
-                                    {trustedDevices.length === 0 ? (
-                                        <p className="field-hint">No trusted devices yet — check "Remember this device" at your next 2FA sign-in.</p>
-                                    ) : (
-                                        trustedDevices.map((device) => (
-                                            <div className="session-item" key={device.id}>
-                                                <div className="session-info">
-                                                    <div className="session-device">
-                                                        <Monitor size={16} className="session-icon" />
-                                                        {device.deviceLabel || 'Unknown device'}
-                                                    </div>
-                                                    <div className="session-location">
-                                                        {device.ipAddress ? `${device.ipAddress} · ` : ''}
-                                                        Last used {device.lastUsedAt ? new Date(device.lastUsedAt).toLocaleString() : '—'}
-                                                    </div>
-                                                </div>
-                                                <Button
-                                                    variant="secondary"
-                                                    onClick={() => handleRevokeDevice(device.id)}
-                                                    disabled={revokingDeviceId === device.id}
-                                                >
-                                                    <Trash2 size={14} /> Revoke
-                                                </Button>
-                                            </div>
-                                        ))
-                                    )}
-                                </div>
-                            </Card>
-                        </div>
-                    )}
+                    {tab === 'account' && <AccountTab user={user} />}
+                    {tab === 'security' && <SecurityTab user={user} onUserChange={updateUser} />}
+                    {tab === 'company' && <CompanyTab canEdit={isAdmin} />}
                 </div>
             </div>
-
-            <ChangePasswordModal
-                isOpen={showChangePassword}
-                onClose={() => setShowChangePassword(false)}
-                userId={currentUser?.id}
-                onSuccess={() => {
-                    setShowChangePassword(false);
-                    toast.success('Password changed successfully');
-                }}
-            />
-
-            <TwoFactorSetupModal
-                isOpen={show2FASetup}
-                onClose={() => setShow2FASetup(false)}
-                onEnabled={handle2FAEnabled}
-            />
-
-            <Modal
-                isOpen={showDisable2FA}
-                onClose={() => setShowDisable2FA(false)}
-                title="Disable Two-Factor Authentication"
-                size="sm"
-                footer={
-                    <>
-                        <Button variant="secondary" onClick={() => setShowDisable2FA(false)} disabled={disabling2FA}>
-                            Cancel
-                        </Button>
-                        <Button variant="danger" onClick={handleDisable2FA} disabled={disabling2FA}>
-                            {disabling2FA ? 'Disabling...' : 'Disable 2FA'}
-                        </Button>
-                    </>
-                }
-            >
-                <p className="security-description">
-                    This will remove the extra layer of protection from your account. You can re-enable it at any time.
-                </p>
-            </Modal>
-
-            <Modal
-                isOpen={!!newBackupCodes}
-                onClose={() => setNewBackupCodes(null)}
-                title="Your new backup codes"
-                size="sm"
-                footer={
-                    <Button variant="primary" onClick={() => setNewBackupCodes(null)}>
-                        Done
-                    </Button>
-                }
-            >
-                <p className="security-description">
-                    Your previous backup codes no longer work. Save these somewhere safe — each one
-                    can only be used once, and they won't be shown again.
-                </p>
-                <div className="backup-codes-grid">
-                    {(newBackupCodes || []).map((c) => (
-                        <code key={c} className="backup-code-item">{c}</code>
-                    ))}
-                </div>
-                <div className="backup-codes-actions">
-                    <button type="button" className="copy-btn" onClick={handleCopyNewCodes}>
-                        {copiedNewCodes ? <Check size={16} /> : <Copy size={16} />}
-                        {copiedNewCodes ? 'Copied' : 'Copy all'}
-                    </button>
-                </div>
-            </Modal>
         </div>
     );
 }

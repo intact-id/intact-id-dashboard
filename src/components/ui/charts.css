@@ -1,0 +1,66 @@
+/* Charts: axis on the left, dashed grid, bars or lines, labels underneath. */
+.chart { display: flex; gap: 10px; width: 100%; }
+.chart-axis {
+  display: flex; flex-direction: column; justify-content: space-between;
+  padding-bottom: 24px; min-width: 34px; text-align: right;
+  font-size: 11px; color: var(--ink-3); font-variant-numeric: tabular-nums;
+}
+/* Zero-height labels sit exactly on their grid line */
+.chart-axis span { height: 0; line-height: 0; white-space: nowrap; }
+.chart-plot { position: relative; flex: 1; min-width: 0; display: flex; }
+.chart-grid {
+  position: absolute; inset: 0 0 24px 0;
+  display: flex; flex-direction: column; justify-content: space-between; pointer-events: none;
+}
+.chart-grid span { height: 0; border-top: 1px dashed var(--rule); }
+.chart-grid span:last-child { border-top-style: solid; }
+
+.chart-bars { position: relative; flex: 1; display: flex; gap: 3px; }
+.chart-col { position: relative; flex: 1; min-width: 0; display: flex; flex-direction: column; cursor: default; }
+.chart-track { position: relative; flex: 1; }
+.chart-stack {
+  position: absolute; left: 12%; right: 12%; bottom: 0;
+  display: flex; flex-direction: column-reverse; gap: 1px;
+  border-radius: 3px 3px 0 0; overflow: hidden; transition: filter 0.12s ease;
+}
+.chart-stack > div { flex-basis: 0; min-height: 2px; }
+.chart-col.is-hover .chart-stack { filter: brightness(1.12); }
+.chart-col.is-hover .chart-track { background: color-mix(in srgb, var(--bg-soft) 70%, transparent); border-radius: 4px; }
+.chart-label {
+  height: 24px; padding-top: 8px; text-align: center; white-space: nowrap; overflow: visible;
+  font-size: 11px; color: var(--ink-3);
+}
+
+.chart-lines { position: relative; flex: 1; }
+.chart-area { position: absolute; inset: 0 0 24px 0; }
+.chart-area svg { width: 100%; height: 100%; overflow: visible; }
+.chart-dot {
+  position: absolute; width: 9px; height: 9px; margin: -4.5px 0 0 -4.5px;
+  border-radius: 50%; background: var(--bg); border: 2px solid; pointer-events: none;
+}
+.chart-hit { position: absolute; inset: 0; display: flex; }
+.chart-hit > div { position: relative; flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: flex-end; }
+
+.chart-tip {
+  position: absolute; top: 0; left: calc(50% + 8px); z-index: 5;
+  min-width: 150px; padding: 10px 12px; border-radius: 8px;
+  background: var(--bg-ink); color: var(--on-ink); box-shadow: 0 8px 24px rgba(10, 12, 14, 0.18);
+  font-size: 12px; pointer-events: none;
+}
+.chart-tip--left { left: auto; right: calc(50% + 8px); }
+.chart-tip-title { font-weight: 600; margin-bottom: 6px; color: var(--on-ink-2); }
+.chart-tip-row { display: flex; align-items: center; gap: 7px; padding: 2px 0; color: var(--on-ink-2); white-space: nowrap; }
+.chart-tip-row i, .chart-legend i { width: 8px; height: 8px; border-radius: 2px; flex: none; }
+.chart-tip-row strong { margin-left: auto; padding-left: 14px; color: var(--on-ink); font-variant-numeric: tabular-nums; }
+
+.chart-legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 12.5px; color: var(--ink-2); }
+.chart-legend span { display: inline-flex; align-items: center; gap: 7px; }
+
+/* Uptime strip */
+.uptime-strip { display: flex; gap: 2px; height: 26px; align-items: stretch; }
+.uptime-strip--empty { align-items: center; font-size: 12px; color: var(--ink-3); }
+.uptime-tick { flex: 1; min-width: 2px; border-radius: 2px; }
+.uptime-tick--ok { background: var(--success); }
+.uptime-tick--warn { background: var(--amber-ink); }
+.uptime-tick--bad { background: var(--danger-dot); }
+.uptime-tick:hover { opacity: 0.7; }

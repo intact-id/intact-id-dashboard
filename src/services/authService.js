@@ -1,208 +1,80 @@
-import api from './api';
+import api, { clearSession, errorMessage } from './api';
 
+// Every function returns { success, data?, error? } so the UI never has to catch.
 const authService = {
-    /**
-     * Login user with username and password
-     * @param {string} username - User's username
-     * @param {string} password - User's password
-     * @returns {Promise<{success: boolean, data?: object, error?: string}>}
-     */
+    // /api/auth/login returns tokens, or — when 2FA is required and this browser is not a
+    // trusted device — { mfaRequired: true, mfaToken } and no tokens at all.
     async login(username, password) {
+        clearSession(); // avoid one account's session leaking into the next sign-in
         try {
-            // Avoid stale-session crossover when switching accounts.
-            localStorage.removeItem('accessToken');
-            localStorage.removeItem('refreshToken');
-            localStorage.removeItem('user');
+            const response = await api.post('/api/auth/login', { username, password });
+            if (!response.data.success) {
+                return { success: false, error: response.data.responseMessage || 'Sign-in failed' };
+            }
+            const loginData = response.data.data;
+            if (loginData.mfaRequired) {
+                return { success: true, data: { mfaRequired: true, mfaToken: loginData.mfaToken } };
+            }
+            return await this.startSession(loginData);
+        } catch (error) {
+            clearSession();
+            return { success: false, error: errorMessage(error, 'Sign-in failed') };
+        }
+    },
 
-            // /api/auth/login returns either full tokens, or — when 2FA is required and this
-            // browser isn't a trusted device — { mfaRequired: true, mfaToken } and no tokens
-            // at all. api.js's request interceptor attaches any stored deviceToken, which
-            // lets the backend skip the 2FA step below if this browser is already trusted.
-            const response = await api.post('/api/auth/login', {
-                username,
-                password,
+    // Completes a pending 2FA challenge. Pass either a TOTP `verificationCode` or a `backupCode`.
+    async verifyTwoFactor({ mfaToken, verificationCode, backupCode, rememberDevice }) {
+        try {
+            const response = await api.post('/api/auth/2fa/login-verify', {
+                mfaToken,
+                verificationCode: verificationCode ? Number(verificationCode) : undefined,
+                backupCode: backupCode || undefined,
+                rememberDevice,
             });
-
             if (!response.data.success) {
-                return {
-                    success: false,
-                    error: response.data.responseMessage || 'Login failed',
-                };
+                return { success: false, error: response.data.responseMessage || 'Verification failed' };
             }
-
-            if (response.data.data.mfaRequired) {
-                return {
-                    success: true,
-                    data: { mfaRequired: true, mfaToken: response.data.data.mfaToken },
-                };
-            }
-
-            return this._persistSession(response.data.data);
+            return await this.startSession(response.data.data);
         } catch (error) {
-            console.error('Login error:', error);
-            localStorage.removeItem('accessToken');
-            localStorage.removeItem('refreshToken');
-            localStorage.removeItem('user');
-            return {
-                success: false,
-                error: error.response?.data?.responseMessage ||
-                    error.response?.data?.errorMessage ||
-                    'Connection error. Please check if the server is running.',
-            };
+            return { success: false, error: errorMessage(error, 'Incorrect code. Please try again.') };
         }
     },
 
-    /**
-     * Complete a pending 2FA challenge with a TOTP code from an authenticator app.
-     */
-    async verifyMfaCode(mfaToken, verificationCode, rememberDevice) {
-        return this._completeMfaChallenge({ mfaToken, verificationCode, rememberDevice });
-    },
-
-    /**
-     * Complete a pending 2FA challenge with a single-use backup code instead of a TOTP code.
-     */
-    async verifyBackupCode(mfaToken, backupCode, rememberDevice) {
-        return this._completeMfaChallenge({ mfaToken, backupCode, rememberDevice });
-    },
-
-    async _completeMfaChallenge(payload) {
-        try {
-            const response = await api.post('/api/auth/2fa/login-verify', payload);
-
-            if (!response.data.success) {
-                return {
-                    success: false,
-                    error: response.data.responseMessage || 'Verification failed',
-                };
-            }
-
-            return this._persistSession(response.data.data);
-        } catch (error) {
-            return {
-                success: false,
-                error: error.response?.data?.responseMessage ||
-                    error.response?.data?.errorMessage ||
-                    'Incorrect code. Please try again.',
-            };
-        }
-    },
-
-    /**
-     * Store tokens (and a trusted-device token, if one was issued) from a successful
-     * login or MFA verification, then fetch and persist the user's profile.
-     */
-    async _persistSession(loginData) {
-        const { accessToken, refreshToken, deviceToken } = loginData;
+    // Stores the tokens, then loads the profile. The profile's companyId is what pages put in
+    // company-scoped URLs; auth-server still re-resolves the company from the token server-side.
+    async startSession({ accessToken, refreshToken, deviceToken }) {
         localStorage.setItem('accessToken', accessToken);
         localStorage.setItem('refreshToken', refreshToken);
-        if (deviceToken) {
-            localStorage.setItem('deviceToken', deviceToken);
-        }
+        if (deviceToken) localStorage.setItem('deviceToken', deviceToken);
 
-        const userData = await this.fetchCurrentUser();
-        localStorage.setItem('user', JSON.stringify(userData));
-
-        return {
-            success: true,
-            data: userData,
-        };
+        const user = await this.fetchCurrentUser();
+        localStorage.setItem('user', JSON.stringify(user));
+        return { success: true, data: user };
     },
 
-    /**
-     * Fetch the authenticated user's profile from the backend
-     * (username, email, roles, companyId, is2faEnabled, ...).
-     * Requires a valid access token to already be set.
-     * @returns {Promise<object>}
-     */
     async fetchCurrentUser() {
         const response = await api.get('/api/auth/current-user');
-
         if (!response.data.success) {
-            throw new Error(response.data.responseMessage || 'Failed to fetch current user');
+            throw new Error(response.data.responseMessage || 'Failed to load your profile');
         }
-
-        const { id, ...rest } = response.data.data;
-        return { id, userId: id, ...rest };
+        return response.data.data;
     },
 
-    /**
-     * Logout current user
-     * @returns {Promise<void>}
-     */
     async logout() {
         try {
             const refreshToken = localStorage.getItem('refreshToken');
-            if (refreshToken) {
-                await api.post('/api/auth/logout', { refreshToken });
-            }
-        } catch (error) {
-            console.error('Logout error:', error);
+            if (refreshToken) await api.post('/api/auth/logout', { refreshToken });
+        } catch {
+            // Signing out locally must succeed even if the server is unreachable.
         } finally {
-            // Clear local storage regardless of API call success. Note: deviceToken is
-            // intentionally left in place — it marks this browser as trusted independent
-            // of any one session, so signing out shouldn't force 2FA again next login.
-            localStorage.removeItem('accessToken');
-            localStorage.removeItem('refreshToken');
-            localStorage.removeItem('user');
+            // deviceToken stays: it marks this browser as trusted, independent of any one session.
+            clearSession();
         }
     },
 
-    /**
-     * Refresh access token
-     * @returns {Promise<{accessToken: string, refreshToken: string}>}
-     */
-    async refreshToken() {
-        const refreshToken = localStorage.getItem('refreshToken');
-        if (!refreshToken) {
-            throw new Error('No refresh token available');
-        }
-
-        const response = await api.post('/api/auth/refresh', { refreshToken });
-
-        if (response.data.success) {
-            const { accessToken, refreshToken: newRefreshToken } = response.data.data;
-            localStorage.setItem('accessToken', accessToken);
-            localStorage.setItem('refreshToken', newRefreshToken);
-            return { accessToken, refreshToken: newRefreshToken };
-        }
-
-        throw new Error('Token refresh failed');
-    },
-
-    /**
-     * Get current user from localStorage
-     * @returns {object|null}
-     */
-    getCurrentUser() {
-        const userStr = localStorage.getItem('user');
-        return userStr ? JSON.parse(userStr) : null;
-    },
-
-    /**
-     * Check if user is authenticated
-     * @returns {boolean}
-     */
-    isAuthenticated() {
-        // No pending-2FA flag needed anymore: a full accessToken is only ever stored
-        // once /api/auth/login (or the MFA verify step) has actually succeeded.
-        return !!localStorage.getItem('accessToken');
-    },
-
-    /**
-     * Get access token
-     * @returns {string|null}
-     */
-    getAccessToken() {
-        return localStorage.getItem('accessToken');
-    },
-
-    /**
-     * Get refresh token
-     * @returns {string|null}
-     */
-    getRefreshToken() {
-        return localStorage.getItem('refreshToken');
+    getStoredUser() {
+        const stored = localStorage.getItem('user');
+        return stored && localStorage.getItem('accessToken') ? JSON.parse(stored) : null;
     },
 };
 

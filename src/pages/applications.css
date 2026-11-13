@@ -1,0 +1,3 @@
+.app-row { cursor: pointer; }
+.app-row:hover td { background: var(--bg-soft); }
+.app-row .name-primary, .app-row .name-secondary { display: block; }
