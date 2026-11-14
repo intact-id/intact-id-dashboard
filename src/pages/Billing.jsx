@@ -8,7 +8,8 @@ import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import billingService from '../services/billingService';
 import { errorMessage } from '../services/api';
-import { isSuperAdmin } from '../utils/roles';
+import { hasAnyRole, isSuperAdmin } from '../utils/roles';
+import BankTopUp from '../components/billing/BankTopUp';
 import { formatDate, formatDateTime, humanize } from '../utils/format';
 import { formatCount, formatMoney, shortDate } from '../utils/insights';
 import './insights/insights.css';
@@ -96,6 +97,7 @@ export default function Billing() {
     const { user } = useAuth();
     const { toast } = useToast();
     const superAdmin = isSuperAdmin(user);
+    const isAdmin = hasAnyRole(user, ['ADMIN', 'SUPER_ADMIN']);
     const [companyId, setCompanyId] = useState('');
     const [data, setData] = useState(null); // { account, prices, invoices, history } or { notSetUp: true }
     const [error, setError] = useState('');
@@ -192,6 +194,11 @@ export default function Billing() {
                             {superAdmin && prepaid && (
                                 <button className="btn bill-balance-btn" onClick={() => { setForm({ amount: '', externalRef: '', description: '', retryRef: `topup-${crypto.randomUUID()}` }); setModal('topup'); }}>
                                     <Plus size={15} /> Top up wallet
+                                </button>
+                            )}
+                            {!superAdmin && prepaid && isAdmin && (
+                                <button className="btn bill-balance-btn" onClick={() => setModal('bank')}>
+                                    <Plus size={15} /> Top up by bank transfer
                                 </button>
                             )}
                         </div>
@@ -307,6 +314,12 @@ export default function Billing() {
                         </div>
                     )}
                 </>
+            )}
+
+            {data && !data.notSetUp && prepaid && (
+                <div style={{ marginTop: 16 }}>
+                    <BankTopUp companyId={company} open={modal === 'bank'} onClose={() => setModal(null)} onChanged={load} />
+                </div>
             )}
 
             <Modal isOpen={modal === 'topup'} onClose={() => setModal(null)} title="Top up wallet" caption={<><Lock size={11} /> Super admins · adds credit to this company’s wallet</>}
