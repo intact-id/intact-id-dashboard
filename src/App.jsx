@@ -21,6 +21,7 @@ import RiskModels from './pages/cra/RiskModels';
 import Workflows from './pages/workflows/Workflows';
 import Services from './pages/services/Services';
 import Applications from './pages/Applications';
+import WaitingPeople from './pages/WaitingPeople';
 // The builder pulls in the canvas library; load it only when a workflow is opened.
 const WorkflowBuilder = lazy(() => import('./pages/workflows/WorkflowBuilder'));
 import RiskModelBuilder from './pages/cra/builder/RiskModelBuilder';
@@ -58,6 +59,7 @@ export default function App() {
                 <Route path="companies" element={<Companies />} />
                 <Route path="services" element={<Services />} />
                 <Route path="applications" element={<Applications />} />
+                <Route path="waiting" element={<WaitingPeople />} />
                 {/* Addresses from the old dashboard */}
                 <Route path="approvals" element={<Navigate to="/dashboard/applications" replace />} />
                 <Route path="maker-checker" element={<Navigate to="/dashboard/applications" replace />} />

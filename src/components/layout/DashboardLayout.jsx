@@ -4,6 +4,7 @@ import {
     LayoutDashboard, ShieldCheck, FileText, BarChart2, Key, Webhook, Code,
     Users, Bell, ClipboardCheck, Building2, Gauge, ListChecks, Radar, CreditCard,
     Settings, LogOut, Menu, X, Search, ShieldCheck as Logo, Workflow, Boxes, Inbox,
+    Hourglass,
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { hasAnyRole, roleLabel } from '../../utils/roles';
@@ -16,6 +17,7 @@ const NAV_SECTIONS = [
         items: [
             { path: '/dashboard', label: 'Overview', icon: LayoutDashboard, exact: true },
             { path: '/dashboard/verifications', label: 'Verifications', icon: ShieldCheck },
+            { path: '/dashboard/waiting', label: 'Waiting for people', icon: Hourglass },
             { path: '/dashboard/workflows', label: 'Workflows', icon: Workflow },
             { path: '/dashboard/documents', label: 'Documents', icon: FileText },
             { path: '/dashboard/analytics', label: 'Analytics', icon: BarChart2 },
