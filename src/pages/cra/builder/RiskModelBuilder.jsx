@@ -3,6 +3,8 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Check, Lock, Pencil, Plus, Trash2, TriangleAlert } from 'lucide-react';
 import Modal from '../../../components/ui/Modal';
 import { useToast } from '../../../contexts/ToastContext';
+import { useAuth } from '../../../contexts/AuthContext';
+import { can } from '../../../utils/access';
 import riskService from '../../../services/riskService';
 import { errorMessage } from '../../../services/api';
 import AttributeModal from './AttributeModal';
@@ -27,6 +29,7 @@ export default function RiskModelBuilder() {
     const { id } = useParams();
     const navigate = useNavigate();
     const { toast } = useToast();
+    const { user } = useAuth();
 
     const [model, setModel] = useState(null);
     const [config, setConfig] = useState(null);
@@ -86,7 +89,8 @@ export default function RiskModelBuilder() {
     }
     if (!config) return <div className="page"><div className="loading-state">Loading risk model…</div></div>;
 
-    const isDraft = model.lifeCycleStatus === 'DRAFT';
+    // Drafts are edited only by those who may change risk models; everyone else sees the model read-only
+    const isDraft = model.lifeCycleStatus === 'DRAFT' && can(user, 'risk-models.edit');
     const categoryKeys = [...new Set([...definitions.map((d) => d.categoryKey), ...config.categories.map((c) => c.key)])]
         .sort((a, b) => categoryRank(a) - categoryRank(b));
     const activeTab = categoryKeys.includes(tab) ? tab : categoryKeys[0];
