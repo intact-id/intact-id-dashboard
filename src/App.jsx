@@ -22,6 +22,7 @@ import Workflows from './pages/workflows/Workflows';
 import Services from './pages/services/Services';
 import Applications from './pages/Applications';
 import WaitingPeople from './pages/WaitingPeople';
+import Monitoring from './pages/Monitoring';
 import TopUps from './pages/TopUps';
 import KybSettings from './pages/KybSettings';
 import DataRetention from './pages/DataRetention';
@@ -63,6 +64,7 @@ export default function App() {
                 <Route path="services" element={<Services />} />
                 <Route path="applications" element={<Applications />} />
                 <Route path="waiting" element={<WaitingPeople />} />
+                <Route path="monitoring" element={<Monitoring />} />
                 <Route path="top-ups" element={<TopUps />} />
                 <Route path="kyb-settings" element={<KybSettings />} />
                 <Route path="data-retention" element={<DataRetention />} />

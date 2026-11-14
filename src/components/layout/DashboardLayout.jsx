@@ -4,7 +4,7 @@ import {
     LayoutDashboard, ShieldCheck, FileText, BarChart2, Key, Webhook, Code,
     Users, Bell, ClipboardCheck, Building2, Gauge, ListChecks, Radar, CreditCard,
     Settings, LogOut, Menu, X, Search, ShieldCheck as Logo, Workflow, Boxes, Inbox,
-    Hourglass, Briefcase, Archive, Banknote,
+    Hourglass, Briefcase, Archive, BellRing, Banknote,
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { hasAnyRole, roleLabel } from '../../utils/roles';
@@ -49,6 +49,7 @@ const NAV_SECTIONS = [
             { path: '/dashboard/risk-models', label: 'Risk Models', icon: Gauge },
             { path: '/dashboard/assessments', label: 'Assessments', icon: ListChecks },
             { path: '/dashboard/screening', label: 'Screening', icon: Radar },
+            { path: '/dashboard/monitoring', label: 'Monitoring', icon: BellRing },
         ],
     },
     {

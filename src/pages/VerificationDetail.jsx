@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { ArrowLeft, X, Check, ShieldQuestion, FileText, Image as ImageIcon, ExternalLink, PlayCircle, TriangleAlert } from 'lucide-react';
 import RetentionPanel from '../components/privacy/RetentionPanel';
+import MonitoringPanel from '../components/monitoring/MonitoringPanel';
 import Badge from '../components/ui/Badge';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
@@ -332,6 +333,9 @@ export default function VerificationDetail() {
                 </div>
             </div>
 
+            <div style={{ marginTop: 16 }}>
+                <MonitoringPanel verification={v} canAct={isStaff} />
+            </div>
             <div style={{ marginTop: 16 }}>
                 <RetentionPanel verificationId={v.verificationId} canAct={isStaff} superAdmin={superAdmin} onErased={load} />
             </div>
