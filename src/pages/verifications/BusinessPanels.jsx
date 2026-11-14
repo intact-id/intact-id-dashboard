@@ -6,7 +6,7 @@ import Modal from '../../components/ui/Modal';
 import { useToast } from '../../contexts/ToastContext';
 import kybService from '../../services/kybService';
 import { errorMessage } from '../../services/api';
-import { formatDate, humanize, initialsOf } from '../../utils/format';
+import { formatDate, formatDateTime, humanize, initialsOf } from '../../utils/format';
 import { PARTY_STATUS } from '../../utils/verification';
 
 // The business's own details (the "Applicant" card for a business verification).
@@ -35,6 +35,14 @@ export function BusinessDetails({ verification }) {
 }
 
 const canInvite = (p) => p.required && ['PENDING', 'INVITED'].includes(p.status);
+
+// Where a person's link stands: who sends it, when it expires, reminders so far
+export function linkInfo(p) {
+    if (p.status !== 'INVITED' || !p.inviteExpiresAt) return null;
+    const who = p.inviteEmailed ? `Emailed to ${p.email}` : 'Not emailed: share the link yourself';
+    const reminders = p.remindersSent ? ` · ${p.remindersSent} reminder${p.remindersSent === 1 ? '' : 's'}` : '';
+    return `${who} · expires ${formatDateTime(p.inviteExpiresAt)}${reminders}`;
+}
 
 function role(p) {
     const parts = [];
@@ -98,11 +106,14 @@ export function PartiesCard({ verification, onChanged }) {
                                         {p.screening?.verdict && <div className="name-secondary">Screening: {humanize(p.screening.verdict)}</div>}
                                     </td>
                                     <td>{role(p)}</td>
-                                    <td><Badge kind={status.badge}>{status.label}</Badge></td>
+                                    <td>
+                                        <Badge kind={status.badge}>{status.label}</Badge>
+                                        {linkInfo(p) && <div className="name-secondary" style={{ marginTop: 4 }}>{linkInfo(p)}</div>}
+                                    </td>
                                     <td style={{ textAlign: 'right' }}>
                                         {canInvite(p) && (
                                             <button className="btn btn--ghost btn--sm" onClick={() => setInviting(p)}>
-                                                <Send size={13} /> {p.status === 'INVITED' ? 'Send again' : 'Send link'}
+                                                <Send size={13} /> {p.email ? (p.status === 'INVITED' ? 'Email a new link' : 'Email link') : 'Get link'}
                                             </button>
                                         )}
                                     </td>
@@ -117,11 +128,11 @@ export function PartiesCard({ verification, onChanged }) {
                 isOpen={!!inviting}
                 onClose={() => setInviting(null)}
                 title={`Send ${inviting?.firstName} their verification link?`}
-                caption={`${inviting?.email ? `It is emailed to them. ` : 'They have no email on file, so copy the link and send it yourself. '}The link works for 7 days; sending again replaces the old link.`}
+                caption={`${inviting?.email ? `It is emailed to ${inviting.email}, and you can copy it too. ` : 'They have no email on file, so copy the link and send it yourself. '}The link works for 7 days and replaces any earlier link.`}
                 footer={(
                     <>
                         <button className="btn btn--secondary" onClick={() => setInviting(null)} disabled={busy}>Cancel</button>
-                        <button className="btn btn--primary" onClick={invite} disabled={busy}>{busy ? 'Sending…' : 'Send link'}</button>
+                        <button className="btn btn--primary" onClick={invite} disabled={busy}>{busy ? 'Working…' : inviting?.email ? 'Email link' : 'Get link'}</button>
                     </>
                 )}
             />

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
-import { UserRound, ShieldCheck, Building2, Copy, Briefcase } from 'lucide-react';
+import { UserRound, ShieldCheck, Building2, Copy, Briefcase, Archive } from 'lucide-react';
 import Badge from '../components/ui/Badge';
 import Modal from '../components/ui/Modal';
 import { useAuth } from '../contexts/AuthContext';
@@ -10,6 +10,7 @@ import companyService from '../services/companyService';
 import api, { errorMessage } from '../services/api';
 import { hasAnyRole, isSuperAdmin, roleLabel } from '../utils/roles';
 import OwnerCheckSettings from '../components/kyb/OwnerCheckSettings';
+import RetentionSettings from '../components/privacy/RetentionSettings';
 import { formatDateTime } from '../utils/format';
 
 const PASSWORD_RULE = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
@@ -345,6 +346,8 @@ export default function Settings() {
         ...(user?.companyId ? [{ id: 'company', label: 'Company', desc: 'Contact details', icon: Building2 }] : []),
         ...(isSuperAdmin(user) || (isAdmin && user?.companyId)
             ? [{ id: 'kyb', label: 'Business verification', desc: 'Who is checked behind a business', icon: Briefcase }] : []),
+        ...(isSuperAdmin(user) || (isAdmin && user?.companyId)
+            ? [{ id: 'retention', label: 'Data retention', desc: 'How long applicant data is kept', icon: Archive }] : []),
     ];
     const [tab, setTab] = useState('account');
 
@@ -372,6 +375,7 @@ export default function Settings() {
                     {tab === 'security' && <SecurityTab user={user} onUserChange={updateUser} />}
                     {tab === 'company' && <CompanyTab canEdit={isAdmin} />}
                     {tab === 'kyb' && <OwnerCheckSettings companyId={isSuperAdmin(user) ? undefined : user.companyId} />}
+                    {tab === 'retention' && <RetentionSettings companyId={isSuperAdmin(user) ? undefined : user.companyId} />}
                 </div>
             </div>
         </div>

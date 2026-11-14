@@ -60,7 +60,7 @@ export function applicantName(verification) {
 export const PARTY_STATUS = {
     NOT_REQUIRED: { label: 'Not required', badge: 'neutral' },
     PENDING: { label: 'Not started', badge: 'neutral' },
-    INVITED: { label: 'Link sent', badge: 'info' },
+    INVITED: { label: 'Link ready', badge: 'info' },
     VERIFYING: { label: 'Verifying', badge: 'info' },
     PASSED: { label: 'Passed', badge: 'ok' },
     FAILED: { label: 'Failed', badge: 'bad' },
