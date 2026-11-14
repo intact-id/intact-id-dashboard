@@ -48,6 +48,17 @@ const workflowService = {
         return unwrap(await api.post(`/api/v1/workflows/${id}/promote`, { version }, scoped(companyId)));
     },
 
+    // Prices the live version again from today's service prices: { oldPrice, newPrice, currency, ... }
+    async reprice(id, { companyId } = {}) {
+        return unwrap(await api.post(`/api/v1/workflows/${id}/reprice`, null, scoped(companyId)));
+    },
+
+    // Every workflow in use: the company's, or every company's for super admins without companyId.
+    // [{ workflowId, key, name, companyId, version, oldPrice, newPrice, currency, error }]
+    async repriceAll({ companyId } = {}) {
+        return unwrap(await api.post('/api/v1/workflows/reprice', null, scoped(companyId)));
+    },
+
     async archive(id, { companyId, template = false } = {}) {
         return unwrap(await api.delete(`/api/v1/workflows/${id}`, scoped(companyId, template ? { template } : {})));
     },

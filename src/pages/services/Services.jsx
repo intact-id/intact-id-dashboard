@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Plus, Search, TriangleAlert } from 'lucide-react';
+import { Plus, RefreshCw, Search, TriangleAlert } from 'lucide-react';
 import Badge from '../../components/ui/Badge';
 import Modal from '../../components/ui/Modal';
 import RowMenu from '../../components/ui/RowMenu';
@@ -49,6 +49,36 @@ const CHANGES = {
     },
 };
 
+// What re-pricing did: the changed prices, and the workflows that could not be priced
+function RepriceResults({ results }) {
+    const failed = results.filter((r) => r.error);
+    const changed = results.filter((r) => !r.error && Number(r.oldPrice) !== Number(r.newPrice));
+    if (results.length === 0) return <p className="svc-effect">No workflows are in use yet.</p>;
+    return (
+        <>
+            <p className="svc-effect">
+                {results.length - failed.length} of {results.length} workflows priced; {changed.length} changed.
+            </p>
+            {changed.length > 0 && (
+                <div className="kv-list">
+                    {changed.map((r) => (
+                        <div key={r.workflowId} className="kv-row">
+                            <span>{r.name} <span className="name-secondary">v{r.version}</span></span>
+                            <strong>{r.oldPrice == null ? '—' : formatMoney(r.oldPrice, r.currency)} → {formatMoney(r.newPrice, r.currency)}</strong>
+                        </div>
+                    ))}
+                </div>
+            )}
+            {failed.length > 0 && (
+                <div className="note note--warn">
+                    <div className="note-head"><TriangleAlert size={16} /><span>Not updated</span></div>
+                    {failed.map((r) => <p key={r.workflowId}>{r.name}: {r.error}</p>)}
+                </div>
+            )}
+        </>
+    );
+}
+
 export default function Services() {
     const { user } = useAuth();
     const { toast } = useToast();
@@ -62,6 +92,8 @@ export default function Services() {
     const [editing, setEditing] = useState(null); // a service, 'new', or null
     const [change, setChange] = useState(null); // { service, target }
     const [busy, setBusy] = useState(false);
+    // Updating the price of workflows in use: null, { asked }, { running } or { results }
+    const [reprice, setReprice] = useState(null);
 
     const load = useCallback(async () => {
         setError('');
@@ -107,6 +139,16 @@ export default function Services() {
         }
     };
 
+    const repriceAll = async () => {
+        setReprice({ running: true });
+        try {
+            setReprice({ results: await workflowService.repriceAll() });
+        } catch (e) {
+            toast.error(errorMessage(e, 'Could not update workflow prices.'));
+            setReprice(null);
+        }
+    };
+
     if (!superAdmin) {
         return (
             <div className="page">
@@ -140,6 +182,7 @@ export default function Services() {
                     <p>The checks workflows can include. Merchants only see available services.</p>
                 </div>
                 <div className="head-actions">
+                    <button className="btn btn--secondary" onClick={() => setReprice({ asked: true })}><RefreshCw size={15} /> Update workflow prices</button>
                     <button className="btn btn--primary" onClick={() => setEditing('new')}><Plus size={15} /> Add service</button>
                 </div>
             </div>
@@ -224,9 +267,23 @@ export default function Services() {
                     charge={editing === 'new' ? null : prices[editing.code]}
                     services={services || []}
                     onClose={() => setEditing(null)}
-                    onSaved={() => { setEditing(null); load(); }}
+                    onSaved={({ priceChanged } = {}) => { setEditing(null); load(); if (priceChanged) setReprice({ asked: true, afterEdit: true }); }}
                 />
             )}
+
+            <Modal isOpen={Boolean(reprice)} onClose={() => !reprice?.running && setReprice(null)} title="Update workflow prices"
+                   footer={reprice?.results ? <button className="btn btn--primary" onClick={() => setReprice(null)}>Done</button> : <>
+                       <button className="btn btn--secondary" disabled={reprice?.running} onClick={() => setReprice(null)}>{reprice?.afterEdit ? 'Not now' : 'Cancel'}</button>
+                       <button className="btn btn--primary" disabled={reprice?.running} onClick={repriceAll}>{reprice?.running ? 'Updating…' : 'Update every workflow'}</button>
+                   </>}>
+                {reprice && !reprice.results && (
+                    <p className="svc-effect">
+                        {reprice.afterEdit ? 'The new price applies to workflows published from now on. ' : ''}
+                        Workflows already in use keep the price they had when published. Updating re-prices every company’s live workflows from today’s service prices, and new runs are charged the new price.
+                    </p>
+                )}
+                {reprice?.results && <RepriceResults results={reprice.results} />}
+            </Modal>
 
             <Modal isOpen={Boolean(change)} onClose={() => setChange(null)} title={changing ? changing.title(change.service) : ''}
                    footer={<>

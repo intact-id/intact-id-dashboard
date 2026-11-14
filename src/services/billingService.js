@@ -24,6 +24,10 @@ const billingService = {
     async invoices(companyId) {
         return unwrap(await api.get('/api/v1/billing/invoices', forCompany(companyId)));
     },
+    // How workflow runs are charged: { platformDefault, mode, companyOverride }; mode is WORKFLOW_PRICE or CHECKS_RUN
+    async chargeMode(companyId) {
+        return unwrap(await api.get('/api/v1/billing/charge-mode', forCompany(companyId)));
+    },
 
     // --- Super admin ---
     // { billingModel: PER_CALL|FLAT_PERIODIC|HYBRID, paymentType: PREPAID|POSTPAID, currency, pricePerCall, freeQuota }
@@ -52,6 +56,11 @@ const billingService = {
     // { name, price, isActive }
     async updateServiceCharge(chargeId, changes) {
         return unwrap(await api.patch(`/api/v1/billing/admin/service-charges/${chargeId}`, changes));
+    },
+
+    // mode null puts the company back on the platform default
+    async updateChargeMode(companyId, mode) {
+        return unwrap(await api.put('/api/v1/billing/admin/charge-mode', { mode }, { params: { companyId } }));
     },
 
     async markInvoicePaid(invoiceId) {

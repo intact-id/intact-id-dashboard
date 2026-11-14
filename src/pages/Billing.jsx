@@ -86,6 +86,12 @@ function SetUpBilling({ companyId, onDone }) {
     );
 }
 
+// How a workflow run is charged (billing.charge-mode, or the company's own choice)
+const CHARGE_MODE_LABEL = {
+    WORKFLOW_PRICE: 'The workflow’s price',
+    CHECKS_RUN: 'Only the checks that ran',
+};
+
 export default function Billing() {
     const { user } = useAuth();
     const { toast } = useToast();
@@ -106,12 +112,13 @@ export default function Billing() {
         setData(null);
         try {
             const account = await billingService.account(company);
-            const [prices, invoices, history] = await Promise.all([
+            const [prices, invoices, history, chargeMode] = await Promise.all([
                 billingService.prices(company).catch(() => []),
                 account.billingProfile ? billingService.invoices(company).catch(() => []) : [],
                 account.wallet ? billingService.walletHistory(company).catch(() => []) : [],
+                billingService.chargeMode(company).catch(() => null),
             ]);
-            setData({ account, prices: prices || [], invoices: invoices || [], history: history || [] });
+            setData({ account, prices: prices || [], invoices: invoices || [], history: history || [], chargeMode });
         } catch (e) {
             if (e.response?.status === 404) setData({ notSetUp: true });
             else setError(errorMessage(e, 'Could not load billing.'));
@@ -212,6 +219,20 @@ export default function Billing() {
                                 <div className="kv-row"><span>Model</span><strong>{MODEL_LABEL[profile?.billingModel] || humanize(profile?.billingModel)}</strong></div>
                                 <div className="kv-row"><span>Payment</span><strong>{prepaid ? 'Prepaid wallet' : 'Postpaid, invoiced'}</strong></div>
                                 <div className="kv-row"><span>Standard price</span><strong>{pricing ? `${formatMoney(pricing.pricePerCall, currency)} / verification` : 'Per service'}</strong></div>
+                                {data.chargeMode && (
+                                    <div className="kv-row">
+                                        <span title="Workflow price: every run costs the workflow's price. Checks that ran: a run costs only the checks it reached, at today's prices.">Workflow runs cost</span>
+                                        {superAdmin ? (
+                                            <select className="input" style={{ maxWidth: 240, padding: "4px 8px" }} disabled={busy}
+                                                    value={data.chargeMode.companyOverride ? data.chargeMode.mode : ''}
+                                                    onChange={(e) => run(() => billingService.updateChargeMode(companyId, e.target.value || null), 'Charging updated')}>
+                                                <option value="">Platform default ({CHARGE_MODE_LABEL[data.chargeMode.platformDefault]})</option>
+                                                <option value="WORKFLOW_PRICE">{CHARGE_MODE_LABEL.WORKFLOW_PRICE}</option>
+                                                <option value="CHECKS_RUN">{CHARGE_MODE_LABEL.CHECKS_RUN}</option>
+                                            </select>
+                                        ) : <strong>{CHARGE_MODE_LABEL[data.chargeMode.mode]}</strong>}
+                                    </div>
+                                )}
                                 <div className="kv-row"><span>Free verifications</span><strong>{pricing ? formatCount(pricing.freeQuota) : '—'}</strong></div>
                                 <div className="kv-row"><span>Status</span><strong>{profile?.isActive === false ? <Badge kind="bad">Inactive</Badge> : <Badge kind="ok">Active</Badge>}</strong></div>
                             </div>
