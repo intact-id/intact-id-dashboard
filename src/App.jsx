@@ -22,7 +22,7 @@ import Workflows from './pages/workflows/Workflows';
 import Services from './pages/services/Services';
 import Applications from './pages/Applications';
 import WaitingPeople from './pages/WaitingPeople';
-import BusinessVerification from './pages/BusinessVerification';
+import KybSettings from './pages/KybSettings';
 import DataRetention from './pages/DataRetention';
 // The builder pulls in the canvas library; load it only when a workflow is opened.
 const WorkflowBuilder = lazy(() => import('./pages/workflows/WorkflowBuilder'));
@@ -62,7 +62,7 @@ export default function App() {
                 <Route path="services" element={<Services />} />
                 <Route path="applications" element={<Applications />} />
                 <Route path="waiting" element={<WaitingPeople />} />
-                <Route path="business-verification" element={<BusinessVerification />} />
+                <Route path="kyb-settings" element={<KybSettings />} />
                 <Route path="data-retention" element={<DataRetention />} />
                 {/* Addresses from the old dashboard */}
                 <Route path="approvals" element={<Navigate to="/dashboard/applications" replace />} />

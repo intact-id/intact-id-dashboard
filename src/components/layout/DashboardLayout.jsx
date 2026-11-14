@@ -19,7 +19,7 @@ const NAV_SECTIONS = [
             { path: '/dashboard/verifications', label: 'Verifications', icon: ShieldCheck },
             { path: '/dashboard/waiting', label: 'Waiting for people', icon: Hourglass },
             { path: '/dashboard/workflows', label: 'Workflows', icon: Workflow },
-            { path: '/dashboard/business-verification', label: 'Business verification', icon: Briefcase, roles: ['ADMIN', 'SUPER_ADMIN'] },
+            { path: '/dashboard/kyb-settings', label: 'KYB settings', icon: Briefcase, roles: ['ADMIN', 'SUPER_ADMIN'] },
             { path: '/dashboard/documents', label: 'Documents', icon: FileText },
             { path: '/dashboard/analytics', label: 'Analytics', icon: BarChart2 },
         ],
