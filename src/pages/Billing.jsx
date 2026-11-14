@@ -158,6 +158,11 @@ export default function Billing() {
         setData(null);
         try {
             const account = await billingService.account(company);
+            // Approval registers the company with billing, but its terms (and wallet) come from Set up billing
+            if (!account.billingProfile) {
+                setData({ notSetUp: true });
+                return;
+            }
             const [prices, invoices, history, chargeMode, fx] = await Promise.all([
                 billingService.prices(company).catch(() => []),
                 account.billingProfile ? billingService.invoices(company).catch(() => []) : [],
