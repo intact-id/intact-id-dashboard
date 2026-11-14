@@ -7,6 +7,8 @@ const ROUTE_LABELS = {
     '/dashboard': 'Overview',
     '/dashboard/verifications': 'Verifications',
     '/dashboard/waiting': 'Waiting for people',
+    '/dashboard/business-verification': 'Business verification',
+    '/dashboard/data-retention': 'Data retention',
     '/dashboard/documents': 'Documents',
     '/dashboard/analytics': 'Analytics',
     '/dashboard/api': 'API keys',
