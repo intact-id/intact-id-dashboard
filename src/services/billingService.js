@@ -24,6 +24,25 @@ const billingService = {
     async invoices(companyId) {
         return unwrap(await api.get('/api/v1/billing/invoices', forCompany(companyId)));
     },
+    // The company's conversion: { base, currency, rate, markupPercent, rateDate, fetchedAt }
+    async fx(companyId) {
+        return unwrap(await api.get('/api/v1/billing/fx', forCompany(companyId)));
+    },
+    // { base, currencies, rates: [{ currency, rate, rateDate, fetchedAt, stale }], platformMarkupPercent }
+    async fxRates() {
+        return unwrap(await api.get('/api/v1/billing/fx/rates'));
+    },
+    async refreshFxRates() {
+        return unwrap(await api.post('/api/v1/billing/admin/fx/rates/refresh'));
+    },
+    // Without companyId: { platformMarkupPercent }; with it: also { markupPercent, companyOverride }
+    async fxMarkup(companyId) {
+        return unwrap(await api.get('/api/v1/billing/admin/fx/markup', forCompany(companyId)));
+    },
+    // markupPercent null removes a company's own markup
+    async setFxMarkup(companyId, markupPercent) {
+        return unwrap(await api.put('/api/v1/billing/admin/fx/markup', { markupPercent }, forCompany(companyId)));
+    },
     // How workflow runs are charged: { platformDefault, mode, companyOverride }; mode is WORKFLOW_PRICE or CHECKS_RUN
     async chargeMode(companyId) {
         return unwrap(await api.get('/api/v1/billing/charge-mode', forCompany(companyId)));

@@ -8,7 +8,8 @@ import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import billingService from '../services/billingService';
 import { errorMessage } from '../services/api';
-import { isSuperAdmin } from '../utils/roles';
+import { hasAnyRole, isSuperAdmin } from '../utils/roles';
+import BankTopUp from '../components/billing/BankTopUp';
 import { formatDate, formatDateTime, humanize } from '../utils/format';
 import { formatCount, formatMoney, shortDate } from '../utils/insights';
 import './insights/insights.css';
@@ -40,7 +41,10 @@ function SetUpBilling({ companyId, onDone }) {
     const { toast } = useToast();
     const [form, setForm] = useState({ billingModel: 'PER_CALL', paymentType: 'PREPAID', currency: 'KES', pricePerCall: '', freeQuota: '' });
     const [busy, setBusy] = useState(false);
+    const [fx, setFx] = useState(null);
     const set = (key) => (e) => setForm({ ...form, [key]: e.target.value });
+    useEffect(() => { billingService.fxRates().then(setFx).catch(() => setFx(null)); }, []);
+    const rateOf = (code) => fx?.rates?.find((r) => r.currency === code);
 
     const save = async () => {
         setBusy(true);
@@ -75,13 +79,54 @@ function SetUpBilling({ companyId, onDone }) {
                         <option value="POSTPAID">Postpaid, invoiced</option>
                     </select>
                 </div>
-                <div className="field"><label>Currency</label><input type="text" maxLength={3} value={form.currency} onChange={set('currency')} /></div>
+                <div className="field"><label>Billing currency</label>
+                    <select value={form.currency} onChange={set('currency')}>
+                        {(fx?.currencies || ['KES']).map((c) => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                    {form.currency !== (fx?.base || 'KES') && (
+                        <span className="field-hint">
+                            KES prices are converted at each day’s rate{rateOf(form.currency)?.rate ? ` (today 1 KES = ${Number(rateOf(form.currency).rate).toPrecision(4)} ${form.currency})` : ''} plus the FX markup.
+                            The price per verification below is in {form.currency}.
+                        </span>
+                    )}
+                </div>
                 <div className="field"><label>Price per verification</label><input type="number" min="0" step="0.01" value={form.pricePerCall} onChange={set('pricePerCall')} placeholder="Optional" /></div>
                 <div className="field"><label>Free verifications</label><input type="number" min="0" step="1" value={form.freeQuota} onChange={set('freeQuota')} placeholder="0" /></div>
             </div>
             <div className="bill-setup-foot">
                 <button className="btn btn--primary" disabled={busy || !/^[A-Za-z]{3}$/.test(form.currency.trim())} onClick={save}>{busy ? 'Setting up…' : 'Set up billing'}</button>
             </div>
+        </div>
+    );
+}
+
+// A super admin's FX markup for one company (empty = the platform markup)
+function CompanyMarkup({ companyId, onSaved }) {
+    const { toast } = useToast();
+    const [state, setState] = useState(null);
+    const [value, setValue] = useState('');
+    useEffect(() => {
+        billingService.fxMarkup(companyId).then((m) => { setState(m); setValue(m.companyOverride ? String(m.markupPercent) : ''); }).catch(() => setState(null));
+    }, [companyId]);
+    if (!state) return null;
+    const save = async () => {
+        try {
+            await billingService.setFxMarkup(companyId, value === '' ? null : Number(value));
+            toast.success('FX markup saved');
+            onSaved();
+        } catch (e) {
+            toast.error(errorMessage(e, 'Could not save the markup.'));
+        }
+    };
+    return (
+        <div className="kv-row">
+            <span>FX markup</span>
+            <span style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                <input className="input" type="number" min="0" max="100" step="0.1" style={{ width: 90, padding: '4px 8px' }}
+                       placeholder={`${Number(state.platformMarkupPercent)}`} value={value} onChange={(e) => setValue(e.target.value)} aria-label="FX markup percent" />
+                <span>%</span>
+                <button className="btn btn--ghost btn--sm" onClick={save}>Save</button>
+            </span>
         </div>
     );
 }
@@ -96,6 +141,7 @@ export default function Billing() {
     const { user } = useAuth();
     const { toast } = useToast();
     const superAdmin = isSuperAdmin(user);
+    const isAdmin = hasAnyRole(user, ['ADMIN', 'SUPER_ADMIN']);
     const [companyId, setCompanyId] = useState('');
     const [data, setData] = useState(null); // { account, prices, invoices, history } or { notSetUp: true }
     const [error, setError] = useState('');
@@ -112,13 +158,14 @@ export default function Billing() {
         setData(null);
         try {
             const account = await billingService.account(company);
-            const [prices, invoices, history, chargeMode] = await Promise.all([
+            const [prices, invoices, history, chargeMode, fx] = await Promise.all([
                 billingService.prices(company).catch(() => []),
                 account.billingProfile ? billingService.invoices(company).catch(() => []) : [],
                 account.wallet ? billingService.walletHistory(company).catch(() => []) : [],
                 billingService.chargeMode(company).catch(() => null),
+                account.billingProfile ? billingService.fx(company).catch(() => null) : null,
             ]);
-            setData({ account, prices: prices || [], invoices: invoices || [], history: history || [], chargeMode });
+            setData({ account, prices: prices || [], invoices: invoices || [], history: history || [], chargeMode, fx });
         } catch (e) {
             if (e.response?.status === 404) setData({ notSetUp: true });
             else setError(errorMessage(e, 'Could not load billing.'));
@@ -194,6 +241,11 @@ export default function Billing() {
                                     <Plus size={15} /> Top up wallet
                                 </button>
                             )}
+                            {!superAdmin && prepaid && isAdmin && (
+                                <button className="btn bill-balance-btn" onClick={() => setModal('bank')}>
+                                    <Plus size={15} /> Top up by bank transfer
+                                </button>
+                            )}
                         </div>
 
                         <div className="card bill-spend">
@@ -233,6 +285,17 @@ export default function Billing() {
                                         ) : <strong>{CHARGE_MODE_LABEL[data.chargeMode.mode]}</strong>}
                                     </div>
                                 )}
+                                {data.fx && data.fx.currency !== data.fx.base && (
+                                    <div className="kv-row">
+                                        <span title="Prices are set in KES and converted at each day's rate plus the FX markup">Exchange rate</span>
+                                        <strong>
+                                            1 {data.fx.base} = {Number(data.fx.rate).toPrecision(4)} {data.fx.currency}
+                                            {Number(data.fx.markupPercent) > 0 ? ` + ${Number(data.fx.markupPercent)}%` : ''}
+                                            <span className="name-secondary"> · {formatDate(data.fx.rateDate)}</span>
+                                        </strong>
+                                    </div>
+                                )}
+                                {superAdmin && data.fx && data.fx.currency !== data.fx.base && <CompanyMarkup companyId={companyId} onSaved={load} />}
                                 <div className="kv-row"><span>Free verifications</span><strong>{pricing ? formatCount(pricing.freeQuota) : '—'}</strong></div>
                                 <div className="kv-row"><span>Status</span><strong>{profile?.isActive === false ? <Badge kind="bad">Inactive</Badge> : <Badge kind="ok">Active</Badge>}</strong></div>
                             </div>
@@ -307,6 +370,12 @@ export default function Billing() {
                         </div>
                     )}
                 </>
+            )}
+
+            {data && !data.notSetUp && prepaid && (
+                <div style={{ marginTop: 16 }}>
+                    <BankTopUp companyId={company} open={modal === 'bank'} onClose={() => setModal(null)} onChanged={load} />
+                </div>
             )}
 
             <Modal isOpen={modal === 'topup'} onClose={() => setModal(null)} title="Top up wallet" caption={<><Lock size={11} /> Super admins · adds credit to this company’s wallet</>}

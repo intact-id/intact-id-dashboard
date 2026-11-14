@@ -12,6 +12,7 @@ import { isSuperAdmin } from '../../utils/roles';
 import { formatMoney } from '../../utils/insights';
 import { CATEGORY_LABELS, serviceIcon } from '../workflows/icons';
 import ServiceEditor from './ServiceEditor';
+import ExchangeRates from './ExchangeRates';
 import './services.css';
 
 const STATUS = {
@@ -260,6 +261,8 @@ export default function Services() {
                     </tbody>
                 </table></div>
             </div>
+
+            <ExchangeRates />
 
             {editing && (
                 <ServiceEditor
