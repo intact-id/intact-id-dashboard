@@ -18,6 +18,7 @@ const EVENTS_SENT = [
     ['verification.review_required', 'A person must decide'],
     ['business.waiting_for_people', 'A business waits for its directors and owners'],
     ['party.invite_created', 'A director or owner got a verification link; emailed: false means you share it'],
+    ['screening.updated', 'Ongoing monitoring found a change for a customer: new match, now sanctioned or PEP, or delisted'],
 ];
 
 // What a verification.completed event looks like (fields you switch off are left out)
