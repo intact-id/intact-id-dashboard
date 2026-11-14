@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
-import { UserRound, ShieldCheck, Building2, Copy, Briefcase, Archive } from 'lucide-react';
+import { UserRound, ShieldCheck, Building2, Copy } from 'lucide-react';
 import Badge from '../components/ui/Badge';
 import Modal from '../components/ui/Modal';
 import { useAuth } from '../contexts/AuthContext';
@@ -8,9 +8,7 @@ import { useToast } from '../contexts/ToastContext';
 import accountService from '../services/accountService';
 import companyService from '../services/companyService';
 import api, { errorMessage } from '../services/api';
-import { hasAnyRole, isSuperAdmin, roleLabel } from '../utils/roles';
-import OwnerCheckSettings from '../components/kyb/OwnerCheckSettings';
-import RetentionSettings from '../components/privacy/RetentionSettings';
+import { hasAnyRole, roleLabel } from '../utils/roles';
 import { formatDateTime } from '../utils/format';
 
 const PASSWORD_RULE = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
@@ -344,10 +342,6 @@ export default function Settings() {
         { id: 'account', label: 'Account', desc: 'Your profile and password', icon: UserRound },
         { id: 'security', label: 'Security', desc: 'Two-factor and trusted browsers', icon: ShieldCheck },
         ...(user?.companyId ? [{ id: 'company', label: 'Company', desc: 'Contact details', icon: Building2 }] : []),
-        ...(isSuperAdmin(user) || (isAdmin && user?.companyId)
-            ? [{ id: 'kyb', label: 'Business verification', desc: 'Who is checked behind a business', icon: Briefcase }] : []),
-        ...(isSuperAdmin(user) || (isAdmin && user?.companyId)
-            ? [{ id: 'retention', label: 'Data retention', desc: 'How long applicant data is kept', icon: Archive }] : []),
     ];
     const [tab, setTab] = useState('account');
 
@@ -374,8 +368,6 @@ export default function Settings() {
                     {tab === 'account' && <AccountTab user={user} />}
                     {tab === 'security' && <SecurityTab user={user} onUserChange={updateUser} />}
                     {tab === 'company' && <CompanyTab canEdit={isAdmin} />}
-                    {tab === 'kyb' && <OwnerCheckSettings companyId={isSuperAdmin(user) ? undefined : user.companyId} />}
-                    {tab === 'retention' && <RetentionSettings companyId={isSuperAdmin(user) ? undefined : user.companyId} />}
                 </div>
             </div>
         </div>

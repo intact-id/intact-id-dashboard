@@ -4,7 +4,7 @@ import {
     LayoutDashboard, ShieldCheck, FileText, BarChart2, Key, Webhook, Code,
     Users, Bell, ClipboardCheck, Building2, Gauge, ListChecks, Radar, CreditCard,
     Settings, LogOut, Menu, X, Search, ShieldCheck as Logo, Workflow, Boxes, Inbox,
-    Hourglass,
+    Hourglass, Briefcase, Archive,
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { hasAnyRole, roleLabel } from '../../utils/roles';
@@ -19,6 +19,7 @@ const NAV_SECTIONS = [
             { path: '/dashboard/verifications', label: 'Verifications', icon: ShieldCheck },
             { path: '/dashboard/waiting', label: 'Waiting for people', icon: Hourglass },
             { path: '/dashboard/workflows', label: 'Workflows', icon: Workflow },
+            { path: '/dashboard/kyb-settings', label: 'KYB settings', icon: Briefcase, roles: ['ADMIN', 'SUPER_ADMIN'] },
             { path: '/dashboard/documents', label: 'Documents', icon: FileText },
             { path: '/dashboard/analytics', label: 'Analytics', icon: BarChart2 },
         ],
@@ -48,6 +49,12 @@ const NAV_SECTIONS = [
             { path: '/dashboard/risk-models', label: 'Risk Models', icon: Gauge },
             { path: '/dashboard/assessments', label: 'Assessments', icon: ListChecks },
             { path: '/dashboard/screening', label: 'Screening', icon: Radar },
+        ],
+    },
+    {
+        title: 'Data protection',
+        items: [
+            { path: '/dashboard/data-retention', label: 'Data retention', icon: Archive, roles: ['ADMIN', 'SUPER_ADMIN'] },
         ],
     },
     {
