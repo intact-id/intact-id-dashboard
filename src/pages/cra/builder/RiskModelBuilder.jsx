@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Check, Lock, Pencil, Trash2, TriangleAlert } from 'lucide-react';
-import Badge from '../../../components/ui/Badge';
+import { ArrowLeft, Check, Lock, Pencil, Plus, Trash2, TriangleAlert } from 'lucide-react';
 import Modal from '../../../components/ui/Modal';
 import { useToast } from '../../../contexts/ToastContext';
 import riskService from '../../../services/riskService';
@@ -10,11 +9,19 @@ import AttributeModal from './AttributeModal';
 import ThresholdModal from './ThresholdModal';
 import BandBar from './BandBar';
 import {
-    CUSTOMER_TYPES, activationProblems, categoryName, categoryRank, evenWeights, normalizeConfig, ruleRows,
+    LEVELS, CUSTOMER_TYPES, activationProblems, categoryName, categoryRank, evenWeights, normalizeConfig, ruleRows,
     totalWeightPercent, weightPercent, withAttribute, withCategoryThresholds, withSafeguard, withWeightPercent,
     withoutAttribute,
 } from './model';
 import './builder.css';
+
+// A score's colour: the risk level of the band it falls in (category bands, else thirds of 0-100)
+function scoreColor(score, thresholds) {
+    const value = Number(score);
+    const band = thresholds?.find((t) => value >= Number(t.minScore) && value <= Number(t.maxScore));
+    const level = band?.riskLevel || (value >= 67 ? 'HIGH' : value >= 34 ? 'MEDIUM' : 'LOW');
+    return LEVELS.find((l) => l.level === level)?.color;
+}
 
 export default function RiskModelBuilder() {
     const { id } = useParams();
@@ -199,131 +206,135 @@ export default function RiskModelBuilder() {
             )}
 
             {step === 1 ? (
-                <div className="card">
-                    <p className="card-caption" style={{ marginBottom: 14 }}>
-                        Pick the attributes that matter in each category and score their values from 0 (lowest risk) to 100 (highest risk).
-                    </p>
-
-                    <div className="rm-tabs" role="tablist">
+                <div className="rm-layout">
+                    <nav className="rm-cats" aria-label="Categories">
                         {categoryKeys.map((key) => (
-                            <button key={key} role="tab" aria-selected={key === activeTab} className={key === activeTab ? 'is-active' : ''} onClick={() => setTab(key)}>
-                                {categoryName(key)}
-                                {attributeCount(key) > 0 && <span className="rm-tab-count">{attributeCount(key)}</span>}
+                            <button key={key} className={`rm-cat${key === activeTab ? ' is-active' : ''}`} onClick={() => setTab(key)}>
+                                <span>{categoryName(key)}</span>
+                                <span className="rm-cat-count">{attributeCount(key) || ''}</span>
                             </button>
                         ))}
-                    </div>
+                        {categoryKeys.length === 0 && <span className="card-caption">No attributes are available for this customer type yet.</span>}
+                    </nav>
 
-                    {categoryKeys.length === 0 && <div className="empty-state">No attributes are available for this customer type yet.</div>}
+                    {activeTab && (
+                        <section className="card rm-pane">
+                            <div className="rm-pane-head">
+                                <h3>{categoryName(activeTab)}</h3>
+                                <p className="card-caption">Score the attributes that matter from 0 (lowest risk) to 100 (highest). The category score is their average.</p>
+                            </div>
 
-                    {configured.map((attribute) => {
-                        const definition = definitionOf(attribute.attributeDefinitionKey);
-                        return (
-                            <div key={attribute.attributeDefinitionKey} className="rm-attribute">
-                                <div className="rm-attribute-head">
-                                    <strong>{definition?.displayName || attribute.attributeDefinitionKey}</strong>
-                                    {isDraft && (
-                                        <div className="head-actions">
-                                            {definition && <button className="rm-icon-btn" onClick={() => setEditingAttribute(definition)} aria-label="Edit scores"><Pencil size={15} /></button>}
-                                            <button className="rm-icon-btn" onClick={() => apply(withoutAttribute(config, activeTab, attribute.attributeDefinitionKey))} aria-label="Remove attribute"><Trash2 size={15} /></button>
-                                        </div>
-                                    )}
+                            {category && (
+                                <div className="rm-levels">
+                                    <span className="rm-label">Risk levels</span>
+                                    <div className="rm-levels-bar"><BandBar thresholds={category.thresholds} /></div>
+                                    {isDraft && <button className="rm-link" onClick={() => setThresholdsFor(activeTab)}>Edit</button>}
                                 </div>
-                                <div className="rm-rule-table">
-                                    <div className="rm-rule-head"><span>Values</span><span>Score</span></div>
-                                    {ruleRows(attribute).map((row, i) => (
-                                        <div key={i} className="rm-rule-row"><span>{row.label}</span><span className="mono">{row.score}</span></div>
+                            )}
+
+                            <div className="rm-group">
+                                <div className="rm-label">Scored</div>
+                                {configured.length === 0 && <p className="rm-empty">Nothing scored in this category yet{isDraft && available.length ? ': add an attribute below.' : '.'}</p>}
+                                {configured.map((attribute) => {
+                                    const definition = definitionOf(attribute.attributeDefinitionKey);
+                                    const rows = ruleRows(attribute);
+                                    return (
+                                        <div
+                                            key={attribute.attributeDefinitionKey}
+                                            className={`rm-row${isDraft && definition ? ' is-clickable' : ''}`}
+                                            onClick={() => isDraft && definition && setEditingAttribute(definition)}
+                                        >
+                                            <div className="rm-row-main">
+                                                <span className="rm-row-name">{definition?.displayName || attribute.attributeDefinitionKey}</span>
+                                                <div className="rm-chips">
+                                                    {rows.map((row, i) => (
+                                                        <span key={i} className="rm-chip">
+                                                            <span className="rm-chip-label">{row.label}</span>
+                                                            <span className="rm-chip-score" style={{ color: scoreColor(row.score, category?.thresholds) }}>{row.score}</span>
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                            {isDraft && (
+                                                <div className="rm-row-actions" onClick={(e) => e.stopPropagation()}>
+                                                    {definition && <button className="rm-icon-btn" onClick={() => setEditingAttribute(definition)} aria-label="Edit scores"><Pencil size={14} /></button>}
+                                                    <button className="rm-icon-btn" onClick={() => apply(withoutAttribute(config, activeTab, attribute.attributeDefinitionKey))} aria-label="Remove attribute"><Trash2 size={14} /></button>
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+
+                            {available.length > 0 && isDraft && (
+                                <div className="rm-group">
+                                    <div className="rm-label">Not scored</div>
+                                    {available.map((definition) => (
+                                        <div key={definition.key} className="rm-row rm-row--muted">
+                                            <div className="rm-row-main">
+                                                <span className="rm-row-name">{definition.displayName}</span>
+                                                {definition.description && <span className="rm-row-hint">{definition.description}</span>}
+                                            </div>
+                                            <button className="rm-link" onClick={() => setEditingAttribute(definition)}><Plus size={13} /> Add</button>
+                                        </div>
                                     ))}
                                 </div>
-                            </div>
-                        );
-                    })}
-
-                    {category && (
-                        <div className="rm-box">
-                            <div className="rm-box-head">
-                                <div>
-                                    <strong>{categoryName(activeTab)} risk levels</strong>
-                                    <div className="card-caption">The category score is the average of its attribute scores.</div>
-                                </div>
-                                {isDraft && <button className="rm-icon-btn" onClick={() => setThresholdsFor(activeTab)} aria-label="Edit category risk levels"><Pencil size={15} /></button>}
-                            </div>
-                            <BandBar thresholds={category.thresholds} />
-                        </div>
-                    )}
-
-                    {available.length > 0 && isDraft && (
-                        <>
-                            <div className="rm-section-title">
-                                <strong>{configured.length ? 'Other attributes' : 'Attributes'}</strong>
-                                <div className="card-caption">{configured.length ? 'Not used in the score until you add them.' : 'Add the ones this model should score.'}</div>
-                            </div>
-                            {available.map((definition) => (
-                                <div key={definition.key} className="rm-available">
-                                    <div>
-                                        <strong>{definition.displayName}</strong>
-                                        {definition.description && <div className="card-caption">{definition.description}</div>}
-                                    </div>
-                                    <button className="btn btn--secondary btn--sm" onClick={() => setEditingAttribute(definition)}>Add</button>
-                                </div>
-                            ))}
-                        </>
+                            )}
+                        </section>
                     )}
                 </div>
             ) : (
-                <>
-                    <div className="card">
-                        <div className="rm-box-head">
+                <section className="card rm-pane rm-pane--overall">
+                    <div className="rm-group">
+                        <div className="rm-group-head">
                             <div>
                                 <h3>Overall risk levels</h3>
-                                <div className="card-caption">Where the overall score (0 to 100) turns from Low to Medium to High.</div>
+                                <p className="card-caption">Where the overall score (0 to 100) turns from Low to Medium to High.</p>
                             </div>
-                            {isDraft && <button className="rm-icon-btn" onClick={() => setThresholdsFor('overall')} aria-label="Edit overall risk levels"><Pencil size={15} /></button>}
+                            {isDraft && <button className="rm-link" onClick={() => setThresholdsFor('overall')}>Edit</button>}
                         </div>
                         <BandBar thresholds={config.overallThresholds} />
                     </div>
 
-                    <div className="card">
-                        <div className="rm-box-head">
+                    <div className="rm-group">
+                        <div className="rm-group-head">
                             <div>
                                 <h3>Category weighting</h3>
-                                <div className="card-caption">How much each category counts towards the overall score. Weights add up to 100%.</div>
+                                <p className="card-caption">How much each category counts towards the overall score. Weights add up to 100%.</p>
                             </div>
                             {isDraft && config.categories.length > 1 && (
-                                <button className="btn btn--ghost btn--sm" onClick={() => apply({ ...config, categories: evenWeights(config.categories) })}>Split evenly</button>
+                                <button className="rm-link" onClick={() => apply({ ...config, categories: evenWeights(config.categories) })}>Split evenly</button>
                             )}
                         </div>
-                        <div className="rm-weights">
-                            {config.categories.map((c) => (
-                                <div key={c.key} className="rm-weight-row">
-                                    <span>{c.displayName || categoryName(c.key)}</span>
-                                    <div className="rm-weight-input">
-                                        <input
-                                            className="input"
-                                            type="number"
-                                            min="1"
-                                            max="100"
-                                            value={weightPercent(c) || ''}
-                                            disabled={!isDraft}
-                                            onChange={(e) => setConfig(withWeightPercent(config, c.key, Number(e.target.value)))}
-                                            onBlur={saveWeights}
-                                            aria-label={`${c.displayName || categoryName(c.key)} weight`}
-                                        />
-                                        <span>%</span>
-                                    </div>
+                        {config.categories.map((c) => (
+                            <div key={c.key} className="rm-weight">
+                                <span className="rm-weight-name">{c.displayName || categoryName(c.key)}</span>
+                                <div className="rm-weight-track"><div className="rm-weight-fill" style={{ width: `${Math.min(100, weightPercent(c) || 0)}%` }} /></div>
+                                <div className="rm-weight-input">
+                                    <input
+                                        className="input"
+                                        type="number"
+                                        min="1"
+                                        max="100"
+                                        value={weightPercent(c) || ''}
+                                        disabled={!isDraft}
+                                        onChange={(e) => setConfig(withWeightPercent(config, c.key, Number(e.target.value)))}
+                                        onBlur={saveWeights}
+                                        aria-label={`${c.displayName || categoryName(c.key)} weight`}
+                                    />
+                                    <span>%</span>
                                 </div>
-                            ))}
-                            <div className="rm-weight-row rm-weight-row--total">
-                                <span>Total</span>
-                                <strong className={totalWeightPercent(config) === 100 ? '' : 'rm-bad'}>{totalWeightPercent(config)}%</strong>
                             </div>
+                        ))}
+                        <div className="rm-weight rm-weight--total">
+                            <span className="rm-weight-name">Total</span>
+                            <span />
+                            <strong className={totalWeightPercent(config) === 100 ? '' : 'rm-bad'}>{totalWeightPercent(config)}%</strong>
                         </div>
                     </div>
 
-                    <div className="note note--lock">
-                        <div className="note-head"><Lock size={15} /><span>Always applied</span></div>
-                        <p>A confirmed sanctions match is always <Badge kind="bad" dot={false}>High risk</Badge>, whatever the score.</p>
-                    </div>
-                </>
+                    <p className="rm-footnote"><Lock size={13} /> A confirmed sanctions match is always High risk, whatever the score.</p>
+                </section>
             )}
 
             {editingAttribute && (

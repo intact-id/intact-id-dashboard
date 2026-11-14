@@ -24,7 +24,7 @@
 .rm-step.is-done .rm-step-chip { background: var(--accent-soft); border-color: var(--accent-soft); color: var(--accent); }
 .rm-step-line { width: 28px; height: 1px; background: var(--rule); }
 
-/* Category tabs */
+/* Tabs (risk models list) */
 .rm-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--rule); margin-bottom: 18px; overflow-x: auto; }
 .rm-tabs button {
   border: none; background: none; cursor: pointer; font: inherit; font-size: 14px; font-weight: 600;
@@ -38,9 +38,70 @@
   color: var(--accent); font-size: 11.5px; display: inline-flex; align-items: center; justify-content: center;
 }
 
-/* Configured attribute + its rule table */
-.rm-attribute { margin-bottom: 18px; }
-.rm-attribute-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; font-size: 15px; }
+/* Step 1: categories on the left, the selected one on the right — one surface, no boxes inside boxes */
+.rm-layout { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 20px; align-items: start; margin-top: 4px; }
+.rm-cats { display: flex; flex-direction: column; gap: 2px; position: sticky; top: 16px; }
+.rm-cat {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%;
+  border: none; background: none; cursor: pointer; font: inherit; font-size: 14px; color: var(--ink-2);
+  padding: 9px 12px; border-radius: 8px; text-align: left; border-left: 2px solid transparent;
+}
+.rm-cat:hover { background: var(--bg-soft); color: var(--ink); }
+.rm-cat.is-active { background: var(--accent-soft); color: var(--accent); font-weight: 600; border-left-color: var(--accent); border-radius: 0 8px 8px 0; }
+.rm-cat-count { font-size: 12px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.rm-cat.is-active .rm-cat-count { color: var(--accent); }
+
+.rm-pane { padding: 22px 24px; }
+.rm-pane-head h3 { margin: 0 0 4px; }
+.rm-pane-head .card-caption { margin: 0; }
+
+.rm-label { font-size: 11.5px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-2); }
+.rm-link {
+  border: none; background: none; padding: 4px 6px; border-radius: 6px; cursor: pointer; font: inherit;
+  font-size: 13px; font-weight: 600; color: var(--accent); display: inline-flex; align-items: center; gap: 4px; white-space: nowrap;
+}
+.rm-link:hover { background: var(--accent-soft); }
+
+/* The category's risk levels as one slim line */
+.rm-levels { display: flex; align-items: center; gap: 16px; padding: 14px 0; margin-top: 14px; border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule); }
+.rm-levels-bar { flex: 1; min-width: 0; }
+.rm-levels .rm-band { min-width: 0; }
+
+/* Attribute rows */
+.rm-group { margin-top: 20px; }
+.rm-group .rm-label { margin-bottom: 6px; }
+.rm-group-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+.rm-group-head h3 { margin: 0 0 4px; }
+.rm-group-head .card-caption { margin: 0; }
+.rm-empty { font-size: 13.5px; color: var(--ink-2); margin: 6px 0; }
+.rm-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 12px 8px; margin: 0 -8px; border-radius: 8px; border-bottom: 1px solid var(--rule);
+}
+.rm-row:last-child { border-bottom: none; }
+.rm-row.is-clickable { cursor: pointer; }
+.rm-row.is-clickable:hover { background: var(--bg-soft); }
+.rm-row-main { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.rm-row-name { font-size: 14px; font-weight: 600; color: var(--ink); }
+.rm-row-hint { font-size: 13px; color: var(--ink-2); }
+.rm-row--muted .rm-row-name { font-weight: 500; color: var(--ink-body, var(--ink)); }
+.rm-row-actions { display: flex; gap: 2px; opacity: 0; transition: opacity .12s; }
+.rm-row:hover .rm-row-actions, .rm-row-actions:focus-within { opacity: 1; }
+@media (hover: none) { .rm-row-actions { opacity: 1; } }
+
+/* "value · score" tags */
+.rm-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.rm-chip {
+  display: inline-flex; align-items: center; gap: 8px; max-width: 100%;
+  padding: 3px 4px 3px 9px; border-radius: 6px; background: var(--bg-soft); font-size: 12.5px; color: var(--ink-2);
+}
+.rm-chip-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 260px; }
+.rm-chip-score {
+  font-family: var(--font-mono, ui-monospace, monospace); font-weight: 600; font-size: 12px;
+  background: var(--bg, #fff); border-radius: 4px; padding: 1px 6px; min-width: 26px; text-align: center;
+}
+
+/* Rule table inside the attribute dialog */
 .rm-rule-table { border: 1px solid var(--rule); border-radius: var(--radius); overflow: hidden; }
 .rm-rule-head, .rm-rule-row {
   display: grid; grid-template-columns: 1fr 120px; align-items: center; gap: 12px; padding: 10px 14px;
@@ -53,13 +114,27 @@
 .rm-score-cell { display: flex; align-items: center; gap: 4px; }
 .rm-score-input { width: 76px; }
 
-/* Boxes on the category tab */
-.rm-box { border: 1px solid var(--rule); border-radius: var(--radius); padding: 14px 16px; margin-bottom: 18px; }
-.rm-box-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
-.rm-section-title { margin: 6px 0 10px; }
-.rm-available {
-  display: flex; align-items: center; justify-content: space-between; gap: 12px;
-  border: 1px solid var(--rule); border-radius: var(--radius); padding: 12px 14px; margin-bottom: 8px;
+/* Step 2: one panel */
+.rm-pane--overall { max-width: 760px; }
+.rm-pane--overall .rm-group:first-child { margin-top: 0; }
+.rm-pane--overall .rm-group + .rm-group { padding-top: 20px; border-top: 1px solid var(--rule); }
+.rm-weight { display: grid; grid-template-columns: 180px minmax(0, 1fr) 110px; align-items: center; gap: 14px; padding: 8px 0; font-size: 14px; }
+.rm-weight-track { height: 6px; border-radius: 3px; background: var(--bg-soft); overflow: hidden; }
+.rm-weight-fill { height: 100%; background: var(--accent); border-radius: 3px; transition: width .15s; }
+.rm-weight--total { border-top: 1px solid var(--rule); margin-top: 4px; padding-top: 12px; font-weight: 600; }
+.rm-weight--total strong { text-align: right; padding-right: 22px; }
+.rm-footnote { display: flex; align-items: center; gap: 6px; margin: 22px 0 0; font-size: 13px; color: var(--ink-2); }
+
+@media (max-width: 820px) {
+  .rm-layout { grid-template-columns: 1fr; }
+  .rm-cats { position: static; flex-direction: row; overflow-x: auto; gap: 4px; padding-bottom: 4px; }
+  .rm-cat { width: auto; white-space: nowrap; border-left: none; border-radius: 8px; }
+  .rm-cat.is-active { border-radius: 8px; }
+  .rm-levels { flex-wrap: wrap; }
+  .rm-levels-bar { flex-basis: 100%; order: 3; }
+  .rm-weight { grid-template-columns: 1fr 100px; }
+  .rm-weight-track { display: none; }
+  .rm-pane { padding: 18px 16px; }
 }
 
 /* Risk level bands */
@@ -69,12 +144,9 @@
 .rm-level-row { display: grid; grid-template-columns: 120px auto 80px auto 80px; align-items: center; gap: 10px; margin-bottom: 10px; color: var(--ink-2); font-size: 13.5px; }
 .rm-level-row .input { width: 80px; }
 
-/* Category weights */
-.rm-weights { max-width: 420px; }
-.rm-weight-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--rule); font-size: 14px; }
-.rm-weight-row--total { border-bottom: none; font-weight: 600; }
-.rm-weight-input { display: flex; align-items: center; gap: 6px; color: var(--ink-2); }
-.rm-weight-input .input { width: 80px; }
+/* Weight inputs */
+.rm-weight-input { display: flex; align-items: center; justify-content: flex-end; gap: 6px; color: var(--ink-2); }
+.rm-weight-input .input { width: 76px; }
 .rm-bad { color: var(--danger); }
 .rm-problems { margin: 0; padding-left: 20px; font-size: 13px; color: var(--ink-body); }
 
