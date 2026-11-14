@@ -6,6 +6,7 @@ import './Topbar.css';
 const ROUTE_LABELS = {
     '/dashboard': 'Overview',
     '/dashboard/verifications': 'Verifications',
+    '/dashboard/waiting': 'Waiting for people',
     '/dashboard/documents': 'Documents',
     '/dashboard/analytics': 'Analytics',
     '/dashboard/api': 'API keys',

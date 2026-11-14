@@ -11,8 +11,30 @@ import { humanize, initialsOf } from '../utils/format';
 import { DeliveryHealth, DeliveryLog } from './webhooks/Deliveries';
 import ApplicantEmails from './webhooks/ApplicantEmails';
 
-// The only events auth-server sends today. There is no per-event subscription in the API.
-const EVENTS_SENT = ['verification.completed', 'verification.failed'];
+// The events auth-server sends (payload version 2). There is no per-event subscription in the API.
+const EVENTS_SENT = [
+    ['verification.completed', 'Approved or rejected, including a reviewer’s decision'],
+    ['verification.failed', 'Could not be finished on our side'],
+    ['verification.review_required', 'A person must decide'],
+    ['business.waiting_for_people', 'A business waits for its directors and owners'],
+    ['party.invite_created', 'A director or owner got a verification link; emailed: false means you share it'],
+];
+
+// What a verification.completed event looks like (fields you switch off are left out)
+const EXAMPLE_PAYLOAD = {
+    id: '6b1f…', type: 'verification.completed', version: 2, createdAt: '2026-11-14T18:02:11',
+    companyId: 'f0a9…', companyName: 'Acme Pay',
+    data: {
+        verificationId: '8c2e…', externalReference: 'user-123', type: 'individual', status: 'COMPLETED',
+        decision: 'approved', riskScore: 0.1, workflow: { id: '6946…', version: 3 }, tier: 'workflow',
+        applicant: { firstName: 'Jane', lastName: 'Doe', email: 'jane@example.com' },
+        checks: [
+            { service: 'DOCUMENT_CHECK', status: 'passed', score: 0.93, completedAt: '2026-11-14T18:02:05' },
+            { service: 'LIVENESS', status: 'passed', score: 0.97, completedAt: '2026-11-14T18:02:09' },
+        ],
+        submittedAt: '2026-11-14T18:01:40', completedAt: '2026-11-14T18:02:10',
+    },
+};
 
 // Payload fields a company can switch on or off. `byDefault` mirrors auth-server's
 // CompanyCommunicationDetails.isPayloadFieldEnabled: everything on except raw scores and applicant PII.
@@ -23,9 +45,9 @@ const PAYLOAD_FIELDS = [
     { key: 'includeTier', label: 'Verification tier', byDefault: true },
     { key: 'includeTimestamps', label: 'Timestamps', byDefault: true },
     { key: 'includeRejectionReason', label: 'Rejection reason', byDefault: true },
-    { key: 'includeResults', label: 'Step results', byDefault: true },
-    { key: 'includeRawScores', label: 'Raw scores (inside step results)', byDefault: false },
-    { key: 'includeApplicant', label: 'Applicant details (personal data)', byDefault: false },
+    { key: 'includeResults', label: 'Checks (each check and its result)', byDefault: true },
+    { key: 'includeRawScores', label: 'Scores (risk score and each check’s score)', byDefault: false },
+    { key: 'includeApplicant', label: 'Applicant details: names, date of birth, contact (personal data)', byDefault: false },
 ];
 
 function formFromSettings(settings) {
@@ -252,9 +274,17 @@ export default function Webhooks() {
                         <div className="field">
                             <label>Events sent</label>
                             <div className="event-checklist">
-                                {EVENTS_SENT.map((event) => <span key={event} className="mono">{event}</span>)}
+                                {EVENTS_SENT.map(([event, meaning]) => (
+                                    <span key={event}><span className="mono">{event}</span> <span className="card-caption">· {meaning}</span></span>
+                                ))}
                             </div>
                         </div>
+
+                        <details className="field">
+                            <summary style={{ cursor: 'pointer' }}>Example payload</summary>
+                            <pre className="mono" style={{ fontSize: 12, overflowX: 'auto', whiteSpace: 'pre', marginTop: 8 }}>{JSON.stringify(EXAMPLE_PAYLOAD, null, 2)}</pre>
+                            <div className="card-caption">Headers: X-Event-Type, X-Webhook-Version: 2 and X-Webhook-Signature.</div>
+                        </details>
 
                         <div className="field">
                             <label>Fields included</label>

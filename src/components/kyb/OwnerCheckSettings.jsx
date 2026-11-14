@@ -125,7 +125,7 @@ export default function OwnerCheckSettings({ companyId }) {
                     {form.ownerCheck === 'FULL_KYC' && (
                         <label className="checkbox-row" style={{ marginTop: 12 }}>
                             <input type="checkbox" checked={form.autoInvite} onChange={(e) => setForm({ ...form, autoInvite: e.target.checked })} />
-                            <span>Email each person their link automatically when the business reaches this check. People without an email get their link from you (Invite on the verification).</span>
+                            <span>Email each person their link when the business reaches this check, with reminders. Links are made either way, so you can also share them yourself.</span>
                         </label>
                     )}
                     <div className="head-actions" style={{ marginTop: 16, justifyContent: 'flex-end' }}>

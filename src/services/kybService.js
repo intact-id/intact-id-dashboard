@@ -9,6 +9,11 @@ function unwrap(response) {
 // Business verification (KYB): the directors and owners behind a business, and who must be checked.
 const kybService = {
     // Emails the person their verification link (if they have an email) and returns { link }.
+    // Businesses waiting for their directors and owners: [{ verificationId, businessName, companyName, submittedAt, people }]
+    async waiting(companyId) {
+        return unwrap(await api.get('/api/v1/kyb/waiting', { params: companyId ? { companyId } : {} }));
+    },
+
     async invite(verificationId, partyId) {
         return unwrap(await api.post(`/api/v1/kyb/verifications/${verificationId}/parties/${partyId}/invite`));
     },
