@@ -83,7 +83,9 @@ export function errorMessage(error, fallback = 'Something went wrong. Please try
     const body = error?.response?.data;
     if (body?.responseMessage) return body.responseMessage;
     if (body?.errorMessage) return body.errorMessage;
-    if (!error?.response) return 'Cannot reach the server. Check your connection and try again.';
+    // A request that got no answer; any other error (including a bug in the page) gets the fallback
+    if (error?.request && !error?.response) return 'Cannot reach the server. Check your connection and try again.';
+    if (!error?.response) console.error(error);
     return fallback;
 }
 
