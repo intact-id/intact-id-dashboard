@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ArrowLeft, X, Check, ShieldQuestion, FileText, Image as ImageIcon, ExternalLink, PlayCircle, Eraser, TriangleAlert } from 'lucide-react';
-import Modal from '../components/ui/Modal';
-import privacyService from '../services/privacyService';
+import { ArrowLeft, X, Check, ShieldQuestion, FileText, Image as ImageIcon, ExternalLink, PlayCircle, TriangleAlert } from 'lucide-react';
+import RetentionPanel from '../components/privacy/RetentionPanel';
 import Badge from '../components/ui/Badge';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
@@ -14,9 +13,6 @@ import {
     STEP_STATUS, TYPE_LABEL, applicantName, isBusiness, decisionOf, maskId, riskOf, statusOf, stepLabel,
 } from '../utils/verification';
 import ReviewDecisionModal from './verifications/ReviewDecisionModal';
-
-// Only a finished verification's data can be erased
-const FINISHED = ['COMPLETED', 'REJECTED', 'FAILED', 'CANCELLED'];
 import TurnaroundPanel from './verifications/TurnaroundPanel';
 import { BusinessDetails, PartiesCard } from './verifications/BusinessPanels';
 
@@ -100,8 +96,6 @@ export default function VerificationDetail() {
     const [error, setError] = useState('');
     const [decision, setDecision] = useState(null);
     const [releasing, setReleasing] = useState(false);
-    const [erasing, setErasing] = useState(null); // { reason } while the erase dialog is open
-    const [erasingBusy, setErasingBusy] = useState(false);
 
     const load = useCallback(async () => {
         setError('');
@@ -124,20 +118,6 @@ export default function VerificationDetail() {
             toast.error(errorMessage(e, 'Could not release the verification.'));
         } finally {
             setReleasing(false);
-        }
-    };
-
-    const erase = async () => {
-        setErasingBusy(true);
-        try {
-            await privacyService.erase(v.verificationId, erasing.reason.trim());
-            toast.success('Personal data erased');
-            setErasing(null);
-            await load();
-        } catch (e) {
-            toast.error(errorMessage(e, 'Could not erase the data.'));
-        } finally {
-            setErasingBusy(false);
         }
     };
 
@@ -179,11 +159,6 @@ export default function VerificationDetail() {
                     </div>
                 </div>
                 <div className="head-actions">
-                    {isStaff && FINISHED.includes(v.status) && !v.personalDataErasedAt && (
-                        <button className="btn btn--ghost" onClick={() => setErasing({ reason: '' })}>
-                            <Eraser size={15} /> Erase personal data
-                        </button>
-                    )}
                     {isStaff && v.status === 'ON_HOLD' && (
                         <button className="btn btn--secondary" onClick={release} disabled={releasing}>
                             <PlayCircle size={15} /> {releasing ? 'Releasing…' : 'Release for processing'}
@@ -357,26 +332,9 @@ export default function VerificationDetail() {
                 </div>
             </div>
 
-            <Modal
-                isOpen={!!erasing}
-                onClose={() => !erasingBusy && setErasing(null)}
-                title="Erase this applicant’s personal data?"
-                caption="Their documents, selfies, names, ID numbers, contact details and what was read from documents are deleted. The decision and check results stay. This cannot be undone."
-                footer={(
-                    <>
-                        <button className="btn btn--secondary" onClick={() => setErasing(null)} disabled={erasingBusy}>Cancel</button>
-                        <button className="btn btn--danger-outline" onClick={erase} disabled={erasingBusy || !erasing?.reason.trim()}>{erasingBusy ? 'Erasing…' : 'Erase'}</button>
-                    </>
-                )}
-            >
-                {erasing && (
-                    <div className="field">
-                        <label htmlFor="erase-reason">Why</label>
-                        <input id="erase-reason" className="input" placeholder="e.g. The applicant asked us to delete their data"
-                               value={erasing.reason} onChange={(e) => setErasing({ reason: e.target.value })} />
-                    </div>
-                )}
-            </Modal>
+            <div style={{ marginTop: 16 }}>
+                <RetentionPanel verificationId={v.verificationId} canAct={isStaff} superAdmin={superAdmin} onErased={load} />
+            </div>
 
             <ReviewDecisionModal
                 pending={decision}

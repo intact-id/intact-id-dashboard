@@ -5,29 +5,61 @@ function unwrap(response) {
     return response.data.data;
 }
 
-// Data retention and erasure. Days count from when a verification finished; null keeps the data.
+const forCompany = (companyId) => ({ params: companyId ? { companyId } : {} });
+
+// Data retention by country and kind of data (BIOMETRICS, DOCUMENTS, PERSONAL_DATA, RECORD).
 const privacyService = {
-    // { platformDefault: { documentsDays, personalDataDays }, company: { ..., companyOverride } }
-    async retention(companyId) {
-        return unwrap(await api.get('/api/v1/privacy/retention', { params: companyId ? { companyId } : {} }));
+    // [{ country, name, categories: { BIOMETRICS: { minDays, maxDays, defaultDays, startsFrom, legalBasis } } }]
+    async countryRules() {
+        return unwrap(await api.get('/api/v1/privacy/country-rules'));
     },
-    async updateDefault(rule) {
-        return unwrap(await api.put('/api/v1/privacy/retention/default', rule));
+    async updateCountry(country, limits) {
+        return unwrap(await api.put(`/api/v1/privacy/country-rules/${encodeURIComponent(country)}`, limits));
     },
-    async updateCompany(companyId, rule) {
-        return unwrap(await api.put('/api/v1/privacy/retention', rule, { params: { companyId } }));
+    async deleteCountry(country) {
+        return unwrap(await api.delete(`/api/v1/privacy/country-rules/${encodeURIComponent(country)}`));
     },
-    async clearCompany(companyId) {
-        return unwrap(await api.delete('/api/v1/privacy/retention', { params: { companyId } }));
+    // [{ country, name, days: { CATEGORY: n }, effective: { CATEGORY: { days, minDays, maxDays, source, adjusted } } }]
+    async companyRules(companyId) {
+        return unwrap(await api.get('/api/v1/privacy/company-rules', forCompany(companyId)));
     },
-    // Erases a finished verification's documents and personal details. Cannot be undone.
-    async erase(verificationId, reason) {
-        return unwrap(await api.post(`/api/v1/privacy/verifications/${verificationId}/erase`, { reason }));
+    async updateCompany(companyId, country, days) {
+        return unwrap(await api.put(`/api/v1/privacy/company-rules/${encodeURIComponent(country)}`, days, forCompany(companyId)));
     },
-    // [{ verificationId, scope, trigger, reason, performedBy, documentsDeleted, createdAt }]
+    async status(verificationId) {
+        return unwrap(await api.get(`/api/v1/privacy/verifications/${verificationId}`));
+    },
+    // { scope, reason, override }. Cannot be undone.
+    async erase(verificationId, body) {
+        return unwrap(await api.post(`/api/v1/privacy/verifications/${verificationId}/erase`, body));
+    },
+    async hold(verificationId, reason) {
+        return unwrap(await api.put(`/api/v1/privacy/verifications/${verificationId}/hold`, { reason }));
+    },
+    async release(verificationId) {
+        return unwrap(await api.delete(`/api/v1/privacy/verifications/${verificationId}/hold`));
+    },
+    async relationshipEnded(verificationId, endedAt) {
+        return unwrap(await api.post(`/api/v1/privacy/verifications/${verificationId}/relationship-ended`, endedAt ? { endedAt } : {}));
+    },
+    async holds(companyId) {
+        return unwrap(await api.get('/api/v1/privacy/holds', forCompany(companyId)));
+    },
     async erasures(companyId) {
-        return unwrap(await api.get('/api/v1/privacy/erasures', { params: companyId ? { companyId } : {} }));
+        return unwrap(await api.get('/api/v1/privacy/erasures', forCompany(companyId)));
     },
 };
+
+export const CATEGORIES = [
+    ['BIOMETRICS', 'Biometrics', 'Selfies and liveness frames'],
+    ['DOCUMENTS', 'Documents', 'ID documents, proof of address, business documents'],
+    ['PERSONAL_DATA', 'Personal details', 'Names, ID numbers, dates of birth, contact, what was read from documents'],
+    ['RECORD', 'Verification record', 'The checks, decision trail, people and webhook history'],
+];
+
+export const categoryLabel = (code) => CATEGORIES.find(([c]) => c === code)?.[1] || code;
+
+// "365 days" / "Keep"
+export const daysLabel = (days) => (days === null || days === undefined ? 'Keep' : days === 1 ? '1 day' : `${days} days`);
 
 export default privacyService;
