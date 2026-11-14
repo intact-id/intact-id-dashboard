@@ -124,11 +124,13 @@ export default function ServiceEditor({ service, charge, services, onClose, onSa
 
             // The standard price lives in billing, under the same code
             let priceNote = '';
+            let priceChanged = false;
             if (form.price !== '') {
                 try {
                     if (charge) {
                         if (Number(form.price) !== Number(charge.price) || charge.name !== payload.name) {
                             await billingService.updateServiceCharge(charge.id, { price: Number(form.price), name: payload.name });
+                            priceChanged = Number(form.price) !== Number(charge.price);
                         }
                     } else {
                         await billingService.createStandardPrice({ serviceCode: saved.code, name: payload.name, price: Number(form.price), currency: form.currency.trim().toUpperCase() });
@@ -139,7 +141,7 @@ export default function ServiceEditor({ service, charge, services, onClose, onSa
             }
             if (priceNote) toast.error(`${saved.name} saved.${priceNote}`);
             else toast.success(creating ? `${saved.name} added. It stays in development until you make it available.` : `${saved.name} saved`);
-            onSaved();
+            onSaved({ priceChanged });
         } catch (e) {
             toast.error(e.response ? errorMessage(e, 'Could not save the service.') : e.message);
         } finally {

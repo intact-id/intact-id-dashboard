@@ -15,6 +15,7 @@ const toForm = (s) => ({
     ownershipThreshold: s.ownershipThreshold ?? 25,
     includeDirectors: !!s.includeDirectors,
     personWorkflow: s.personWorkflow || '',
+    autoInvite: !!s.autoInvite,
 });
 
 /**
@@ -120,6 +121,12 @@ export default function OwnerCheckSettings({ companyId }) {
                                    value={form.personWorkflow} onChange={(e) => setForm({ ...form, personWorkflow: e.target.value })} />
                             <span className="field-hint">A person workflow's key. Empty: the company's default workflow, else the Tier 1 checks.</span>
                         </div>
+                    )}
+                    {form.ownerCheck === 'FULL_KYC' && (
+                        <label className="checkbox-row" style={{ marginTop: 12 }}>
+                            <input type="checkbox" checked={form.autoInvite} onChange={(e) => setForm({ ...form, autoInvite: e.target.checked })} />
+                            <span>Email each person their link automatically when the business reaches this check. People without an email get their link from you (Invite on the verification).</span>
+                        </label>
                     )}
                     <div className="head-actions" style={{ marginTop: 16, justifyContent: 'flex-end' }}>
                         {override && <button className="btn btn--ghost btn--sm" onClick={reset} disabled={saving}>Use the platform default</button>}

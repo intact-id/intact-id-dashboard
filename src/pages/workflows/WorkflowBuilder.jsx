@@ -12,6 +12,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../contexts/ToastContext';
 import workflowService from '../../services/workflowService';
 import { errorMessage } from '../../services/api';
+import { formatMoney } from '../../utils/insights';
 import { isSuperAdmin } from '../../utils/roles';
 import { BuilderContext } from './BuilderContext';
 import { nodeTypes } from './nodes';
@@ -308,6 +309,22 @@ function Editor({ workflowId, initial, scope, readOnly, onDetail }) {
         }
     };
 
+    const [repricing, setRepricing] = useState(false);
+    const reprice = async () => {
+        setRepricing(true);
+        try {
+            const result = await workflowService.reprice(workflowId, scope);
+            onDetail(await workflowService.get(workflowId, scope));
+            toast.success(Number(result.oldPrice) === Number(result.newPrice)
+                ? 'Price unchanged: it already matches today’s service prices'
+                : `Price updated to ${formatMoney(result.newPrice, result.currency)} per run`);
+        } catch (error) {
+            toast.error(errorMessage(error, 'Could not update the price.'));
+        } finally {
+            setRepricing(false);
+        }
+    };
+
     const changeDefault = async () => {
         setBusy(true);
         try {
@@ -459,6 +476,8 @@ function Editor({ workflowId, initial, scope, readOnly, onDetail }) {
                                 readOnly={readOnly || scope.template}
                                 onSelectNode={selectNode}
                                 onPromote={(number) => setPromoting(number)}
+                                onReprice={scope.template ? null : reprice}
+                                repricing={repricing}
                             />
                         )}
                     </aside>

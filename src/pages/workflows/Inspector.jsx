@@ -1,6 +1,7 @@
 import { ArrowDown, ArrowUp, Plus, Trash2, TriangleAlert, CircleCheck, X } from 'lucide-react';
 import Badge from '../../components/ui/Badge';
 import { formatDateTime, humanize } from '../../utils/format';
+import { formatMoney } from '../../utils/insights';
 import { OPERATORS, clausesOf, factsBefore, matchModeOf } from './graph';
 
 // ---------------------------------------------------------------------------
@@ -8,7 +9,8 @@ import { OPERATORS, clausesOf, factsBefore, matchModeOf } from './graph';
 // ---------------------------------------------------------------------------
 
 function SettingField({ name, schema, value, required, onChange, disabled }) {
-    const label = <label>{humanize(name.replace(/([A-Z])/g, '_$1'))}{required && <span className="wf-required"> *</span>}</label>;
+    const label = <label>{schema.title || humanize(name.replace(/([A-Z])/g, '_$1'))}{required && <span className="wf-required"> *</span>}</label>;
+    const hint = schema.description && <span className="wf-hint">{schema.description}</span>;
     if (schema.type === 'array' && schema.items?.enum) {
         const selected = Array.isArray(value) ? value : [];
         return (
@@ -37,6 +39,7 @@ function SettingField({ name, schema, value, required, onChange, disabled }) {
                     <option value="">Default</option>
                     {schema.enum.map((o) => <option key={o} value={o}>{humanize(o)}</option>)}
                 </select>
+                {hint}
             </div>
         );
     }
@@ -57,21 +60,30 @@ function SettingField({ name, schema, value, required, onChange, disabled }) {
                 {(schema.minimum !== undefined || schema.maximum !== undefined) && (
                     <span className="wf-hint">Between {schema.minimum ?? '…'} and {schema.maximum ?? '…'}</span>
                 )}
+                {hint}
             </div>
         );
     }
     if (schema.type === 'boolean') {
+        // Unset means the company's (or platform's) setting applies, so it is not the same as No
         return (
-            <label className="checkbox-row">
-                <input type="checkbox" disabled={disabled} checked={!!value} onChange={(e) => onChange(e.target.checked)} />
-                <span>{humanize(name)}</span>
-            </label>
+            <div className="field">
+                {label}
+                <select className="input" disabled={disabled} value={value === undefined ? '' : String(value)}
+                        onChange={(e) => onChange(e.target.value === '' ? undefined : e.target.value === 'true')}>
+                    <option value="">Default</option>
+                    <option value="true">Yes</option>
+                    <option value="false">No</option>
+                </select>
+                {hint}
+            </div>
         );
     }
     return (
         <div className="field">
             {label}
             <input className="input" type="text" disabled={disabled} value={value ?? ''} onChange={(e) => onChange(e.target.value || undefined)} />
+            {hint}
         </div>
     );
 }
@@ -93,6 +105,9 @@ function ServicePanel({ node, service, readOnly, onChange }) {
             {Object.keys(properties).length > 0 && (
                 <div className="wf-panel-section">
                     <h4>Settings</h4>
+                    {service.code === 'OWNER_VERIFICATION' && (
+                        <p className="wf-hint">Anything left on Default uses the business-verification settings of the company (or the platform's).</p>
+                    )}
                     {Object.entries(properties).map(([key, schema]) => (
                         <SettingField key={key} name={key} schema={schema} value={settings[key]} required={required.includes(key)} disabled={readOnly} onChange={(v) => setSetting(key, v)} />
                     ))}
@@ -290,7 +305,7 @@ export function NodePanel({ node, nodes, edges, catalogByCode, problems, readOnl
     );
 }
 
-export function SummaryPanel({ validation, versions, saving, readOnly, onSelectNode, onPromote }) {
+export function SummaryPanel({ validation, versions, saving, readOnly, onSelectNode, onPromote, onReprice, repricing }) {
     const problems = validation?.problems || [];
     const requirements = validation?.requirements;
     const price = validation?.price;
@@ -344,8 +359,15 @@ export function SummaryPanel({ validation, versions, saving, readOnly, onSelectN
                                     <strong>v{v.number}</strong> {v.live && <Badge kind="ok">Live</Badge>}
                                     <div className="wf-hint">{formatDateTime(v.publishedAt)}{v.publishedBy ? ` · ${v.publishedBy}` : ''}</div>
                                     {v.notes && <div className="wf-hint">{v.notes}</div>}
+                                    {v.live && v.price != null && <div className="wf-hint">Price per run: {formatMoney(v.price, v.currency)}</div>}
                                 </div>
                                 {!v.live && !readOnly && <button className="btn btn--ghost btn--sm" onClick={() => onPromote(v.number)}>Use this version</button>}
+                                {v.live && !readOnly && onReprice && (
+                                    <button className="btn btn--ghost btn--sm" onClick={onReprice} disabled={repricing}
+                                            title="Price this version again from today's service prices">
+                                        {repricing ? 'Updating…' : 'Update price'}
+                                    </button>
+                                )}
                             </li>
                         ))}
                     </ul>
