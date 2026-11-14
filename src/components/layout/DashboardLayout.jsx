@@ -4,7 +4,7 @@ import {
     LayoutDashboard, ShieldCheck, FileText, BarChart2, Key, Webhook, Code,
     Users, Bell, ClipboardCheck, Building2, Gauge, ListChecks, Radar, CreditCard,
     Settings, LogOut, Menu, X, Search, ShieldCheck as Logo, Workflow, Boxes, Inbox,
-    Hourglass, Briefcase, Archive,
+    Hourglass, Briefcase, Archive, Banknote,
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { hasAnyRole, roleLabel } from '../../utils/roles';
@@ -61,6 +61,7 @@ const NAV_SECTIONS = [
         title: 'Account',
         items: [
             { path: '/dashboard/billing', label: 'Billing & Plan', icon: CreditCard },
+            { path: '/dashboard/top-ups', label: 'Top-ups', icon: Banknote, roles: ['SUPER_ADMIN'] },
             { path: '/dashboard/settings', label: 'Settings', icon: Settings },
         ],
     },

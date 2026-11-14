@@ -7,6 +7,7 @@ const ROUTE_LABELS = {
     '/dashboard': 'Overview',
     '/dashboard/verifications': 'Verifications',
     '/dashboard/waiting': 'Waiting for people',
+    '/dashboard/top-ups': 'Top-ups',
     '/dashboard/kyb-settings': 'KYB settings',
     '/dashboard/data-retention': 'Data retention',
     '/dashboard/documents': 'Documents',
