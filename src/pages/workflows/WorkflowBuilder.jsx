@@ -397,9 +397,11 @@ function Editor({ workflowId, initial, scope, readOnly, onDetail }) {
                         <button className={`btn btn--secondary btn--sm${testing ? ' is-on' : ''}`} onClick={() => setTesting((t) => !t)}>
                             <FlaskConical size={15} /> Test run
                         </button>
-                        <span className={`wf-check ${problemCount ? 'wf-check--bad' : 'wf-check--ok'}`} title={problemCount ? 'See the panel on the right' : 'No problems found'}>
-                            {problemCount ? <><TriangleAlert size={14} /> {problemCount} to fix</> : <><CircleCheck size={14} /> Ready</>}
-                        </span>
+                        {!readOnly && (
+                            <span className={`wf-check ${problemCount ? 'wf-check--bad' : 'wf-check--ok'}`} title={problemCount ? 'See the panel on the right' : 'No problems found'}>
+                                {problemCount ? <><TriangleAlert size={14} /> {problemCount} to fix</> : <><CircleCheck size={14} /> Ready</>}
+                            </span>
+                        )}
                         {!readOnly && (
                             <button className="btn btn--primary btn--sm" disabled={problemCount > 0 || saveState === 'saving'} onClick={() => setPublishing({ notes: '', step: 'notes' })}
                                 title={problemCount ? 'Fix the problems first' : 'Freeze this draft as a new version'}>
@@ -409,7 +411,7 @@ function Editor({ workflowId, initial, scope, readOnly, onDetail }) {
                     </div>
                 </header>
 
-                <div className="wf-body">
+                <div className={`wf-body${readOnly ? ' wf-body--read-only' : ''}`}>
                     {!readOnly && <Palette catalog={catalog} unavailable={unavailable} onAdd={(kind) => addStep(kind)} />}
 
                     <div className="wf-canvas" ref={wrapperRef} onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }} onDrop={onDrop}>
@@ -475,6 +477,8 @@ function Editor({ workflowId, initial, scope, readOnly, onDetail }) {
                                 versions={initial.versions}
                                 saving={saveState !== 'saved'}
                                 readOnly={readOnly || scope.template}
+                                canPublish={!readOnly}
+                                templatePreview={scope.template && readOnly}
                                 onSelectNode={selectNode}
                                 onPromote={(number) => setPromoting(number)}
                                 onReprice={scope.template ? null : reprice}
