@@ -9,6 +9,7 @@ import workflowService from '../../services/workflowService';
 import companyService from '../../services/companyService';
 import { errorMessage } from '../../services/api';
 import { isSuperAdmin } from '../../utils/roles';
+import { can } from '../../utils/access';
 import { formatDateTime } from '../../utils/format';
 import { SUBJECT_TYPES, starterGraph } from './graph';
 import './workflows.css';
@@ -54,6 +55,7 @@ export default function Workflows() {
     const navigate = useNavigate();
     const [params, setParams] = useSearchParams();
     const superAdmin = isSuperAdmin(user);
+    const canEdit = can(user, 'workflows.edit');
 
     const [companies, setCompanies] = useState([]);
     const companyId = superAdmin ? params.get('companyId') || null : undefined;
@@ -190,7 +192,7 @@ export default function Workflows() {
                             {companies.map((c) => <option key={c.id} value={c.id}>{c.tradingName || c.legalName}</option>)}
                         </select>
                     )}
-                    {(tab === 'workflows' || superAdmin) && (
+                    {canEdit && (tab === 'workflows' || superAdmin) && (
                         <button className="btn btn--primary btn--sm" onClick={() => openCreate()}>
                             <Plus size={15} /> {tab === 'templates' ? 'New template' : 'New workflow'}
                         </button>
@@ -249,14 +251,14 @@ export default function Workflows() {
                                         <div className="wf-card-meta"><Badge kind="neutral" dot={false}>{SUBJECT_TYPES[w.subjectType]?.label || 'Any applicant'}</Badge></div>
                                         <div className="wf-card-foot">
                                             <Link to={`/dashboard/workflows/${w.id}?template=1`}>Preview</Link>
-                                            <button className="btn btn--secondary btn--sm" onClick={() => { setTab('workflows'); openCreate({ templateId: w.id, subjectType: w.subjectType || 'INDIVIDUAL', name: w.name, key: slug(w.name), template: false }); }}>Use template</button>
+                                            {canEdit && <button className="btn btn--secondary btn--sm" onClick={() => { setTab('workflows'); openCreate({ templateId: w.id, subjectType: w.subjectType || 'INDIVIDUAL', name: w.name, key: slug(w.name), template: false }); }}>Use template</button>}
                                         </div>
                                     </div>
                                 ) : (
-                                    <WorkflowCard key={w.id} workflow={w} href={`/dashboard/workflows/${w.id}${scopeQuery(tab === 'templates')}`} onArchive={setArchiving} />
+                                    <WorkflowCard key={w.id} workflow={w} href={`/dashboard/workflows/${w.id}${scopeQuery(tab === 'templates')}`} onArchive={canEdit ? setArchiving : undefined} />
                                 )
                             ))}
-                            {(tab === 'workflows' || superAdmin) && (
+                            {canEdit && (tab === 'workflows' || superAdmin) && (
                                 <button className="wf-card wf-card--new" onClick={() => openCreate()}>
                                     <WorkflowIcon size={22} />
                                     {tab === 'templates' ? 'New template' : 'New workflow'}

@@ -9,6 +9,7 @@ import riskService from '../../services/riskService';
 import companyService from '../../services/companyService';
 import { errorMessage } from '../../services/api';
 import { isSuperAdmin } from '../../utils/roles';
+import { can } from '../../utils/access';
 import { formatDate } from '../../utils/format';
 import { CUSTOMER_TYPES, newModelConfig } from './builder/model';
 import './builder/builder.css';
@@ -21,6 +22,7 @@ export default function RiskModels() {
     const { toast } = useToast();
     const navigate = useNavigate();
     const superAdmin = isSuperAdmin(user);
+    const canEdit = can(user, 'risk-models.edit');
 
     // Risk models belong to a company. Super admins choose which one to act for.
     const [companies, setCompanies] = useState([]);
@@ -117,9 +119,9 @@ export default function RiskModels() {
                             {companies.map((c) => <option key={c.id} value={c.id}>{c.tradingName || c.legalName}</option>)}
                         </select>
                     )}
-                    <button className="btn btn--primary btn--sm" onClick={() => setCreating({ name: '', customerType: 'INDIVIDUAL' })}>
+                    {canEdit && <button className="btn btn--primary btn--sm" onClick={() => setCreating({ name: '', customerType: 'INDIVIDUAL' })}>
                         <Plus size={15} /> Create
-                    </button>
+                    </button>}
                 </div>
             </div>
 
@@ -153,7 +155,9 @@ export default function RiskModels() {
                                     <td>{formatDate(m.effectiveFrom)}</td>
                                     <td>
                                         <div className="head-actions" style={{ justifyContent: 'flex-end' }}>
-                                            {m.lifeCycleStatus === 'DRAFT' ? (
+                                            {!canEdit ? (
+                                                <Link className="btn btn--ghost btn--sm" to={`/dashboard/risk-models/${m.id}`}>View</Link>
+                                            ) : m.lifeCycleStatus === 'DRAFT' ? (
                                                 <>
                                                     <Link className="btn btn--secondary btn--sm" to={`/dashboard/risk-models/${m.id}`}>Edit</Link>
                                                     <button className="btn btn--ghost btn--sm" onClick={() => setDeleting(m)}>Delete</button>

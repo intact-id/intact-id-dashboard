@@ -12,6 +12,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../contexts/ToastContext';
 import workflowService from '../../services/workflowService';
 import { errorMessage } from '../../services/api';
+import { can } from '../../utils/access';
 import { formatMoney } from '../../utils/insights';
 import { isSuperAdmin } from '../../utils/roles';
 import { BuilderContext } from './BuilderContext';
@@ -565,7 +566,8 @@ export default function WorkflowBuilder() {
     const template = params.get('template') === '1';
     const companyId = params.get('companyId') || undefined;
     const scope = useMemo(() => ({ companyId, template }), [companyId, template]);
-    const readOnly = template && !isSuperAdmin(user);
+    // Templates are changed only by super admins; workflows only by those who may edit them
+    const readOnly = (template && !isSuperAdmin(user)) || !can(user, 'workflows.edit');
 
     const [detail, setDetail] = useState(null);
     const [error, setError] = useState('');
