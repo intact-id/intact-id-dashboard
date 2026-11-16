@@ -7,7 +7,8 @@ import {
     Hourglass, Briefcase, Archive, BellRing, Banknote,
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
-import { hasAnyRole, roleLabel } from '../../utils/roles';
+import { roleLabel } from '../../utils/roles';
+import { can } from '../../utils/access';
 import Topbar from './Topbar';
 import './DashboardLayout.css';
 
@@ -15,55 +16,55 @@ const NAV_SECTIONS = [
     {
         title: 'Main',
         items: [
-            { path: '/dashboard', label: 'Overview', icon: LayoutDashboard, exact: true },
-            { path: '/dashboard/verifications', label: 'Verifications', icon: ShieldCheck },
-            { path: '/dashboard/waiting', label: 'Waiting for people', icon: Hourglass },
-            { path: '/dashboard/workflows', label: 'Workflows', icon: Workflow },
-            { path: '/dashboard/kyb-settings', label: 'KYB settings', icon: Briefcase, roles: ['ADMIN', 'SUPER_ADMIN'] },
-            { path: '/dashboard/documents', label: 'Documents', icon: FileText },
-            { path: '/dashboard/analytics', label: 'Analytics', icon: BarChart2 },
+            { path: '/dashboard', label: 'Overview', icon: LayoutDashboard, exact: true, access: 'overview' },
+            { path: '/dashboard/verifications', label: 'Verifications', icon: ShieldCheck, access: 'verifications' },
+            { path: '/dashboard/waiting', label: 'Waiting for people', icon: Hourglass, access: 'waiting' },
+            { path: '/dashboard/workflows', label: 'Workflows', icon: Workflow, access: 'workflows' },
+            { path: '/dashboard/kyb-settings', label: 'KYB settings', icon: Briefcase, access: 'kyb-settings' },
+            { path: '/dashboard/documents', label: 'Documents', icon: FileText, access: 'documents' },
+            { path: '/dashboard/analytics', label: 'Analytics', icon: BarChart2, access: 'analytics' },
         ],
     },
     {
         title: 'Developers',
         items: [
-            { path: '/dashboard/api', label: 'API Keys', icon: Key },
-            { path: '/dashboard/webhooks', label: 'Webhooks', icon: Webhook },
-            { path: '/dashboard/logs', label: 'Audit Logs', icon: Code },
+            { path: '/dashboard/api', label: 'API Keys', icon: Key, access: 'api' },
+            { path: '/dashboard/webhooks', label: 'Webhooks', icon: Webhook, access: 'webhooks' },
+            { path: '/dashboard/logs', label: 'Audit Logs', icon: Code, access: 'logs' },
         ],
     },
     {
         title: 'Management',
         items: [
-            { path: '/dashboard/users', label: 'User Management', icon: Users },
-            { path: '/dashboard/notifications', label: 'Notifications', icon: Bell },
-            { path: '/dashboard/kyc-reviews', label: 'Manual Review', icon: ClipboardCheck },
-            { path: '/dashboard/applications', label: 'Applications', icon: Inbox, roles: ['SUPER_ADMIN'] },
-            { path: '/dashboard/companies', label: 'Companies', icon: Building2 },
-            { path: '/dashboard/services', label: 'Services', icon: Boxes, roles: ['SUPER_ADMIN'] },
+            { path: '/dashboard/users', label: 'User Management', icon: Users, access: 'users' },
+            { path: '/dashboard/notifications', label: 'Notifications', icon: Bell, access: 'notifications' },
+            { path: '/dashboard/kyc-reviews', label: 'Manual Review', icon: ClipboardCheck, access: 'kyc-reviews' },
+            { path: '/dashboard/applications', label: 'Applications', icon: Inbox, access: 'applications' },
+            { path: '/dashboard/companies', label: 'Companies', icon: Building2, access: 'companies' },
+            { path: '/dashboard/services', label: 'Services', icon: Boxes, access: 'services' },
         ],
     },
     {
         title: 'Customer Risk Assessment',
         items: [
-            { path: '/dashboard/risk-models', label: 'Risk Models', icon: Gauge },
-            { path: '/dashboard/assessments', label: 'Assessments', icon: ListChecks },
-            { path: '/dashboard/screening', label: 'Screening', icon: Radar },
-            { path: '/dashboard/monitoring', label: 'Monitoring', icon: BellRing },
+            { path: '/dashboard/risk-models', label: 'Risk Models', icon: Gauge, access: 'risk-models' },
+            { path: '/dashboard/assessments', label: 'Assessments', icon: ListChecks, access: 'assessments' },
+            { path: '/dashboard/screening', label: 'Screening', icon: Radar, access: 'screening' },
+            { path: '/dashboard/monitoring', label: 'Monitoring', icon: BellRing, access: 'monitoring' },
         ],
     },
     {
         title: 'Data protection',
         items: [
-            { path: '/dashboard/data-retention', label: 'Data retention', icon: Archive, roles: ['ADMIN', 'SUPER_ADMIN'] },
+            { path: '/dashboard/data-retention', label: 'Data retention', icon: Archive, access: 'data-retention' },
         ],
     },
     {
         title: 'Account',
         items: [
-            { path: '/dashboard/billing', label: 'Billing & Plan', icon: CreditCard },
-            { path: '/dashboard/top-ups', label: 'Top-ups', icon: Banknote, roles: ['SUPER_ADMIN'] },
-            { path: '/dashboard/settings', label: 'Settings', icon: Settings },
+            { path: '/dashboard/billing', label: 'Billing & Plan', icon: CreditCard, access: 'billing' },
+            { path: '/dashboard/top-ups', label: 'Top-ups', icon: Banknote, access: 'top-ups' },
+            { path: '/dashboard/settings', label: 'Settings', icon: Settings, access: 'settings' },
         ],
     },
 ];
@@ -111,7 +112,7 @@ export default function DashboardLayout() {
                         <div key={section.title} className="nav-group">
                             <div className="nav-label">{section.title}</div>
                             <ul>
-                                {section.items.filter((item) => !item.roles || hasAnyRole(user, item.roles)).map((item) => (
+                                {section.items.filter((item) => can(user, item.access)).map((item) => (
                                     <li key={item.path}>
                                         <Link
                                             to={item.path}

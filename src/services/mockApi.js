@@ -23,20 +23,3 @@ export async function fetchDocuments() {
     });
 }
 
-export const AUDIT_LOGS = [
-    { user: 'Amina Wanjiku', initials: 'AW', method: 'POST', path: '/v1/verifications', status: 200, duration: '318 ms', ip: '41.90.64.12', time: '14:32:04' },
-    { user: 'System', initials: 'SY', method: 'POST', path: '/v1/webhooks/deliver', status: 200, duration: '118 ms', ip: '10.0.4.21', time: '14:32:04' },
-    { user: 'David Otieno', initials: 'DO', method: 'GET', path: '/v1/verifications/8f42', status: 200, duration: '64 ms', ip: '41.90.64.88', time: '14:31:12' },
-    { user: 'Sarah Kimani', initials: 'SK', method: 'POST', path: '/v1/documents', status: 200, duration: '842 ms', ip: '197.232.14.9', time: '14:29:41' },
-    { user: 'Unknown', initials: '?', method: 'POST', path: '/v1/verifications', status: 401, duration: '12 ms', ip: '102.68.77.3', time: '14:26:58' },
-    { user: 'Peter Kariuki', initials: 'PK', method: 'GET', path: '/v1/companies', status: 200, duration: '48 ms', ip: '41.90.64.51', time: '14:24:03' },
-    { user: 'Brian Mwangi', initials: 'BM', method: 'DELETE', path: '/v1/api-keys/2c19', status: 204, duration: '92 ms', ip: '41.90.64.77', time: '14:22:47' },
-    { user: 'Grace Achieng', initials: 'GA', method: 'PUT', path: '/v1/companies/kc', status: 200, duration: '156 ms', ip: '41.90.64.19', time: '14:20:15' },
-    { user: 'System', initials: 'SY', method: 'POST', path: '/v1/webhooks/deliver', status: 500, duration: '2,004 ms', ip: '10.0.4.21', time: '14:22:10' },
-    { user: 'Lucy Njeri', initials: 'LN', method: 'GET', path: '/v1/verifications', status: 200, duration: '71 ms', ip: '41.90.64.34', time: '14:18:02' },
-];
-
-export async function fetchAuditLogs() {
-    await delay();
-    return ok({ logs: AUDIT_LOGS, totalActivity: 128430, totalSessions: 342 });
-}
