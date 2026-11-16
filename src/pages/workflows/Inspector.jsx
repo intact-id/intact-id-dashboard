@@ -305,7 +305,11 @@ export function NodePanel({ node, nodes, edges, catalogByCode, problems, readOnl
     );
 }
 
-export function SummaryPanel({ validation, versions, saving, readOnly, onSelectNode, onPromote, onReprice, repricing }) {
+/**
+ * The panel when no step is selected. canPublish: the checks only matter to someone who can publish.
+ * templatePreview: a company looking at an Intact template; it sees what the template does, not its history.
+ */
+export function SummaryPanel({ validation, versions, saving, readOnly, canPublish = true, templatePreview = false, onSelectNode, onPromote, onReprice, repricing }) {
     const problems = validation?.problems || [];
     const requirements = validation?.requirements;
     const price = validation?.price;
@@ -313,6 +317,16 @@ export function SummaryPanel({ validation, versions, saving, readOnly, onSelectN
         <div className="wf-panel">
             <div className="wf-panel-head"><h3>Workflow</h3></div>
 
+            {templatePreview && (
+                <div className="wf-panel-section">
+                    <p className="wf-panel-text">
+                        An Intact template, shown read-only. Click any step to see what it checks. To use it, choose <strong>Use template</strong> on
+                        the Workflows page: you get your own copy to change and publish.
+                    </p>
+                </div>
+            )}
+
+            {canPublish && (
             <div className="wf-panel-section">
                 <h4>Checks</h4>
                 {!validation ? <p className="wf-panel-text">{saving ? 'Checking…' : 'Checked after each change.'}</p>
@@ -329,6 +343,7 @@ export function SummaryPanel({ validation, versions, saving, readOnly, onSelectN
                             </ul>
                         )}
             </div>
+            )}
 
             {requirements && (
                 <div className="wf-panel-section">
@@ -349,6 +364,7 @@ export function SummaryPanel({ validation, versions, saving, readOnly, onSelectN
                 </div>
             )}
 
+            {!templatePreview && (
             <div className="wf-panel-section">
                 <h4>Versions</h4>
                 {versions.length === 0 ? <p className="wf-panel-text">Not published yet. Publish to freeze this draft as version 1.</p> : (
@@ -373,6 +389,7 @@ export function SummaryPanel({ validation, versions, saving, readOnly, onSelectN
                     </ul>
                 )}
             </div>
+            )}
         </div>
     );
 }
