@@ -5,6 +5,7 @@ import Modal from '../components/ui/Modal';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import apiKeyService from '../services/apiKeyService';
+import { can } from '../utils/access';
 import companyService from '../services/companyService';
 import { errorMessage } from '../services/api';
 import { hasAnyRole, isSuperAdmin } from '../utils/roles';
@@ -22,6 +23,12 @@ function copy(text, toast) {
         () => toast.error('Could not copy — select the text and copy it manually'),
     );
 }
+
+const KEY_ACCESS = {
+    FULL: 'Full access',
+    VERIFY: 'Verify only: start sessions, submit verifications, read results',
+    READ_ONLY: 'Read only',
+};
 
 export default function ApiManagement() {
     const { user } = useAuth();
@@ -68,6 +75,19 @@ export default function ApiManagement() {
             toast.error(errorMessage(error, 'Could not load API keys.'));
         }
     }, [toast]);
+
+    const changeAccess = async (access) => {
+        setSaving(true);
+        try {
+            await apiKeyService.setAccess(selected.id, access);
+            setKeys((list) => list.map((k, n) => (n === 0 ? { ...k, access } : k)));
+            toast.success('Key access updated. Tokens already issued keep their access until they expire.');
+        } catch (error) {
+            toast.error(errorMessage(error, 'Could not change the key access.'));
+        } finally {
+            setSaving(false);
+        }
+    };
 
     useEffect(() => {
         if (selected?.id) loadKeys(selected.id);
@@ -204,6 +224,15 @@ export default function ApiManagement() {
                                                 </div>
                                             </div>
                                             <div className="api-key-value mono">{key ? '•••••••••••••••• (stored hashed — shown only when issued)' : 'No key issued'}</div>
+                                            {key && (
+                                                <div className="field" style={{ marginTop: 10, maxWidth: 420 }}>
+                                                    <label>What the key may do</label>
+                                                    <select className="input" value={key.access || 'FULL'} disabled={!can(user, 'api.manage') || saving}
+                                                        onChange={(e) => changeAccess(e.target.value)}>
+                                                        {Object.entries(KEY_ACCESS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                                                    </select>
+                                                </div>
+                                            )}
                                             {key && (
                                                 <div className="api-key-meta">
                                                     Expires {formatDate(key.expiresAt)} · {usage?.lastUsedAt ? `Last used ${formatDate(usage.lastUsedAt)}` : 'Never used'}
