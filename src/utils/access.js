@@ -13,7 +13,7 @@ const ACCESS = {
     documents: 'verifications:view',
     analytics: 'analytics:view',
     api: 'apikeys:view',
-    webhooks: 'companies:view',
+    webhooks: 'webhooks:view',
     logs: 'audit:view',
     users: 'users:view',
     notifications: null,
