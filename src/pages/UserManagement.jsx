@@ -6,9 +6,12 @@ import RowMenu from '../components/ui/RowMenu';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import userService from '../services/userService';
+import roleService from '../services/roleService';
+import RolesPanel from './RolesPanel';
+import { can } from '../utils/access';
 import companyService from '../services/companyService';
 import { errorMessage } from '../services/api';
-import { hasAnyRole, isSuperAdmin, normalizeRole } from '../utils/roles';
+import { isSuperAdmin, normalizeRole } from '../utils/roles';
 import { formatDateTime, humanize, initialsOf } from '../utils/format';
 
 const PAGE_SIZE = 20;
@@ -29,7 +32,10 @@ export default function UserManagement() {
     const { user: me } = useAuth();
     const { toast } = useToast();
     const superAdmin = isSuperAdmin(me);
-    const canManage = hasAnyRole(me, ['ADMIN', 'SUPER_ADMIN']);
+    const canManage = can(me, 'users');
+    const canAssign = can(me, 'users.roles');
+    const isStaff = !me?.companyId;
+    const [tab, setTab] = useState('team');
 
     const [search, setSearch] = useState('');
     const [query, setQuery] = useState('');
@@ -38,17 +44,35 @@ export default function UserManagement() {
     const [result, setResult] = useState(null);
     const [error, setError] = useState('');
 
-    const [roles, setRoles] = useState([]);
+    const [roles, setRoles] = useState([]); // roles the open form's person can be given
+    const [roleLabels, setRoleLabels] = useState({}); // role name -> label, for the table
     const [companies, setCompanies] = useState([]);
     const [form, setForm] = useState(null); // { mode: 'create' | 'edit', ...fields }
     const [confirm, setConfirm] = useState(null); // { title, caption, action, danger }
     const [busy, setBusy] = useState(false);
 
     useEffect(() => {
-        if (!superAdmin) return;
-        userService.roles().then(setRoles).catch(() => {});
+        if (!isStaff || !canManage) return;
         companyService.list({ size: 100 }).then((p) => setCompanies(p.content)).catch(() => {});
-    }, [superAdmin]);
+    }, [isStaff, canManage]);
+
+    useEffect(() => {
+        if (!canManage) return;
+        roleService.list().then((d) => setRoleLabels((m) => ({ ...m, ...Object.fromEntries(d.roles.map((r) => [r.name, r.label])) }))).catch(() => {});
+    }, [canManage]);
+
+    // The roles on offer depend on whose roles they are: a company's roles, or the staff roles
+    const formCompany = form ? (form.companyId || '') : null;
+    useEffect(() => {
+        if (formCompany === null || !canAssign) return;
+        setRoles([]);
+        roleService.list(formCompany || undefined)
+            .then((d) => {
+                setRoles(d.roles.filter((r) => (formCompany ? !r.staff : r.staff)));
+                setRoleLabels((m) => ({ ...m, ...Object.fromEntries(d.roles.map((r) => [r.name, r.label])) }));
+            })
+            .catch(() => {});
+    }, [formCompany, canAssign]);
 
     useEffect(() => {
         const timer = setTimeout(() => { setQuery(search.trim()); setPage(0); }, 350);
@@ -71,21 +95,23 @@ export default function UserManagement() {
     }, [canManage, load]);
 
     const companyName = (id) => companies.find((c) => c.id === id)?.tradingName || companies.find((c) => c.id === id)?.legalName;
-    const roleId = (name) => roles.find((r) => normalizeRole(r.name) === normalizeRole(name))?.id;
+    const roleLabel = (name) => roleLabels[name] || (name.startsWith('CUSTOM_') ? 'Custom role' : humanize(normalizeRole(name)));
 
     const openCreate = () => setForm({
         mode: 'create', firstName: '', lastName: '', email: '', username: '', usernameEdited: false, phone: '',
-        password: temporaryPassword(), mustChangePassword: true, roleIds: [], companyId: superAdmin ? '' : me?.companyId,
+        password: temporaryPassword(), mustChangePassword: true, roles: [], companyId: isStaff ? '' : me?.companyId,
     });
 
-    const openEdit = (u) => setForm({
-        mode: 'edit', id: u.id, firstName: u.firstName || '', lastName: u.lastName || '', email: u.email || '',
+    const openEdit = (u, mode = 'edit') => setForm({
+        mode, id: u.id, firstName: u.firstName || '', lastName: u.lastName || '', email: u.email || '',
         username: u.username, phone: u.phone || '', companyId: u.companyId || '',
-        roleIds: (u.roles || []).map(roleId).filter(Boolean), originalRoleIds: (u.roles || []).map(roleId).filter(Boolean),
+        roles: u.roles || [], originalRoles: u.roles || [],
     });
 
     const formError = (() => {
         if (!form) return '';
+        if (form.mode === 'roles') return form.roles.length ? '' : 'Choose at least one role.';
+        if (form.mode === 'edit' && canAssign && !form.roles.length) return 'Choose at least one role.';
         if (!form.firstName.trim() || !form.lastName.trim()) return 'Enter a first and last name.';
         if (!/^\S+@\S+\.\S+$/.test(form.email)) return 'Enter a valid email address.';
         if (form.username.trim().length < 3) return 'The username needs at least 3 characters.';
@@ -100,20 +126,27 @@ export default function UserManagement() {
             username: form.username.trim(), phone: form.phone.trim() || undefined,
             ...(superAdmin && form.companyId !== undefined ? { companyId: form.companyId } : {}),
         };
+        const rolesChanged = form.roles.length > 0
+            && (form.roles.length !== (form.originalRoles || []).length || form.roles.some((r) => !form.originalRoles.includes(r)));
         try {
             if (form.mode === 'create') {
-                await userService.create({
-                    ...fields, password: form.password, mustChangePassword: form.mustChangePassword,
-                    ...(form.roleIds.length ? { roleIds: form.roleIds } : {}),
-                });
+                // Created as Viewer, then given the chosen roles (the server checks they may be given)
+                const created = await userService.create({ ...fields, password: form.password, mustChangePassword: form.mustChangePassword });
+                if (rolesChanged) {
+                    try {
+                        await roleService.assign(created.id, form.roles);
+                    } catch (e) {
+                        toast.error(`${fields.firstName} was added as Viewer, but their roles weren't set: ${errorMessage(e, 'try again from Change roles.')}`);
+                        setForm(null);
+                        await load();
+                        return;
+                    }
+                }
                 toast.success(`${fields.firstName} ${fields.lastName} added`);
             } else {
-                await userService.update(form.id, fields);
-                const added = form.roleIds.filter((id) => !form.originalRoleIds.includes(id));
-                const removed = form.originalRoleIds.filter((id) => !form.roleIds.includes(id));
-                if (added.length) await userService.assignRoles(form.id, added);
-                for (const id of removed) await userService.removeRole(form.id, id);
-                toast.success('User updated');
+                if (form.mode === 'edit') await userService.update(form.id, fields);
+                if (rolesChanged) await roleService.assign(form.id, form.roles);
+                toast.success(form.mode === 'roles' ? 'Roles updated' : 'User updated');
             }
             setForm(null);
             await load();
@@ -142,7 +175,8 @@ export default function UserManagement() {
         const name = [u.firstName, u.lastName].filter(Boolean).join(' ') || u.username;
         const items = [];
         const isMe = u.id === me?.id;
-        if (superAdmin) items.push({ label: 'Edit details and roles', onClick: () => openEdit(u) });
+        if (superAdmin) items.push({ label: canAssign ? 'Edit details and roles' : 'Edit details', onClick: () => openEdit(u) });
+        else if (canAssign) items.push({ label: 'Change roles', onClick: () => openEdit(u, 'roles') });
         items.push({ label: 'Unlock sign-in', onClick: () => setConfirm({ title: `Unlock ${name}?`, caption: 'Clears a lock from too many failed sign-in attempts.', action: () => userService.unlock(u.id), done: `${name} unlocked` }) });
         if (superAdmin && !isMe) {
             items.push({ label: 'Sign out everywhere', onClick: () => setConfirm({ title: `Sign ${name} out everywhere?`, caption: 'Every open session ends; they can sign in again straight away.', action: () => userService.signOutEverywhere(u.id), done: `${name} signed out` }) });
@@ -173,10 +207,19 @@ export default function UserManagement() {
                     <h1>User management</h1>
                     <p>{superAdmin ? 'Everyone who can sign in to the console, across companies.' : 'Everyone in your company who can sign in to the console.'}</p>
                 </div>
-                <div className="head-actions">
-                    <button className="btn btn--primary btn--sm" onClick={openCreate}><UserPlus size={15} /> Add user</button>
-                </div>
+                {tab === 'team' && (
+                    <div className="head-actions">
+                        <button className="btn btn--primary btn--sm" onClick={openCreate}><UserPlus size={15} /> Add user</button>
+                    </div>
+                )}
             </div>
+
+            <div className="page-tabs" role="tablist">
+                <button role="tab" aria-selected={tab === 'team'} className={tab === 'team' ? 'is-active' : ''} onClick={() => setTab('team')}>Team</button>
+                <button role="tab" aria-selected={tab === 'roles'} className={tab === 'roles' ? 'is-active' : ''} onClick={() => setTab('roles')}>Roles</button>
+            </div>
+
+            {tab === 'roles' ? <RolesPanel canEdit={canAssign} isStaff={isStaff} companies={companies} /> : (<>
 
             <div className="filter-bar">
                 <div className="search-input">
@@ -215,7 +258,7 @@ export default function UserManagement() {
                                                         </div>
                                                     </td>
                                                     {superAdmin && <td>{u.companyId ? companyName(u.companyId) || '—' : <span className="name-secondary">Intact ID</span>}</td>}
-                                                    <td><div className="head-actions" style={{ flexWrap: 'wrap', gap: 4 }}>{(u.roles || []).map((r) => <span key={r} className="role-chip">{humanize(normalizeRole(r))}</span>)}</div></td>
+                                                    <td><div className="head-actions" style={{ flexWrap: 'wrap', gap: 4 }}>{(u.roles || []).map((r) => <span key={r} className="role-chip">{roleLabel(r)}</span>)}</div></td>
                                                     <td>
                                                         <Badge kind={STATUS_BADGE[u.status] || 'neutral'}>{humanize(u.status)}</Badge>
                                                         {u.mustChangePassword && <div className="name-secondary">Must change password</div>}
@@ -239,11 +282,13 @@ export default function UserManagement() {
                 )}
             </div>
 
+            </>)}
+
             <Modal
                 isOpen={!!form}
                 onClose={() => setForm(null)}
                 size="lg"
-                title={form?.mode === 'create' ? 'Add user' : 'Edit user'}
+                title={form?.mode === 'create' ? 'Add user' : form?.mode === 'roles' ? `Roles of ${form?.firstName || form?.username}` : 'Edit user'}
                 caption={form?.mode === 'create' ? 'They sign in with the username and temporary password below. Share them securely.' : undefined}
                 footer={(
                     <>
@@ -254,6 +299,7 @@ export default function UserManagement() {
             >
                 {form && (
                     <div className="form-grid">
+                        {form.mode !== 'roles' && (<>
                         <div className="field"><label>First name</label><input className="input" value={form.firstName} onChange={(e) => setForm({ ...form, firstName: e.target.value })} autoFocus /></div>
                         <div className="field"><label>Last name</label><input className="input" value={form.lastName} onChange={(e) => setForm({ ...form, lastName: e.target.value })} /></div>
                         <div className="field"><label>Email</label>
@@ -283,19 +329,20 @@ export default function UserManagement() {
                                 <label className="checkbox-row"><input type="checkbox" checked={form.mustChangePassword} onChange={(e) => setForm({ ...form, mustChangePassword: e.target.checked })} /><span>Ask them to choose a new password when they first sign in</span></label>
                             </div>
                         )}
-                        {superAdmin && roles.length > 0 && (
+                        </>)}
+                        {canAssign && roles.length > 0 && (
                             <div className="field form-grid-full">
                                 <label>Roles</label>
                                 <div className="role-options">
                                     {roles.map((r) => (
-                                        <label key={r.id} className="checkbox-row" title={r.description}>
-                                            <input type="checkbox" checked={form.roleIds.includes(r.id)}
-                                                onChange={(e) => setForm({ ...form, roleIds: e.target.checked ? [...form.roleIds, r.id] : form.roleIds.filter((id) => id !== r.id) })} />
-                                            <span><strong>{humanize(normalizeRole(r.name))}</strong> <span className="name-secondary">{r.description}</span></span>
+                                        <label key={r.name} className="checkbox-row" title={r.description}>
+                                            <input type="checkbox" checked={form.roles.includes(r.name)}
+                                                onChange={(e) => setForm({ ...form, roles: e.target.checked ? [...form.roles, r.name] : form.roles.filter((n) => n !== r.name) })} />
+                                            <span><strong>{r.label}</strong> <span className="name-secondary">{r.description}</span></span>
                                         </label>
                                     ))}
                                 </div>
-                                {form.mode === 'create' && !form.roleIds.length && <span className="name-secondary">No role ticked: they get read-only access (Viewer).</span>}
+                                {form.mode === 'create' && !form.roles.length && <span className="name-secondary">No role ticked: they get read-only access (Viewer).</span>}
                             </div>
                         )}
                         {formError && <div className="field-error form-grid-full">{formError}</div>}
