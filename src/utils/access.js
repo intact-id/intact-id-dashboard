@@ -16,6 +16,8 @@ const ACCESS = {
     webhooks: 'webhooks:view',
     logs: 'audit:view',
     users: 'users:view',
+    'users.roles': 'roles:manage',
+    'api.manage': 'apikeys:manage',
     notifications: null,
     'kyc-reviews': 'reviews:view',
     applications: 'applications:view',

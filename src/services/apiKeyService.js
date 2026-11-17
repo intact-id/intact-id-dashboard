@@ -34,6 +34,12 @@ const apiKeyService = {
         return unwrap(await api.post(`/api/companies/${companyId}/credentials/activate`));
     },
 
+    // What the key may do: 'FULL', 'VERIFY' (sessions, submitting verifications, reading results) or 'READ_ONLY'.
+    // Access tokens already issued keep their level until they expire.
+    async setAccess(companyId, access) {
+        return unwrap(await api.put('/api/companies/api-keys/access', { access }, { params: { companyId } }));
+    },
+
     // Super admin only. limits = { perHour, perDay, perMonth }; a negative value removes that limit.
     async updateRateLimits(companyId, limits) {
         return unwrap(await api.put(`/api/companies/${companyId}/rate-limits`, limits));
