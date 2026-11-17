@@ -142,7 +142,7 @@ export default function RolesPanel({ canEdit, isStaff, companies }) {
             </Modal>
 
             <Modal isOpen={!!form} onClose={() => setForm(null)} size="lg" title={form?.name ? 'Edit role' : 'New role'}
-                caption="A role can only include what you can do yourself. Changes apply to everyone holding it at their next sign-in."
+                caption="A role can only include what you can do yourself. Changes apply straight away to everyone holding it."
                 footer={(
                     <>
                         <button className="btn btn--secondary" onClick={() => setForm(null)} disabled={busy}>Cancel</button>
