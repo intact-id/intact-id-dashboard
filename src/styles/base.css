@@ -744,3 +744,4 @@ table.data-table tbody tr:hover { background: var(--bg-soft); }
 /* A role's permissions, read-only */
 .role-perms { margin: 0; padding-left: 18px; font-size: 13.5px; color: var(--ink-body, var(--ink)); columns: 2; column-gap: 24px; }
 @media (max-width: 640px) { .role-perms { columns: 1; } }
+.dropzone.is-dragging { outline: 2px dashed var(--accent); outline-offset: -6px; background: var(--accent-soft); }
